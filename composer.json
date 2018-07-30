@@ -1,0 +1,37 @@
+{
+    "name": "easyengine/site-command",
+    "description": "",
+    "type": "ee-cli-package",
+    "homepage": "https://github.com/easyengine/site-command",
+    "license": "MIT",
+    "authors": [],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {
+            "": "src/",
+            "AcmePhp\\Cli\\": "AcmePhp/Cli"
+        },
+        "files": [ "site-command.php" ]
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.x-dev"
+        },
+        "bundled": true,
+        "commands": [
+            "site",
+            "site create",
+            "site list",
+            "site delete"
+        ]
+    },
+    "require": {
+        "acmephp/core": "dev-master",
+        "ext-openssl": "*",
+        "guzzlehttp/guzzle": "^6.0",
+        "league/flysystem": "^1.0.19",
+        "symfony/serializer": "^3.0",
+        "webmozart/assert": "^1.0"
+    }
+}
