@@ -390,18 +390,14 @@ class Site_WP_Command extends EE_Site_Command {
 		$core_download_arguments = '';
 		if ( ! empty( $assoc_args ) ) {
 			foreach ( $assoc_args as $key => $value ) {
-				if ( in_array( $key, $core_download_args, true ) ) {
-					$core_download_arguments .= ' --' . $key . '=' . $value;
-				}
+				$core_download_arguments .= in_array( $key, $core_download_args, true ) ? ' --' . $key . '=' . $value : '';
 			}
 		}
 
 		$config_arguments = '';
 		if ( ! empty( $assoc_args ) ) {
 			foreach ( $assoc_args as $key => $value ) {
-				if ( in_array( $key, $config_args, true ) ) {
-					$config_arguments .= ' --' . $key . '=' . $value;
-				}
+				$core_download_arguments .= in_array( $key, $config_args, true ) ? ' --' . $key . '=' . $value : '';
 			}
 		}
 
@@ -692,16 +688,15 @@ class Site_WP_Command extends EE_Site_Command {
 	 * Shutdown function to catch and rollback from fatal errors.
 	 */
 	private function shutDownFunction() {
+
 		$error = error_get_last();
-		if ( isset( $error ) ) {
-			if ( $error['type'] === E_ERROR ) {
-				EE::warning( 'An Error occurred. Initiating clean-up.' );
-				$this->logger->error( 'Type: ' . $error['type'] );
-				$this->logger->error( 'Message: ' . $error['message'] );
-				$this->logger->error( 'File: ' . $error['file'] );
-				$this->logger->error( 'Line: ' . $error['line'] );
-				$this->rollback();
-			}
+		if ( isset( $error ) && $error['type'] === E_ERROR ) {
+			EE::warning( 'An Error occurred. Initiating clean-up.' );
+			$this->logger->error( 'Type: ' . $error['type'] );
+			$this->logger->error( 'Message: ' . $error['message'] );
+			$this->logger->error( 'File: ' . $error['file'] );
+			$this->logger->error( 'Line: ' . $error['line'] );
+			$this->rollback();
 		}
 	}
 }
