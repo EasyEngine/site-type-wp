@@ -401,7 +401,7 @@ class Site_WP_Command extends EE_Site_Command {
 		$config_arguments = '';
 		if ( ! empty( $assoc_args ) ) {
 			foreach ( $assoc_args as $key => $value ) {
-				$core_download_arguments .= in_array( $key, $config_args, true ) ? ' --' . $key . '=' . $value : '';
+				$config_arguments .= in_array( $key, $config_args, true ) ? ' --' . $key . '=' . $value : '';
 			}
 		}
 
@@ -563,27 +563,6 @@ class Site_WP_Command extends EE_Site_Command {
 	}
 
 	/**
-	 * @inheritdoc
-	 */
-	public function _list( $args, $assoc_args ) {
-		parent::_list( $args, $assoc_args );
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	public function delete( $args, $assoc_args ) {
-		parent::delete( $args, $assoc_args );
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	public function delete_site( $level, $site_name, $site_root ) {
-		parent::delete_site( $level, $site_name, $site_root );
-	}
-
-	/**
 	 * Restarts containers associated with site.
 	 * When no service(--nginx etc.) is specified, all site containers will be restarted.
 	 *
@@ -627,35 +606,6 @@ class Site_WP_Command extends EE_Site_Command {
 		$whitelisted_containers = [ 'nginx', 'php' ];
 		$reload_commands['php'] = 'php kill -USR2 1';
 		parent::reload( $args, $assoc_args, $whitelisted_containers, $reload_commands );
-	}
-
-
-	/**
-	 * @inheritdoc
-	 */
-	public function up( $args, $assoc_args ) {
-		parent::up( $args, $assoc_args );
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	public function down( $args, $assoc_args ) {
-		parent::down( $args, $assoc_args );
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	public function init_le( $site_name, $site_root, $wildcard = false ) {
-		return parent::init_le( $site_name, $site_root, $wildcard );
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	public function le( $args = [], $assoc_args = [], $wildcard = false ) {
-		return parent::le( $args, $assoc_args, $wildcard );
 	}
 
 
