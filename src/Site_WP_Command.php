@@ -2,6 +2,9 @@
 
 declare( ticks=1 );
 
+
+use \Symfony\Component\Filesystem\Filesystem;
+
 /**
  * Creates a simple WordPress Website.
  *
@@ -12,23 +15,65 @@ declare( ticks=1 );
  *
  * @package ee-cli
  */
-
-use \Symfony\Component\Filesystem\Filesystem;
-
 class Site_WP_Command extends EE_Site_Command {
+
+	/**
+	 * @var string $command Name of the command being run.
+	 */
 	private $command;
+
+	/**
+	 * @var array $site Associative array containing essential site related information.
+	 */
 	private $site;
+
+	/**
+	 * @var string $proxy_type Name of the reverse proxy used.
+	 */
 	private $proxy_type;
+	/**
+	 * @var string $cache_type Type of caching being used.
+	 */
 	private $cache_type;
+	/**
+	 * @var array $db Associative array containing essential site database related information.
+	 */
 	private $db;
+	/**
+	 * @var object $docker Object to access `EE::docker()` functions.
+	 */
 	private $docker;
+	/**
+	 * @var int $level The level of creation in progress. Essential for rollback in case of failure.
+	 */
 	private $level;
+	/**
+	 * @var object $logger Object of logger.
+	 */
 	private $logger;
+	/**
+	 * @var bool $le Whether the site is letsencrypt or not.
+	 */
 	private $le;
+	/**
+	 * @var string $locale Language to install WordPress in.
+	 */
 	private $locale;
+	/**
+	 * @var bool $skip_install To skip installation of WordPress.
+	 */
 	private $skip_install;
+	/**
+	 * @var bool $skip_chk To skip site status check pre-installation.
+	 */
 	private $skip_chk;
+	/**
+	 * @var bool $force To reset remote database.
+	 */
 	private $force;
+	/**
+	 * @var Filesystem $fs Symfony Filesystem object.
+	 */
 	private $fs;
 
 	public function __construct() {
@@ -284,9 +329,11 @@ class Site_WP_Command extends EE_Site_Command {
 	/**
 	 * Function to generate default.conf from mustache templates.
 	 *
-	 * @param string $site_type   Type of site (wpsubdom, wpredis etc..)
-	 * @param string $cache_type  Type of cache(wpredis or none)
-	 * @param string $server_name Name of server to use in virtual_host
+	 * @param string $site_type   Type of site (wpsubdom, wpredis etc..).
+	 * @param string $cache_type  Type of cache(wpredis or none).
+	 * @param string $server_name Name of server to use in virtual_host.
+	 *
+	 * @return string Parsed mustache template string output.
 	 */
 	private function generate_default_conf( $site_type, $cache_type, $server_name ) {
 
@@ -365,6 +412,9 @@ class Site_WP_Command extends EE_Site_Command {
 		$this->create_site_db_entry();
 	}
 
+	/**
+	 * Download and configure WordPress according to the user passed parameters.
+	 */
 	private function wp_download_and_config( $assoc_args ) {
 
 		$core_download_args = [
