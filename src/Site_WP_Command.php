@@ -31,46 +31,57 @@ class Site_WP_Command extends EE_Site_Command {
 	 * @var string $proxy_type Name of the reverse proxy used.
 	 */
 	private $proxy_type;
+
 	/**
 	 * @var string $cache_type Type of caching being used.
 	 */
 	private $cache_type;
+
 	/**
 	 * @var array $db Associative array containing essential site database related information.
 	 */
 	private $db;
+
 	/**
 	 * @var object $docker Object to access `EE::docker()` functions.
 	 */
 	private $docker;
+
 	/**
 	 * @var int $level The level of creation in progress. Essential for rollback in case of failure.
 	 */
 	private $level;
+
 	/**
 	 * @var object $logger Object of logger.
 	 */
 	private $logger;
+
 	/**
 	 * @var bool $le Whether the site is letsencrypt or not.
 	 */
 	private $le;
+
 	/**
 	 * @var string $locale Language to install WordPress in.
 	 */
 	private $locale;
+
 	/**
 	 * @var bool $skip_install To skip installation of WordPress.
 	 */
 	private $skip_install;
+
 	/**
 	 * @var bool $skip_chk To skip site status check pre-installation.
 	 */
 	private $skip_chk;
+
 	/**
 	 * @var bool $force To reset remote database.
 	 */
 	private $force;
+
 	/**
 	 * @var Filesystem $fs Symfony Filesystem object.
 	 */
@@ -186,7 +197,7 @@ class Site_WP_Command extends EE_Site_Command {
 		}
 
 		if ( EE::db()::site_in_db( $this->site['name'] ) ) {
-			EE::error( sprintf( 'Site %1$s already exists. If you want to re-create it please delete the older one using:\n`ee site delete %1$s`', $this->site['name'] ) );
+			EE::error( sprintf( "Site %1\$s already exists. If you want to re-create it please delete the older one using:\n`ee site delete %1\$s`", $this->site['name'] ) );
 		}
 
 		$this->proxy_type      = EE_PROXY_TYPE;
