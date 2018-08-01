@@ -26,7 +26,7 @@ Feature: Site Command
     """
 
   Scenario: Create wp site successfully
-    When I run 'sudo bin/ee site create wp.test --wp'
+    When I run 'sudo bin/ee site create wp.test --type=wp'
     Then The site 'wp.test' should have webroot
       And The site 'wp.test' should have WordPress
       And Request on 'wp.test' should contain following headers:
@@ -34,7 +34,7 @@ Feature: Site Command
         | HTTP/1.1 200 OK  |
 
   Scenario: Create wpsubdir site successfully
-    When I run 'sudo bin/ee site create wpsubdir.test --wpsubdir'
+    When I run 'sudo bin/ee site create wpsubdir.test --type=wp --wpsubdir'
       And I create subsite '1' in 'wpsubdir.test'
     Then The site 'wpsubdir.test' should have webroot
       And The site 'wpsubdir.test' should have WordPress
@@ -44,7 +44,7 @@ Feature: Site Command
         | HTTP/1.1 200 OK  |
 
   Scenario: Create wpsubdom site successfully
-    When I run 'sudo bin/ee site create wpsubdom.test --wpsubdom'
+    When I run 'sudo bin/ee site create wpsubdom.test --type=wp --wpsubdom'
       And I create subsite '1' in 'wpsubdom.test'
     Then The site 'wpsubdom.test' should have webroot
       And The site 'wpsubdom.test' should have WordPress
