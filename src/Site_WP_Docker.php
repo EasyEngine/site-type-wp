@@ -23,10 +23,10 @@ class Site_WP_Docker {
 		$db['service_name'] = [ 'name' => 'db' ];
 		$db['image']        = [ 'name' => 'easyengine/mariadb:v' . EE_VERSION ];
 		$db['restart']      = $restart_default;
-		$db['labels']      = [
-				'label' => [
-					'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
-				],
+		$db['labels']       = [
+			'label' => [
+				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
+			],
 		];
 		$db['volumes']      = [
 			[
@@ -49,10 +49,10 @@ class Site_WP_Docker {
 		$php['image']        = [ 'name' => 'easyengine/php:v' . EE_VERSION ];
 		$php['depends_on']   = [ 'name' => 'db' ];
 		$php['restart']      = $restart_default;
-		$php['labels']      = [
-				'label' => [
-					'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
-				],
+		$php['labels']       = [
+			'label' => [
+				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
+			],
 		];
 		$php['volumes']      = [
 			[
@@ -81,7 +81,7 @@ class Site_WP_Docker {
 		$nginx['depends_on']   = [ 'name' => 'php' ];
 		$nginx['restart']      = $restart_default;
 
-		$v_host = in_array ( 'wpsubdom', $filters, true ) ? 'VIRTUAL_HOST=${VIRTUAL_HOST},*.${VIRTUAL_HOST}' : 'VIRTUAL_HOST';
+		$v_host = in_array( 'wpsubdom', $filters, true ) ? 'VIRTUAL_HOST=${VIRTUAL_HOST},*.${VIRTUAL_HOST}' : 'VIRTUAL_HOST';
 
 		$nginx['environment'] = [
 			'env' => [
@@ -99,9 +99,9 @@ class Site_WP_Docker {
 			],
 		];
 		$nginx['labels']      = [
-				'label' => [
-					'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
-				],
+			'label' => [
+				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
+			],
 		];
 		$nginx['networks']    = $network_default;
 
@@ -116,10 +116,10 @@ class Site_WP_Docker {
 				[ 'name' => 'VIRTUAL_PATH=/ee-admin/pma/' ],
 			],
 		];
-		$phpmyadmin['labels']      = [
-				'label' => [
-					'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
-				],
+		$phpmyadmin['labels']       = [
+			'label' => [
+				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
+			],
 		];
 		$phpmyadmin['networks']     = $network_default;
 
@@ -135,24 +135,24 @@ class Site_WP_Docker {
 				[ 'name' => 'VIRTUAL_PORT=8025' ],
 			],
 		];
-		$mailhog['labels']      = [
-				'label' => [
-					'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
-				],
+		$mailhog['labels']       = [
+			'label' => [
+				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
+			],
 		];
 		$mailhog['networks']     = $network_default;
 
 		// redis configuration.
 		$redis['service_name'] = [ 'name' => 'redis' ];
 		$redis['image']        = [ 'name' => 'easyengine/redis:v' . EE_VERSION ];
-		$redis['labels']      = [
-				'label' => [
-					'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
-				],
+		$redis['labels']       = [
+			'label' => [
+				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
+			],
 		];
 		$redis['networks']     = $network_default;
 
-		if ( in_array ( 'db', $filters, true ) ) {
+		if ( in_array( 'db', $filters, true ) ) {
 			$base[] = $db;
 		}
 
@@ -161,7 +161,7 @@ class Site_WP_Docker {
 		$base[] = $mailhog;
 		$base[] = $phpmyadmin;
 
-		if ( in_array ( 'wpredis', $filters, true ) ) {
+		if ( in_array( 'wpredis', $filters, true ) ) {
 			$base[] = $redis;
 		}
 
