@@ -1,16 +1,8 @@
 Feature: Site Command
 
-  Scenario: ee throws error when run without root
-    Given 'bin/ee' is installed
-    When I run 'bin/ee'
-    Then STDERR should return exactly
-    """
-    Error: Please run `ee` with root privileges.
-    """
-
   Scenario: ee executable is command working correctly
     Given 'bin/ee' is installed
-    When I run 'sudo bin/ee'
+    When I run 'bin/ee'
     Then STDOUT should return something like
     """
     NAME
@@ -19,14 +11,14 @@ Feature: Site Command
     """
 
   Scenario: Check site command is present
-    When I run 'sudo bin/ee site'
+    When I run 'bin/ee site'
     Then STDOUT should return something like
     """
     usage: ee site
     """
 
   Scenario: Create wp site successfully
-    When I run 'sudo bin/ee site create wp.test --type=wp'
+    When I run 'bin/ee site create wp.test --type=wp'
     Then The site 'wp.test' should have webroot
       And The site 'wp.test' should have WordPress
       And Request on 'wp.test' should contain following headers:
@@ -34,7 +26,7 @@ Feature: Site Command
         | HTTP/1.1 200 OK  |
 
   Scenario: Create wpsubdir site successfully
-    When I run 'sudo bin/ee site create wpsubdir.test --type=wp --wpsubdir'
+    When I run 'bin/ee site create wpsubdir.test --type=wp --wpsubdir'
       And I create subsite '1' in 'wpsubdir.test'
     Then The site 'wpsubdir.test' should have webroot
       And The site 'wpsubdir.test' should have WordPress
@@ -44,7 +36,7 @@ Feature: Site Command
         | HTTP/1.1 200 OK  |
 
   Scenario: Create wpsubdom site successfully
-    When I run 'sudo bin/ee site create wpsubdom.test --type=wp --wpsubdom'
+    When I run 'bin/ee site create wpsubdom.test --type=wp --wpsubdom'
       And I create subsite '1' in 'wpsubdom.test'
     Then The site 'wpsubdom.test' should have webroot
       And The site 'wpsubdom.test' should have WordPress
@@ -54,7 +46,7 @@ Feature: Site Command
         | HTTP/1.1 200 OK  |
 
   Scenario: List the sites
-    When I run 'sudo bin/ee site list --format=text'
+    When I run 'bin/ee site list --format=text'
     Then STDOUT should return exactly
     """
     wp.test
@@ -63,7 +55,7 @@ Feature: Site Command
     """
 
   Scenario: Delete the sites
-    When I run 'sudo bin/ee site delete wp.test --yes'
+    When I run 'bin/ee site delete wp.test --yes'
     Then STDOUT should return something like
     """
     Site wp.test deleted.
