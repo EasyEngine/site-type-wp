@@ -334,7 +334,7 @@ class Site_WP_Command extends EE_Site_Command {
 			$this->fs->mkdir( $site_conf_dir . '/postfix/ssl' );
 			$ssl_dir = $site_conf_dir . '/postfix/ssl';
 
-			if ( \EE\Utils\default_launch( "openssl req -new -x509 -nodes -days 365 -subj \"/CN=smtp.${this->site['name']}\" -out $ssl_dir/server.crt -keyout $ssl_dir/server.key" )
+			if ( ! \EE\Utils\default_launch( sprintf( "openssl req -new -x509 -nodes -days 365 -subj \"/CN=smtp.%s\" -out $ssl_dir/server.crt -keyout $ssl_dir/server.key", $this->site['name'] ) )
 				&& \EE\Utils\default_launch( "chmod 0600 $ssl_dir/server.key" ) ) {
 				throw new Exception( 'Unable to generate ssl key for postfix' );
 			}
