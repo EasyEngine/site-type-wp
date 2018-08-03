@@ -20,7 +20,7 @@ cp -R ../$TEST_COMMAND/features .
 composer update
 
 # Place the command inside EE repo
-rm -r vendor/easyengine/$TEST_COMMAND
+sudo rm -r vendor/easyengine/$TEST_COMMAND
 cp -R ../$TEST_COMMAND vendor/easyengine/
 
 # Create phar and test it
