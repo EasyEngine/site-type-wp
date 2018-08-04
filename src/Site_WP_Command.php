@@ -320,7 +320,7 @@ class Site_WP_Command extends EE_Site_Command {
 		$env_content     = EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/.env.mustache', $env_data );
 		$php_ini_content = EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/php-fpm/php.ini.mustache', [] );
 
-		EE\Siteutils\add_site_redirects( $this->site['name'], $this->le );
+		EE\SiteUtils\add_site_redirects( $this->site['name'], $this->le );
 
 		try {
 			$this->fs->dumpFile( $site_docker_yml, $docker_compose_content );
@@ -330,14 +330,8 @@ class Site_WP_Command extends EE_Site_Command {
 			$this->fs->dumpFile( $site_nginx_default_conf, $default_conf_content );
 			$this->fs->mkdir( $site_conf_dir . '/php-fpm' );
 			$this->fs->dumpFile( $site_php_ini, $php_ini_content );
-			$this->fs->mkdir( $site_conf_dir . '/postfix' );
-			$this->fs->mkdir( $site_conf_dir . '/postfix/ssl' );
-			$ssl_dir = $site_conf_dir . '/postfix/ssl';
 
-			if ( ! EE::exec( sprintf( "openssl req -new -x509 -nodes -days 365 -subj \"/CN=smtp.%s\" -out $ssl_dir/server.crt -keyout $ssl_dir/server.key", $this->site['name'] ) )
-				&& EE::exec( "chmod 0600 $ssl_dir/server.key" ) ) {
-				throw new Exception( 'Unable to generate ssl key for postfix' );
-			}
+			EE\SiteUtils\set_postfix_files( $this->site['name'], $site_conf_dir );
 
 			EE::success( 'Configuration files copied.' );
 		} catch ( Exception $e ) {
@@ -401,22 +395,22 @@ class Site_WP_Command extends EE_Site_Command {
 		$this->site['root'] = WEBROOT . $this->site['name'];
 		$this->level        = 1;
 		try {
-			EE\Siteutils\create_site_root( $this->site['root'], $this->site['name'] );
+			EE\SiteUtils\create_site_root( $this->site['root'], $this->site['name'] );
 			$this->level = 2;
-			EE\Siteutils\setup_site_network( $this->site['name'] );
+			EE\SiteUtils\setup_site_network( $this->site['name'] );
 			$this->maybe_verify_remote_db_connection();
 			$this->level = 3;
 			$this->configure_site_files();
 
-			EE\Siteutils\start_site_containers( $this->site['root'] );
-
+			EE\SiteUtils\start_site_containers( $this->site['root'] );
+			EE\SiteUtils\configure_postfix( $this->site['name'], $this->site['root'] );
 			$this->wp_download_and_config( $assoc_args );
 
 			if ( ! $this->skip_install ) {
-				EE\Siteutils\create_etc_hosts_entry( $this->site['name'] );
+				EE\SiteUtils\create_etc_hosts_entry( $this->site['name'] );
 				if ( ! $this->skip_chk ) {
 					$this->level = 4;
-					EE\Siteutils\site_status_check( $this->site['name'] );
+					EE\SiteUtils\site_status_check( $this->site['name'] );
 				}
 				$this->install_wp();
 			}
