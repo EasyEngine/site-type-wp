@@ -376,8 +376,7 @@ class Site_WP_Command extends EE_Site_Command {
 		// The since we're inside the container and we want to access host machine,
 		// we would need to replace localhost with default gateway
 		if ( $this->db['host'] === '127.0.0.1' || $this->db['host'] === 'localhost' ) {
-			$launch = EE::launch( sprintf( "docker network inspect %s --format='{{ (index .IPAM.Config 0).Gateway }}'", $this->site['name'] ), false, true );
-			EE\Utils\default_debug( $launch );
+			EE::exec( sprintf( "docker network inspect %s --format='{{ (index .IPAM.Config 0).Gateway }}'", $this->site['name'] ), false, true );
 
 			if ( ! $launch->return_code ) {
 				$this->db['host'] = trim( $launch->stdout, "\n" );
@@ -387,7 +386,7 @@ class Site_WP_Command extends EE_Site_Command {
 		}
 		\EE::log( 'Verifying connection to remote database' );
 
-		if ( ! EE\Utils\default_launch( sprintf( "docker run -it --rm --network='%s' mysql sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"", $this->site['name'], $this->db['host'], $this->db['port'], $this->db['user'], $this->db['pass'] ) ) ) {
+		if ( ! EE::exec( sprintf( "docker run -it --rm --network='%s' mysql sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"", $this->site['name'], $this->db['host'], $this->db['port'], $this->db['user'], $this->db['pass'] ) ) ) {
 			throw new Exception( 'Unable to connect to remote db' );
 		}
 
@@ -466,10 +465,10 @@ class Site_WP_Command extends EE_Site_Command {
 		EE::log( 'Downloading and configuring WordPress.' );
 
 		$chown_command = "docker-compose exec --user=root php chown -R www-data: /var/www/";
-		EE\Utils\default_launch( $chown_command );
+		EE::exec( $chown_command );
 
 		$core_download_command = "docker-compose exec --user='www-data' php wp core download --locale='$this->locale' $core_download_arguments";
-		EE\Utils\default_launch( $core_download_command );
+		EE::exec( $core_download_command );
 
 		// TODO: Look for better way to handle mysql healthcheck
 		if ( 'db' === $this->db['host'] ) {
@@ -477,7 +476,7 @@ class Site_WP_Command extends EE_Site_Command {
 			$health_chk      = sprintf( "docker-compose exec --user='www-data' php mysql --user='root' --password='%s' --host='db' -e exit", $this->db['root_pass'] );
 			$count           = 0;
 			while ( $mysql_unhealthy ) {
-				$mysql_unhealthy = ! EE\Utils\default_launch( $health_chk );
+				$mysql_unhealthy = ! EE::exec( $health_chk );
 				if ( $count ++ > 30 ) {
 					break;
 				}
@@ -489,27 +488,27 @@ class Site_WP_Command extends EE_Site_Command {
 		$wp_config_create_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp config create --dbuser=\'%s\' --dbname=\'%s\' --dbpass=\'%s\' --dbhost=\'%s\' %s --extra-php="if ( isset( \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] ) && \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] == \'https\'){\$_SERVER[\'HTTPS\']=\'on\';}"', $this->db['user'], $this->db['name'], $this->db['pass'], $db_host, $config_arguments );
 
 		try {
-			if ( ! EE\Utils\default_launch( $wp_config_create_command ) ) {
+			if ( ! EE::exec( $wp_config_create_command ) ) {
 				throw new Exception( sprintf( 'Couldn\'t connect to %s:%s or there was issue in `wp config create`. Please check logs.', $this->db['host'], $this->db['port'] ) );
 			}
 			if ( 'db' !== $this->db['host'] ) {
 				$name            = str_replace( '_', '\_', $this->db['name'] );
 				$check_db_exists = sprintf( "docker-compose exec php bash -c \"mysqlshow --user='%s' --password='%s' --host='%s' --port='%s' '%s'", $this->db['user'], $this->db['pass'], $this->db['host'], $this->db['port'], $name );
 
-				if ( ! EE\Utils\default_launch( $check_db_exists ) ) {
+				if ( ! EE::exec( $check_db_exists ) ) {
 					EE::log( sprintf( 'Database `%s` does not exist. Attempting to create it.', $this->db['name'] ) );
 					$create_db_command = sprintf( 'docker-compose exec php bash -c "mysql --host=%s --port=%s --user=%s --password=%s --execute="CREATE DATABASE %s;"', $this->db['host'], $this->db['port'], $this->db['user'], $this->db['pass'], $this->db['name'] );
 
-					if ( ! EE\Utils\default_launch( $create_db_command ) ) {
+					if ( ! EE::exec( $create_db_command ) ) {
 						throw new Exception( sprintf( 'Could not create database `%s` on `%s:%s`. Please check if %s has rights to create database or manually create a database and pass with `--dbname` parameter.', $this->db['name'], $this->db['host'], $this->db['port'], $this->db['user'] ) );
 					}
 					$this->level = 4;
 				} else {
 					if ( $this->force ) {
-						EE\Utils\default_launch( 'docker-compose exec --user=\'www-data\' php wp db reset --yes' );
+						EE::exec( 'docker-compose exec --user=\'www-data\' php wp db reset --yes' );
 					}
 					$check_tables = 'docker-compose exec --user=\'www-data\' php wp db tables';
-					if ( EE\Utils\default_launch( $check_tables ) ) {
+					if ( EE::exec( $check_tables ) ) {
 						throw new Exception( 'WordPress tables already seem to exist. Please backup and reset the database or use `--force` in the site create command to reset it.' );
 					}
 				}
@@ -540,7 +539,7 @@ class Site_WP_Command extends EE_Site_Command {
 		$install_command .= $this->site['pass'] ? sprintf( ' --admin_password=\'%s\'', $this->site['pass'] ) : '';
 		$install_command .= sprintf( ' --admin_email=\'%s\' %s', $this->site['email'], $maybe_multisite_type );
 
-		$core_install = EE\Utils\default_launch( $install_command );
+		$core_install = EE::exec( $install_command );
 
 		if ( ! $core_install ) {
 			EE::warning( 'WordPress install failed. Please check logs.' );
