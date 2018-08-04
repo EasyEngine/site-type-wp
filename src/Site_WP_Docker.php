@@ -143,24 +143,22 @@ class Site_WP_Docker {
 		$mailhog['networks']     = $network_default;
 
 		// postfix configuration.
-		$postfix['service_name'] = array( 'name' => 'postfix' );
-		$postfix['image']      = array( 'name' => 'easyengine/postfix:v' . EE_VERSION );
-		$postfix['hostname']        = array( 'name' => '${VIRTUAL_HOST}' );
+		$postfix['service_name'] = [ 'name' => 'postfix' ];
+		$postfix['image']        = [ 'name' => 'easyengine/postfix:v' . EE_VERSION ];
+		$postfix['hostname']     = [ 'name' => '${VIRTUAL_HOST}' ];
 		$postfix['restart']      = $restart_default;
-		$postfix['labels']      = array(
-			array(
-				'label' => array(
-					'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
-				),
-			),
-		);
-		$postfix['volumes']     = array(
-			'vol' => array(
-				array( 'name' => '/dev/log:/dev/log' ),
-				array( 'name' => './config/postfix/ssl:/etc/ssl/postfix' ),
-				array( 'name' => './app/postfix/spool:/var/spool/postfix' ),
-			),
-		);
+		$postfix['labels']       = [
+			'label' => [
+				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
+			],
+		];
+		$postfix['volumes']      = [
+			'vol' => [
+				[ 'name' => '/dev/log:/dev/log' ],
+				[ 'name' => './config/postfix/ssl:/etc/ssl/postfix' ],
+				[ 'name' => './app/postfix/spool:/var/spool/postfix' ],
+			],
+		];
 		$postfix['networks']     = $network_default;
 
 
