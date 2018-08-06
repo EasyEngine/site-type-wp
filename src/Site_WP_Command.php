@@ -254,7 +254,6 @@ class Site_WP_Command extends EE_Site_Command {
 		$info   = [
 			[ 'Site', $prefix . $this->site['name'] ],
 			[ 'Access phpMyAdmin', $prefix . $this->site['name'] . '/ee-admin/pma/' ],
-			[ 'Access mailhog', $prefix . $this->site['name'] . '/ee-admin/mailhog/' ],
 			[ 'Site Title', $this->site['title'] ],
 			[ 'DB Root Password', $this->db['root_pass'] ],
 			[ 'DB Name', $this->db['name'] ],
@@ -655,7 +654,7 @@ class Site_WP_Command extends EE_Site_Command {
 	 */
 	public function reload( $args, $assoc_args, $whitelisted_containers = [], $reload_commands = [] ) {
 		$whitelisted_containers = [ 'nginx', 'php' ];
-		$reload_commands['php'] = 'php kill -USR2 1';
+		$reload_commands['php'] = 'kill -USR2 1';
 		parent::reload( $args, $assoc_args, $whitelisted_containers, $reload_commands );
 	}
 
