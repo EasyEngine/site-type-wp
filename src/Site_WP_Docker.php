@@ -158,7 +158,7 @@ class Site_WP_Docker {
 
 		$base[] = $php;
 		$base[] = $nginx;
-		$base[] = $mailhog;
+		//$base[] = $mailhog;
 		$base[] = $phpmyadmin;
 
 		if ( in_array( 'wpredis', $filters, true ) ) {
