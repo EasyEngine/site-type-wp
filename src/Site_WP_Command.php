@@ -112,13 +112,14 @@ class Site_WP_Command extends EE_Site_Command {
 	 * [--wp]
 	 * : WordPress website.
 	 *
-	 * [--wpredis]
-	 * : Use redis for WordPress.
+	 * [--cache]
+	 * : Use redis cache for WordPress.
 	 *
-	 * [--wpsubdir]
+	 *
+	 * [--mu=<subdir>]
 	 * : WordPress sub-dir Multi-site.
 	 *
-	 * [--wpsubdom]
+	 * [--mu=<subdom>]
 	 * : WordPress sub-domain Multi-site.
 	 *
 	 * [--title=<title>]
@@ -191,17 +192,20 @@ class Site_WP_Command extends EE_Site_Command {
 		$this->logger->debug( 'args:', $args );
 		$this->logger->debug( 'assoc_args:', empty( $assoc_args ) ? array( 'NULL' ) : $assoc_args );
 		$this->site['name'] = strtolower( EE\Utils\remove_trailing_slash( $args[0] ) );
-		$this->site['type'] = EE\Utils\get_type( $assoc_args, [ 'wp', 'wpsubdom', 'wpsubdir' ], 'wp' );
-		if ( false === $this->site['type'] ) {
-			EE::error( 'Invalid arguments' );
+
+		$mu = EE\Utils\get_flag_value( $assoc_args, 'mu' );
+
+		if ( isset( $assoc_args['mu'] ) && ! in_array( $mu, [ 'subdom', 'subdir' ], true ) ) {
+			EE::error( "Unrecognized multi-site parameter: $mu. Only `--mu=subdom` and `--mu=subdir` are supported." );
 		}
+		$this->site['type'] = $mu ?? 'wp';
 
 		if ( EE::db()::site_in_db( $this->site['name'] ) ) {
 			EE::error( sprintf( "Site %1\$s already exists. If you want to re-create it please delete the older one using:\n`ee site delete %1\$s`", $this->site['name'] ) );
 		}
 
 		$this->proxy_type      = EE_PROXY_TYPE;
-		$this->cache_type      = empty( $assoc_args['wpredis'] ) ? 'none' : 'wpredis';
+		$this->cache_type      = EE\Utils\get_flag_value( $assoc_args, 'cache' );
 		$this->le              = EE\Utils\get_flag_value( $assoc_args, 'letsencrypt' );
 		$this->site['title']   = EE\Utils\get_flag_value( $assoc_args, 'title', $this->site['name'] );
 		$this->site['user']    = EE\Utils\get_flag_value( $assoc_args, 'admin_user', 'admin' );
@@ -260,7 +264,7 @@ class Site_WP_Command extends EE_Site_Command {
 			[ 'DB User', $this->db['user'] ],
 			[ 'DB Password', $this->db['pass'] ],
 			[ 'E-Mail', $this->site['email'] ],
-			[ 'Cache Type', $this->cache_type ],
+			[ 'Cache', $this->cache_type ? 'Enabled' : 'none' ],
 			[ 'SSL', $ssl ],
 		];
 
@@ -284,7 +288,7 @@ class Site_WP_Command extends EE_Site_Command {
 		$site_conf_env           = $this->site['root'] . '/.env';
 		$site_nginx_default_conf = $site_conf_dir . '/nginx/default.conf';
 		$site_php_ini            = $site_conf_dir . '/php-fpm/php.ini';
-		$server_name             = ( 'wpsubdom' === $this->site['type'] ) ? $this->site['name'] . ' *.' . $this->site['name'] : $this->site['name'];
+		$server_name             = ( 'subdom' === $this->site['type'] ) ? $this->site['name'] . ' *.' . $this->site['name'] : $this->site['name'];
 		$process_user            = posix_getpwuid( posix_geteuid() );
 
 		EE::log( 'Creating WordPress site ' . $this->site['name'] );
@@ -292,7 +296,7 @@ class Site_WP_Command extends EE_Site_Command {
 
 		$filter                 = [];
 		$filter[]               = $this->site['type'];
-		$filter[]               = $this->cache_type;
+		$filter[]               = $this->cache_type ? 'redis' : 'none';
 		$filter[]               = $this->le;
 		$filter[]               = $this->db['host'];
 		$site_docker            = new Site_WP_Docker();
@@ -339,9 +343,9 @@ class Site_WP_Command extends EE_Site_Command {
 	/**
 	 * Function to generate default.conf from mustache templates.
 	 *
-	 * @param string $site_type   Type of site (wpsubdom, wpredis etc..).
-	 * @param string $cache_type  Type of cache(wpredis or none).
-	 * @param string $server_name Name of server to use in virtual_host.
+	 * @param string  $site_type   Type of site (subdom, subdir etc..).
+	 * @param boolean $cache_type  Cache enabled or not.
+	 * @param string  $server_name Name of server to use in virtual_host.
 	 *
 	 * @return string Parsed mustache template string output.
 	 */
@@ -349,9 +353,9 @@ class Site_WP_Command extends EE_Site_Command {
 
 		$default_conf_data['site_type']             = $site_type;
 		$default_conf_data['server_name']           = $server_name;
-		$default_conf_data['include_php_conf']      = $cache_type !== 'wpredis';
-		$default_conf_data['include_wpsubdir_conf'] = $site_type === 'wpsubdir';
-		$default_conf_data['include_redis_conf']    = $cache_type === 'wpredis';
+		$default_conf_data['include_php_conf']      = ! $cache_type;
+		$default_conf_data['include_wpsubdir_conf'] = $site_type === 'subdir';
+		$default_conf_data['include_redis_conf']    = $cache_type;
 
 		return EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/nginx/default.conf.mustache', $default_conf_data );
 	}
@@ -415,7 +419,8 @@ class Site_WP_Command extends EE_Site_Command {
 		}
 
 		if ( $this->le ) {
-			$this->init_le();
+			$wildcard = 'subdom' === $this->site['type'] ? true : false;
+			$this->init_le( $this->site['name'], $this->site['root'], $wildcard );
 		}
 		$this->info( [ $this->site['name'] ], [] );
 		$this->create_site_db_entry();
@@ -520,9 +525,9 @@ class Site_WP_Command extends EE_Site_Command {
 		$wp_install_command   = 'install';
 		$maybe_multisite_type = '';
 
-		if ( 'wpsubdom' === $this->site['type'] || 'wpsubdir' === $this->site['type'] ) {
+		if ( 'subdom' === $this->site['type'] || 'subdir' === $this->site['type'] ) {
 			$wp_install_command   = 'multisite-install';
-			$maybe_multisite_type = $this->site['type'] === 'wpsubdom' ? '--subdomains' : '';
+			$maybe_multisite_type = $this->site['type'] === 'subdom' ? '--subdomains' : '';
 		}
 
 		$install_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp core %s --url=\'%s\' --title=\'%s\' --admin_user=\'%s\'', $wp_install_command, $this->site['name'], $this->site['title'], $this->site['user'] );
@@ -550,7 +555,7 @@ class Site_WP_Command extends EE_Site_Command {
 			'site_title'       => $this->site['title'],
 			'site_command'     => $this->command,
 			'proxy_type'       => $this->proxy_type,
-			'cache_type'       => $this->cache_type,
+			'cache_type'       => (int) $this->cache_type,
 			'site_path'        => $this->site['root'],
 			'db_name'          => $this->db['name'],
 			'db_user'          => $this->db['user'],

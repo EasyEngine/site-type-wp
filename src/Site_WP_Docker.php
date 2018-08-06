@@ -81,7 +81,7 @@ class Site_WP_Docker {
 		$nginx['depends_on']   = [ 'name' => 'php' ];
 		$nginx['restart']      = $restart_default;
 
-		$v_host = in_array( 'wpsubdom', $filters, true ) ? 'VIRTUAL_HOST=${VIRTUAL_HOST},*.${VIRTUAL_HOST}' : 'VIRTUAL_HOST';
+		$v_host = in_array( 'subdom', $filters, true ) ? 'VIRTUAL_HOST=${VIRTUAL_HOST},*.${VIRTUAL_HOST}' : 'VIRTUAL_HOST';
 
 		$nginx['environment'] = [
 			'env' => [
@@ -161,7 +161,7 @@ class Site_WP_Docker {
 		//$base[] = $mailhog;
 		$base[] = $phpmyadmin;
 
-		if ( in_array( 'wpredis', $filters, true ) ) {
+		if ( in_array( 'redis', $filters, true ) ) {
 			$base[] = $redis;
 		}
 
