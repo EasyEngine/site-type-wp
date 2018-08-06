@@ -26,7 +26,7 @@ Feature: Site Command
         | HTTP/1.1 200 OK  |
 
   Scenario: Create wpsubdir site successfully
-    When I run 'bin/ee site create wpsubdir.test --type=wp --wpsubdir'
+    When I run 'bin/ee site create wpsubdir.test --type=wp --mu=subdir'
       And I create subsite '1' in 'wpsubdir.test'
     Then The site 'wpsubdir.test' should have webroot
       And The site 'wpsubdir.test' should have WordPress
@@ -36,7 +36,7 @@ Feature: Site Command
         | HTTP/1.1 200 OK  |
 
   Scenario: Create wpsubdom site successfully
-    When I run 'bin/ee site create wpsubdom.test --type=wp --wpsubdom'
+    When I run 'bin/ee site create wpsubdom.test --type=wp --mu=subdom'
       And I create subsite '1' in 'wpsubdom.test'
     Then The site 'wpsubdom.test' should have webroot
       And The site 'wpsubdom.test' should have WordPress

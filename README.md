@@ -18,22 +18,22 @@ Performs basic site functions in easyengine.
 Runs the site creation.
 
 ```bash
-ee site create example.com                                # install wordpress without any page caching (default)
-ee site create example.com --type=wp                      # install wordpress without any page caching
-ee site create example.com --type=wp --wpredis            # install wordpress with page caching
-ee site create example.com --type=wp --wpsubir            # install wpmu-subdirectory without any page caching
-ee site create example.com --type=wp --wpsubir --wpredis  # install wpmu-subdirectory with page caching
-ee site create example.com --type=wp --wpsubdom           # install wpmu-subdomain without any page caching
-ee site create example.com --type=wp --wpsubdom --wpredis # install wpmu-subdomain with page cache
+ee site create example.com                                  # install wordpress without any page caching (default)
+ee site create example.com --type=wp                        # install wordpress without any page caching
+ee site create example.com --type=wp --cache                # install wordpress with page caching
+ee site create example.com --type=wp --mu=wpsubdir          # install wpmu-subdirectory without any page caching
+ee site create example.com --type=wp --mu=wpsubdir --cache  # install wpmu-subdirectory with page caching
+ee site create example.com --type=wp --mu=subdom            # install wpmu-subdomain without any page caching
+ee site create example.com --type=wp --mu=subdom --cache    # install wpmu-subdomain with page cache
 ```
 
 Let's Encrypt SSL
 ```bash
 # Enable SSL using Let’s Encrypt (You can add --letsencrypt along with any other flag.)
-ee site create example.com [--letsencrypt|--le]
-ee site create example.com --le                 # install wordpress without any page caching + letsencrypt ssl
-ee site create example.com --wpredis --le       # install wordpress with page caching + letsencrypt ssl
-ee site create example.com --wpsubdom --le      # install wordpress wpmu-subdomain + wildcard letsencrypt ssl
+ee site create example.com --type=wp [--letsencrypt|--le]
+ee site create example.com --type=wp --le                  # install wordpress without any page caching + letsencrypt ssl
+ee site create example.com --type=wp --cache --le          # install wordpress with page caching + letsencrypt ssl
+ee site create example.com --type=wp --mu=subdom --le      # install wordpress wpmu-subdomain + wildcard letsencrypt ssl
 ```
 
 ## delete
