@@ -142,6 +142,26 @@ class Site_WP_Docker {
 		];
 		$mailhog['networks']     = $network_default;
 
+		// postfix configuration.
+		$postfix['service_name'] = [ 'name' => 'postfix' ];
+		$postfix['image']        = [ 'name' => 'easyengine/postfix:v' . EE_VERSION ];
+		$postfix['hostname']     = [ 'name' => '${VIRTUAL_HOST}' ];
+		$postfix['restart']      = $restart_default;
+		$postfix['labels']       = [
+			'label' => [
+				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
+			],
+		];
+		$postfix['volumes']      = [
+			'vol' => [
+				[ 'name' => '/dev/log:/dev/log' ],
+				[ 'name' => './config/postfix/ssl:/etc/ssl/postfix' ],
+				[ 'name' => './app/postfix/spool:/var/spool/postfix' ],
+			],
+		];
+		$postfix['networks']     = $network_default;
+
+
 		// redis configuration.
 		$redis['service_name'] = [ 'name' => 'redis' ];
 		$redis['image']        = [ 'name' => 'easyengine/redis:v' . EE_VERSION ];
@@ -160,6 +180,7 @@ class Site_WP_Docker {
 		$base[] = $nginx;
 		//$base[] = $mailhog;
 		$base[] = $phpmyadmin;
+		$base[] = $postfix;
 
 		if ( in_array( 'redis', $filters, true ) ) {
 			$base[] = $redis;
