@@ -420,7 +420,8 @@ class Site_WP_Command extends EE_Site_Command {
 		}
 
 		if ( $this->le ) {
-			$this->init_le();
+			$wildcard = 'subdom' === $this->site['type'] ? true : false;
+			$this->init_le( $this->site['name'], $this->site['root'], $wildcard );
 		}
 		$this->info( [ $this->site['name'] ], [] );
 		$this->create_site_db_entry();
