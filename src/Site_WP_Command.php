@@ -405,7 +405,7 @@ class Site_WP_Command extends EE_Site_Command {
 			$this->level = 3;
 			$this->configure_site_files();
 
-			EE\SiteUtils\start_site_containers( $this->site['root'] );
+			EE\SiteUtils\start_site_containers( $this->site['root'], [ 'nginx', 'postfix' ] );
 			EE\SiteUtils\configure_postfix( $this->site['name'], $this->site['root'] );
 			$this->wp_download_and_config( $assoc_args );
 
