@@ -178,7 +178,7 @@ class Site_WP_Docker {
 
 		$base[] = $php;
 		$base[] = $nginx;
-		//$base[] = $mailhog;
+		$base[] = $mailhog;
 		$base[] = $phpmyadmin;
 		$base[] = $postfix;
 
