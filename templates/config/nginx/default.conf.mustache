@@ -78,7 +78,7 @@ server {
 		# Redirect wp-admin to wp-admin/
 		rewrite /wp-admin$ $scheme://$host$uri/ permanent;
 
-		# Redirect wp-* files/folders
+		# Redirect wp-* files/directories
 		rewrite ^(/[^/]+)?(/wp-.*) $2 last;
 
 		# Redirect other php files
@@ -113,7 +113,7 @@ server {
 		access_log off;
 		log_not_found off;
 	}
-	# Disallow php in upload folder
+	# Disallow php in uploads directory
 	location /wp-content/uploads/ {
 		location ~ \.php$ {
 			#Prevent Direct Access Of PHP Files From Web Browsers
@@ -159,7 +159,7 @@ server {
 		access_log off;
 		log_not_found off;
 	}
-	
+
 	# Deny backup extensions & log files
 	location ~* ^.+\.(bak|log|old|orig|original|php#|php~|php_bak|save|swo|swp|sql)$ {
 		deny all;
