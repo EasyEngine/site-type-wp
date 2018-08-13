@@ -190,7 +190,7 @@ class Site_WP_Command extends EE_Site_Command {
 		if ( isset( $assoc_args['mu'] ) && ! in_array( $mu, [ 'subdom', 'subdir' ], true ) ) {
 			EE::error( "Unrecognized multi-site parameter: $mu. Only `--mu=subdom` and `--mu=subdir` are supported." );
 		}
-		$this->site['app_site_type'] = $mu ?? 'wp';
+		$this->site['app_sub_type'] = $mu ?? 'wp';
 
 		if ( Site::find( $this->site['url'] ) ) {
 			EE::error( sprintf( "Site %1\$s already exists. If you want to re-create it please delete the older one using:\n`ee site delete %1\$s`", $this->site['url'] ) );
@@ -280,20 +280,20 @@ class Site_WP_Command extends EE_Site_Command {
 		$site_conf_env           = $this->site['root'] . '/.env';
 		$site_nginx_default_conf = $site_conf_dir . '/nginx/default.conf';
 		$site_php_ini            = $site_conf_dir . '/php-fpm/php.ini';
-		$server_name             = ( 'subdom' === $this->site['app_site_type'] ) ? $this->site['url'] . ' *.' . $this->site['url'] : $this->site['url'];
+		$server_name             = ( 'subdom' === $this->site['app_sub_type'] ) ? $this->site['url'] . ' *.' . $this->site['url'] : $this->site['url'];
 		$process_user            = posix_getpwuid( posix_geteuid() );
 
 		EE::log( 'Creating WordPress site ' . $this->site['url'] );
 		EE::log( 'Copying configuration files.' );
 
 		$filter                 = [];
-		$filter[]               = $this->site['app_site_type'];
+		$filter[]               = $this->site['app_sub_type'];
 		$filter[]               = $this->cache_type ? 'redis' : 'none';
 		$filter[]               = $this->le;
 		$filter[]               = $this->db['host'];
 		$site_docker            = new Site_WP_Docker();
 		$docker_compose_content = $site_docker->generate_docker_compose_yml( $filter );
-		$default_conf_content   = $this->generate_default_conf( $this->site['app_site_type'], $this->cache_type, $server_name );
+		$default_conf_content   = $this->generate_default_conf( $this->site['app_sub_type'], $this->cache_type, $server_name );
 		$local                  = ( 'db' === $this->db['host'] ) ? true : false;
 
 		$db_host  = isset( $this->db['port'] ) ? $this->db['host'] . ':' . $this->db['port'] : $this->db['host'];
@@ -414,7 +414,7 @@ class Site_WP_Command extends EE_Site_Command {
 		}
 
 		if ( $this->le ) {
-			$wildcard = 'subdom' === $this->site['app_site_type'] ? true : false;
+			$wildcard = 'subdom' === $this->site['app_sub_type'] ? true : false;
 			$this->init_le( $this->site['url'], $this->site['root'], $wildcard );
 		}
 		$this->info( [ $this->site['url'] ], [] );
@@ -520,9 +520,9 @@ class Site_WP_Command extends EE_Site_Command {
 		$wp_install_command   = 'install';
 		$maybe_multisite_type = '';
 
-		if ( 'subdom' === $this->site['app_site_type'] || 'subdir' === $this->site['app_site_type'] ) {
+		if ( 'subdom' === $this->site['app_sub_type'] || 'subdir' === $this->site['app_sub_type'] ) {
 			$wp_install_command   = 'multisite-install';
-			$maybe_multisite_type = $this->site['app_site_type'] === 'subdom' ? '--subdomains' : '';
+			$maybe_multisite_type = $this->site['app_sub_type'] === 'subdom' ? '--subdomains' : '';
 		}
 
 		$install_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp core %s --url=\'%s\' --title=\'%s\' --admin_user=\'%s\'', $wp_install_command, $this->site['url'], $this->site['title'], $this->site['wp_user'] );
@@ -546,7 +546,7 @@ class Site_WP_Command extends EE_Site_Command {
 		$ssl = null;
 
 		if( $this->le ) {
-			if( 'subdom' === $this->site['app_site_type'] ) {
+			if( 'subdom' === $this->site['app_sub_type'] ) {
 				$ssl = 'wildcard';
 			}
 			$ssl = 'letsencrypt';
@@ -558,7 +558,7 @@ class Site_WP_Command extends EE_Site_Command {
 			'app_admin_url'        => $this->site['title'],
 			'app_admin_email'      => $this->site['wp_email'],
 			'app_mail'             => 'postfix',
-			'app_site_type'        => $this->site['app_site_type'],
+			'app_sub_type'        => $this->site['app_sub_type'],
 			'cache_nginx_browser'  => (int) $this->cache_type,
 			'cache_nginx_fullpage' => (int) $this->cache_type,
 			'cache_mysql_query'    => (int) $this->cache_type,
@@ -601,7 +601,7 @@ class Site_WP_Command extends EE_Site_Command {
 
 		if ( $site ) {
 			$this->site['type']          = $site->site_type;
-			$this->site['app_site_type'] = $site->app_site_type;
+			$this->site['app_sub_type'] = $site->app_sub_type;
 			$this->site['title']         = $site->app_admin_url;
 			$this->cache_type            = $site->cache_nginx_fullpage;
 			$this->site['root']          = $site->site_fs_path;
