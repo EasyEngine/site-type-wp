@@ -582,7 +582,7 @@ class Site_WP_Command extends EE_Site_Command {
 			'db_password'      => $this->db['pass'],
 			'db_root_password' => $this->db['root_pass'],
 			'email'            => $this->site['email'],
-			'is_ssl'           => (int) $this->ssl,
+			'is_ssl'           => $this->ssl ? 1 : 0,
 			'site_ssl_wildcard'=> 'subdom' === $this->site['type'] || $this->ssl_wildcard ? 1 : 0,
 			'created_on'       => date( 'Y-m-d H:i:s', time() ),
 		];
