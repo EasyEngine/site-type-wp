@@ -58,9 +58,14 @@ class Site_WP_Command extends EE_Site_Command {
 	private $logger;
 
 	/**
-	 * @var bool $le Whether the site is letsencrypt or not.
+	 * @var bool $ssl Whether the site has SSL.
 	 */
-	private $le;
+	private $ssl;
+
+	/**
+	 * @var bool $ssl Whether the site SSL type is wildcard.
+	 */
+	private $ssl_wildcard;
 
 	/**
 	 * @var string $locale Language to install WordPress in.
@@ -179,8 +184,11 @@ class Site_WP_Command extends EE_Site_Command {
 	 * [--skip-status-check]
 	 * : Skips site status check.
 	 *
-	 * [--letsencrypt]
-	 * : Enables ssl via letsencrypt certificate.
+	 * [--ssl=<value>]
+	 * : Enables ssl on site.
+	 *
+	 * [--wildcard]
+	 * : Gets wildcard SSL .
 	 *
 	 * [--force]
 	 * : Resets the remote database if it is not empty.
@@ -206,7 +214,8 @@ class Site_WP_Command extends EE_Site_Command {
 
 		$this->proxy_type      = EE_PROXY_TYPE;
 		$this->cache_type      = EE\Utils\get_flag_value( $assoc_args, 'cache' );
-		$this->le              = EE\Utils\get_flag_value( $assoc_args, 'letsencrypt' );
+		$this->ssl             = EE\Utils\get_flag_value( $assoc_args, 'ssl' );
+		$this->ssl_wildcard    = EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
 		$this->site['title']   = EE\Utils\get_flag_value( $assoc_args, 'title', $this->site['name'] );
 		$this->site['user']    = EE\Utils\get_flag_value( $assoc_args, 'admin_user', 'admin' );
 		$this->site['pass']    = EE\Utils\get_flag_value( $assoc_args, 'admin_pass', EE\Utils\random_password() );
@@ -253,8 +262,8 @@ class Site_WP_Command extends EE_Site_Command {
 			$args = EE\SiteUtils\auto_site_name( $args, $this->command, __FUNCTION__ );
 			$this->populate_site_info( $args );
 		}
-		$ssl    = $this->le ? 'Enabled' : 'Not Enabled';
-		$prefix = ( $this->le ) ? 'https://' : 'http://';
+		$ssl    = $this->ssl ? 'Enabled' : 'Not Enabled';
+		$prefix = ( $this->ssl ) ? 'https://' : 'http://';
 		$info   = [
 			[ 'Site', $prefix . $this->site['name'] ],
 			[ 'Access phpMyAdmin', $prefix . $this->site['name'] . '/ee-admin/pma/' ],
@@ -267,6 +276,10 @@ class Site_WP_Command extends EE_Site_Command {
 			[ 'Cache', $this->cache_type ? 'Enabled' : 'none' ],
 			[ 'SSL', $ssl ],
 		];
+
+		if( $this->ssl ) {
+			$info[] = [ 'SSL Wildcard', $this->ssl_wildcard ? 'Yes': 'No' ];
+		}
 
 		if ( ! empty( $this->site['user'] ) && ! $this->skip_install ) {
 			$info[] = [ 'WordPress Username', $this->site['user'] ];
@@ -297,7 +310,6 @@ class Site_WP_Command extends EE_Site_Command {
 		$filter                 = [];
 		$filter[]               = $this->site['type'];
 		$filter[]               = $this->cache_type ? 'redis' : 'none';
-		$filter[]               = $this->le;
 		$filter[]               = $this->db['host'];
 		$site_docker            = new Site_WP_Docker();
 		$docker_compose_content = $site_docker->generate_docker_compose_yml( $filter );
@@ -323,7 +335,7 @@ class Site_WP_Command extends EE_Site_Command {
 		$env_content     = EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/.env.mustache', $env_data );
 		$php_ini_content = EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/php-fpm/php.ini.mustache', [] );
 
-		EE\SiteUtils\add_site_redirects( $this->site['name'], $this->le );
+		EE\SiteUtils\add_site_redirects( $this->site['name'], $this->ssl );
 
 		try {
 			$this->fs->dumpFile( $site_docker_yml, $docker_compose_content );
@@ -421,10 +433,13 @@ class Site_WP_Command extends EE_Site_Command {
 			$this->catch_clean( $e );
 		}
 
-		if ( $this->le ) {
-			$wildcard = 'subdom' === $this->site['type'] ? true : false;
+		if ( $this->ssl === 'le' ) {
+			$wildcard = 'subdom' === $this->site['type'] || $this->ssl_wildcard;
 			$this->init_le( $this->site['name'], $this->site['root'], $wildcard );
+		} elseif ( $this->ssl === 'inherit' ) {
+			$this->inherit_certs( $this->site['name'], $this->ssl_wildcard );
 		}
+
 		$this->info( [ $this->site['name'] ], [] );
 		$this->create_site_db_entry();
 	}
@@ -543,7 +558,7 @@ class Site_WP_Command extends EE_Site_Command {
 			EE::warning( 'WordPress install failed. Please check logs.' );
 		}
 
-		$prefix = ( $this->le ) ? 'https://' : 'http://';
+		$prefix = ( $this->ssl ) ? 'https://' : 'http://';
 		EE::success( $prefix . $this->site['name'] . ' has been created successfully!' );
 	}
 
@@ -567,8 +582,8 @@ class Site_WP_Command extends EE_Site_Command {
 			'db_password'      => $this->db['pass'],
 			'db_root_password' => $this->db['root_pass'],
 			'email'            => $this->site['email'],
-			'is_ssl'           => (int) $this->le,
-			'is_ssl_wildcard'  => 'subdom' === $this->site['type'] ? 1 : 0,
+			'is_ssl'           => (int) $this->ssl,
+			'site_ssl_wildcard'=> 'subdom' === $this->site['type'] || $this->ssl_wildcard ? 1 : 0,
 			'created_on'       => date( 'Y-m-d H:i:s', time() ),
 		];
 
@@ -613,7 +628,8 @@ class Site_WP_Command extends EE_Site_Command {
 			$this->site['user']    = $db_select['wp_user'];
 			$this->site['pass']    = $db_select['wp_pass'];
 			$this->site['email']   = $db_select['email'];
-			$this->le              = $db_select['is_ssl'];
+			$this->ssl             = $db_select['is_ssl'];
+			$this->ssl_wildcard    = $db_select['site_ssl_wildcard'];
 
 		} else {
 			EE::error( "Site $this->site['name'] does not exist." );
