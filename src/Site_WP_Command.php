@@ -335,8 +335,6 @@ class Site_WP_Command extends EE_Site_Command {
 		$env_content     = EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/.env.mustache', $env_data );
 		$php_ini_content = EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/php-fpm/php.ini.mustache', [] );
 
-		EE\SiteUtils\add_site_redirects( $this->site['name'], $this->ssl );
-
 		try {
 			$this->fs->dumpFile( $site_docker_yml, $docker_compose_content );
 			$this->fs->dumpFile( $site_conf_env, $env_content );
@@ -439,6 +437,8 @@ class Site_WP_Command extends EE_Site_Command {
 		} elseif ( $this->ssl === 'inherit' ) {
 			$this->inherit_certs( $this->site['name'], $this->ssl_wildcard );
 		}
+
+		EE\SiteUtils\add_site_redirects( $this->site['name'], $this->ssl );
 
 		$this->info( [ $this->site['name'] ], [] );
 		$this->create_site_db_entry();
