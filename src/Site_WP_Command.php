@@ -255,7 +255,7 @@ class Site_WP_Command extends EE_Site_Command {
 	 * [<site-name>]
 	 * : Name of the website whose info is required.
 	 */
-	public function info( $args ) {
+	public function info( $args, $assoc_args ) {
 
 		EE\Utils\delem_log( 'site info start' );
 		if ( ! isset( $this->site['name'] ) ) {
@@ -427,18 +427,21 @@ class Site_WP_Command extends EE_Site_Command {
 				}
 				$this->install_wp();
 			}
+
+			EE\SiteUtils\add_site_redirects( $this->site['name'], false );
+			EE\SiteUtils\reload_proxy_configuration();
+
+			if ( $this->ssl ) {
+				$wildcard = 'subdom' === $this->site['type'] || $this->ssl_wildcard;
+				EE::debug("Wildcard in site wp command: $this->ssl_wildcard");
+				$this->init_ssl( $this->site['name'], $this->site['root'], $this->ssl, $wildcard );
+
+				EE\SiteUtils\add_site_redirects( $this->site['name'], true );
+				EE\SiteUtils\reload_proxy_configuration();
+			}
 		} catch ( Exception $e ) {
 			$this->catch_clean( $e );
 		}
-
-		if ( $this->ssl === 'le' ) {
-			$wildcard = 'subdom' === $this->site['type'] || $this->ssl_wildcard;
-			$this->init_le( $this->site['name'], $this->site['root'], $wildcard );
-		} elseif ( $this->ssl === 'inherit' ) {
-			$this->inherit_certs( $this->site['name'], $this->ssl_wildcard );
-		}
-
-		EE\SiteUtils\add_site_redirects( $this->site['name'], $this->ssl );
 
 		$this->info( [ $this->site['name'] ], [] );
 		$this->create_site_db_entry();
