@@ -422,15 +422,15 @@ class Site_WP_Command extends EE_Site_Command {
 				$this->install_wp();
 			}
 
-			EE\SiteUtils\add_site_redirects( $this->site['name'], false, 'inherit' === $this->ssl );
+			EE\SiteUtils\add_site_redirects( $this->site['url'], false, 'inherit' === $this->ssl );
 			EE\SiteUtils\reload_proxy_configuration();
 
 			if ( $this->ssl ) {
 				$wildcard = 'subdom' === $this->site['type'] || $this->ssl_wildcard;
 				EE::debug( "Wildcard in site wp command: $this->ssl_wildcard" );
-				$this->init_ssl( $this->site['name'], $this->site['root'], $this->ssl, $wildcard );
+				$this->init_ssl( $this->site['url'], $this->site['root'], $this->ssl, $wildcard );
 
-				EE\SiteUtils\add_site_redirects( $this->site['name'], true, 'inherit' === $this->ssl );
+				EE\SiteUtils\add_site_redirects( $this->site['url'], true, 'inherit' === $this->ssl );
 				EE\SiteUtils\reload_proxy_configuration();
 			}
 		} catch ( Exception $e ) {
