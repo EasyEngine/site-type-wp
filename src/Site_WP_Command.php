@@ -424,7 +424,7 @@ class Site_WP_Command extends EE_Site_Command {
 			EE\SiteUtils\reload_proxy_configuration();
 
 			if ( $this->ssl ) {
-				$wildcard = 'subdom' === $this->site['type'] || $this->ssl_wildcard;
+				$wildcard = 'subdom' === $this->site['app_sub_type'] || $this->ssl_wildcard;
 				EE::debug( "Wildcard in site wp command: $this->ssl_wildcard" );
 				$this->init_ssl( $this->site['url'], $this->site['root'], $this->ssl, $wildcard );
 
@@ -563,11 +563,11 @@ class Site_WP_Command extends EE_Site_Command {
 	private function create_site_db_entry() {
 		$ssl = null;
 
-		if( $this->le ) {
+		if( $this->ssl ) {
+			$ssl = 'letsencrypt';
 			if( 'subdom' === $this->site['app_sub_type'] ) {
 				$ssl = 'wildcard';
 			}
-			$ssl = 'letsencrypt';
 		}
 
 		$data = [
@@ -576,7 +576,7 @@ class Site_WP_Command extends EE_Site_Command {
 			'app_admin_url'        => $this->site['title'],
 			'app_admin_email'      => $this->site['wp_email'],
 			'app_mail'             => 'postfix',
-			'app_sub_type'        => $this->site['app_sub_type'],
+			'app_sub_type'         => $this->site['app_sub_type'],
 			'cache_nginx_browser'  => (int) $this->cache_type,
 			'cache_nginx_fullpage' => (int) $this->cache_type,
 			'cache_mysql_query'    => (int) $this->cache_type,
@@ -589,7 +589,7 @@ class Site_WP_Command extends EE_Site_Command {
 			'db_password'          => $this->db['pass'],
 			'db_root_password'     => $this->db['root_pass'],
 			'site_ssl'             => $ssl,
-			'site_ssl_wildcard'=> 'subdom' === $this->site['type'] || $this->ssl_wildcard ? 1 : 0,
+			'site_ssl_wildcard'    => 'subdom' === $this->site['app_sub_type'] || $this->ssl_wildcard ? 1 : 0,
 			'php_version'          => '7.2',
 			'created_on'           => date( 'Y-m-d H:i:s', time() ),
 		];
