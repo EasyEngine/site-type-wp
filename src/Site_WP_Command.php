@@ -49,9 +49,14 @@ class Site_WP_Command extends EE_Site_Command {
 	private $logger;
 
 	/**
-	 * @var bool $le Whether the site is letsencrypt or not.
+	 * @var bool $ssl Whether the site has SSL.
 	 */
-	private $le;
+	private $ssl;
+
+	/**
+	 * @var bool $ssl Whether the site SSL type is wildcard.
+	 */
+	private $ssl_wildcard;
 
 	/**
 	 * @var string $locale Language to install WordPress in.
@@ -79,6 +84,7 @@ class Site_WP_Command extends EE_Site_Command {
 	private $fs;
 
 	public function __construct() {
+
 		$this->level   = 0;
 		pcntl_signal( SIGTERM, [ $this, "rollback" ] );
 		pcntl_signal( SIGHUP, [ $this, "rollback" ] );
@@ -171,8 +177,11 @@ class Site_WP_Command extends EE_Site_Command {
 	 * [--skip-status-check]
 	 * : Skips site status check.
 	 *
-	 * [--letsencrypt]
-	 * : Enables ssl via letsencrypt certificate.
+	 * [--ssl=<value>]
+	 * : Enables ssl on site.
+	 *
+	 * [--wildcard]
+	 * : Gets wildcard SSL .
 	 *
 	 * [--force]
 	 * : Resets the remote database if it is not empty.
@@ -197,7 +206,8 @@ class Site_WP_Command extends EE_Site_Command {
 		}
 
 		$this->cache_type      = EE\Utils\get_flag_value( $assoc_args, 'cache' );
-		$this->le              = EE\Utils\get_flag_value( $assoc_args, 'letsencrypt' );
+		$this->ssl             = EE\Utils\get_flag_value( $assoc_args, 'ssl' );
+		$this->ssl_wildcard    = EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
 		$this->site['title']   = EE\Utils\get_flag_value( $assoc_args, 'title', $this->site['url'] );
 		$this->site['wp_user']    = EE\Utils\get_flag_value( $assoc_args, 'admin_user', 'admin' );
 		$this->site['wp_pass']    = EE\Utils\get_flag_value( $assoc_args, 'admin_pass', EE\Utils\random_password() );
@@ -238,15 +248,15 @@ class Site_WP_Command extends EE_Site_Command {
 	 * [<site-name>]
 	 * : Name of the website whose info is required.
 	 */
-	public function info( $args ) {
+	public function info( $args, $assoc_args ) {
 
 		EE\Utils\delem_log( 'site info start' );
 		if ( ! isset( $this->site['url'] ) ) {
 			$args = EE\SiteUtils\auto_site_name( $args, 'wp', __FUNCTION__ );
 			$this->populate_site_info( $args );
 		}
-		$ssl    = $this->le ? 'Enabled' : 'Not Enabled';
-		$prefix = ( $this->le ) ? 'https://' : 'http://';
+		$ssl    = $this->ssl ? 'Enabled' : 'Not Enabled';
+		$prefix = ( $this->ssl ) ? 'https://' : 'http://';
 		$info   = [
 			[ 'Site', $prefix . $this->site['url'] ],
 			[ 'Access phpMyAdmin', $prefix . $this->site['url'] . '/ee-admin/pma/' ],
@@ -259,6 +269,10 @@ class Site_WP_Command extends EE_Site_Command {
 			[ 'Cache', $this->cache_type ? 'Enabled' : 'None' ],
 			[ 'SSL', $ssl ],
 		];
+
+		if( $this->ssl ) {
+			$info[] = [ 'SSL Wildcard', $this->ssl_wildcard ? 'Yes': 'No' ];
+		}
 
 		if ( ! empty( $this->site['wp_user'] ) && ! $this->skip_install ) {
 			$info[] = [ 'WordPress Username', $this->site['wp_user'] ];
@@ -289,7 +303,6 @@ class Site_WP_Command extends EE_Site_Command {
 		$filter                 = [];
 		$filter[]               = $this->site['app_sub_type'];
 		$filter[]               = $this->cache_type ? 'redis' : 'none';
-		$filter[]               = $this->le;
 		$filter[]               = $this->db['host'];
 		$site_docker            = new Site_WP_Docker();
 		$docker_compose_content = $site_docker->generate_docker_compose_yml( $filter );
@@ -314,8 +327,6 @@ class Site_WP_Command extends EE_Site_Command {
 
 		$env_content     = EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/.env.mustache', $env_data );
 		$php_ini_content = EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/php-fpm/php.ini.mustache', [] );
-
-		EE\SiteUtils\add_site_redirects( $this->site['url'], $this->le );
 
 		try {
 			$this->fs->dumpFile( $site_docker_yml, $docker_compose_content );
@@ -409,14 +420,22 @@ class Site_WP_Command extends EE_Site_Command {
 				}
 				$this->install_wp();
 			}
+
+			EE\SiteUtils\add_site_redirects( $this->site['url'], false, 'inherit' === $this->ssl );
+			EE\SiteUtils\reload_proxy_configuration();
+
+			if ( $this->ssl ) {
+				$wildcard = 'subdom' === $this->site['app_sub_type'] || $this->ssl_wildcard;
+				EE::debug( "Wildcard in site wp command: $this->ssl_wildcard" );
+				$this->init_ssl( $this->site['url'], $this->site['root'], $this->ssl, $wildcard );
+
+				EE\SiteUtils\add_site_redirects( $this->site['url'], true, 'inherit' === $this->ssl );
+				EE\SiteUtils\reload_proxy_configuration();
+			}
 		} catch ( Exception $e ) {
 			$this->catch_clean( $e );
 		}
 
-		if ( $this->le ) {
-			$wildcard = 'subdom' === $this->site['app_sub_type'] ? true : false;
-			$this->init_le( $this->site['url'], $this->site['root'], $wildcard );
-		}
 		$this->info( [ $this->site['url'] ], [] );
 		$this->create_site_db_entry();
 	}
@@ -535,7 +554,7 @@ class Site_WP_Command extends EE_Site_Command {
 			EE::warning( 'WordPress install failed. Please check logs.' );
 		}
 
-		$prefix = ( $this->le ) ? 'https://' : 'http://';
+		$prefix = ( $this->ssl ) ? 'https://' : 'http://';
 		EE::success( $prefix . $this->site['url'] . ' has been created successfully!' );
 	}
 
@@ -545,11 +564,11 @@ class Site_WP_Command extends EE_Site_Command {
 	private function create_site_db_entry() {
 		$ssl = null;
 
-		if( $this->le ) {
+		if( $this->ssl ) {
+			$ssl = 'letsencrypt';
 			if( 'subdom' === $this->site['app_sub_type'] ) {
 				$ssl = 'wildcard';
 			}
-			$ssl = 'letsencrypt';
 		}
 
 		$data = [
@@ -558,7 +577,7 @@ class Site_WP_Command extends EE_Site_Command {
 			'app_admin_url'        => $this->site['title'],
 			'app_admin_email'      => $this->site['wp_email'],
 			'app_mail'             => 'postfix',
-			'app_sub_type'        => $this->site['app_sub_type'],
+			'app_sub_type'         => $this->site['app_sub_type'],
 			'cache_nginx_browser'  => (int) $this->cache_type,
 			'cache_nginx_fullpage' => (int) $this->cache_type,
 			'cache_mysql_query'    => (int) $this->cache_type,
@@ -571,6 +590,7 @@ class Site_WP_Command extends EE_Site_Command {
 			'db_password'          => $this->db['pass'],
 			'db_root_password'     => $this->db['root_pass'],
 			'site_ssl'             => $ssl,
+			'site_ssl_wildcard'    => 'subdom' === $this->site['app_sub_type'] || $this->ssl_wildcard ? 1 : 0,
 			'php_version'          => '7.2',
 			'created_on'           => date( 'Y-m-d H:i:s', time() ),
 		];
@@ -600,21 +620,22 @@ class Site_WP_Command extends EE_Site_Command {
 		$site = Site::find( $this->site['url'] );
 
 		if ( $site ) {
-			$this->site['type']          = $site->site_type;
+			$this->site['type']         = $site->site_type;
 			$this->site['app_sub_type'] = $site->app_sub_type;
-			$this->site['title']         = $site->app_admin_url;
-			$this->cache_type            = $site->cache_nginx_fullpage;
-			$this->site['root']          = $site->site_fs_path;
-			$this->db['user']            = $site->db_user;
-			$this->db['name']            = $site->db_name;
-			$this->db['host']            = $site->db_host;
-			$this->db['port']            = $site->db_port;
-			$this->db['pass']            = $site->db_password;
-			$this->db['root_pass']       = $site->db_root_password;
-			$this->site['wp_user']          = $site->app_admin_username;
-			$this->site['wp_pass']          = $site->app_admin_password;
-			$this->site['wp_email']         = $site->app_admin_email;
-			$this->le                    = $site->site_ssl;
+			$this->site['title']        = $site->app_admin_url;
+			$this->cache_type           = $site->cache_nginx_fullpage;
+			$this->site['root']         = $site->site_fs_path;
+			$this->db['user']           = $site->db_user;
+			$this->db['name']           = $site->db_name;
+			$this->db['host']           = $site->db_host;
+			$this->db['port']           = $site->db_port;
+			$this->db['pass']           = $site->db_password;
+			$this->db['root_pass']      = $site->db_root_password;
+			$this->site['wp_user']      = $site->app_admin_username;
+			$this->site['wp_pass']      = $site->app_admin_password;
+			$this->site['wp_email']     = $site->app_admin_email;
+			$this->ssl                  = $site->site_ssl;
+			$this->ssl_wildcard         = $site->site_ssl_wildcard;
 
 		} else {
 			EE::error( "Site $this->site['url'] does not exist." );
