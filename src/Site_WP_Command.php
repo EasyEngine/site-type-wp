@@ -84,6 +84,7 @@ class Site_WP_Command extends EE_Site_Command {
 	private $fs;
 
 	public function __construct() {
+
 		$this->level   = 0;
 		pcntl_signal( SIGTERM, [ $this, "rollback" ] );
 		pcntl_signal( SIGHUP, [ $this, "rollback" ] );

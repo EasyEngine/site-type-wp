@@ -13,6 +13,9 @@
         },
         "files": [ "site-wp-command.php" ]
     },
+    "require-dev": {
+        "wp-cli/mustangostang-spyc": "^0.6.3"
+    },
     "extra": {
         "branch-alias": {
             "dev-master": "1.x-dev"
