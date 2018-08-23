@@ -259,24 +259,24 @@ class Site_WP_Command extends EE_Site_Command {
 		$prefix = ( $this->ssl ) ? 'https://' : 'http://';
 		$info   = [ [ 'Site', $prefix . $this->site['url'] ] ];
 		if ( ! empty( $this->site['admin_tools'] ) ) {
-			$info [] = [ 'Access admin-tools', $prefix . $this->site['url'] . '/ee-admin/' ];
+			$info[] = [ 'Access admin-tools', $prefix . $this->site['url'] . '/ee-admin/' ];
 		}
-		$info [] = [ 'Site Title', $this->site['title'] ];
+		$info[] = [ 'Site Title', $this->site['title'] ];
 		if ( ! empty( $this->site['wp_user'] ) && ! $this->skip_install ) {
 			$info[] = [ 'WordPress Username', $this->site['wp_user'] ];
 			$info[] = [ 'WordPress Password', $this->site['wp_pass'] ];
 		}
-		$info [] = [ 'DB Root Password', $this->db['root_pass'] ];
-		$info [] = [ 'DB Name', $this->db['name'] ];
-		$info [] = [ 'DB User', $this->db['user'] ];
-		$info [] = [ 'DB Password', $this->db['pass'] ];
-		$info [] = [ 'E-Mail', $this->site['wp_email'] ];
-		$info [] = [ 'SSL', $ssl ];
+		$info[] = [ 'DB Root Password', $this->db['root_pass'] ];
+		$info[] = [ 'DB Name', $this->db['name'] ];
+		$info[] = [ 'DB User', $this->db['user'] ];
+		$info[] = [ 'DB Password', $this->db['pass'] ];
+		$info[] = [ 'E-Mail', $this->site['wp_email'] ];
+		$info[] = [ 'SSL', $ssl ];
 
 		if ( $this->ssl ) {
 			$info[] = [ 'SSL Wildcard', $this->ssl_wildcard ? 'Yes' : 'No' ];
 		}
-		$info [] = [ 'Cache', $this->cache_type ? 'Enabled' : 'None' ];
+		$info[] = [ 'Cache', $this->cache_type ? 'Enabled' : 'None' ];
 
 		EE\Utils\format_table( $info );
 
