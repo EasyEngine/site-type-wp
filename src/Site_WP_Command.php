@@ -213,8 +213,8 @@ class Site_WP_Command extends EE_Site_Command {
 		$this->site['wp_pass'] = EE\Utils\get_flag_value( $assoc_args, 'admin_pass', EE\Utils\random_password() );
 		$this->db['name']      = str_replace( [ '.', '-' ], '_', $this->site['url'] );
 		$this->db['host']      = EE\Utils\get_flag_value( $assoc_args, 'dbhost' );
-		//TODO: Generate db user according to site
-		$this->db['user']      = EE\Utils\get_flag_value( $assoc_args, 'dbuser', 'wordpress' );
+		$this->db['port']      = '3306';
+		$this->db['user']      = EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site['url'] ) );
 		$this->db['pass']      = EE\Utils\get_flag_value( $assoc_args, 'dbpass', EE\Utils\random_password() );
 		$this->locale          = EE\Utils\get_flag_value( $assoc_args, 'locale', EE::get_config( 'locale' ) );
 		$this->db['root_pass'] = EE\Utils\random_password();
@@ -240,6 +240,20 @@ class Site_WP_Command extends EE_Site_Command {
 
 		$this->create_site( $assoc_args );
 		EE\Utils\delem_log( 'site create end' );
+	}
+
+	/**
+	 * Creates database user for a site
+	 *
+	 * @param string $site_url URL of site
+	 *
+	 * @return string Generated db user
+	 */
+	private function create_site_db_user( string $site_url ) : string {
+		if ( strlen( $site_url ) > 53 ) {
+			$site_url = substr( $site_url, 0, 53 );
+		}
+		return $site_url . '-' . \EE\Utils\random_password( 6 );
 	}
 
 	/**
@@ -308,7 +322,7 @@ class Site_WP_Command extends EE_Site_Command {
 		$default_conf_content   = $this->generate_default_conf( $this->site['app_sub_type'], $this->cache_type, $server_name );
 		$local                  = ( 'db' === $this->db['host'] ) ? true : false;
 
-		$db_host  = isset( $this->db['port'] ) ? $this->db['host'] . ':' . $this->db['port'] : $this->db['host'];
+		$db_host  = $local ? $this->db['host'] : $this->db['host'] . ':' . $this->db['port'];
 		$env_data = [
 			'local'         => $local,
 			'virtual_host'  => $this->site['url'],
