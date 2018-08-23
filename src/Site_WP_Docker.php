@@ -105,6 +105,7 @@ class Site_WP_Docker {
 			],
 		];
 		$nginx['networks']    = $network_default;
+		//$nginx['networks']    = [ 'name' => 'global-network' ];
 
 		// mailhog configuration.
 		$mailhog['service_name'] = [ 'name' => 'mailhog' ];
