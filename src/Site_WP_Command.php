@@ -250,7 +250,7 @@ class Site_WP_Command extends EE_Site_Command {
 	 * @return string Generated db user
 	 */
 	private function create_site_db_user( string $site_url ) : string {
-		return $site_url . '-' . \EE\Utils\random_password( 6 );
+		return substr( $site_url, 0, 73 ) . '-' . \EE\Utils\random_password( 6 );
 	}
 
 	/**
