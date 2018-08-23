@@ -106,24 +106,6 @@ class Site_WP_Docker {
 		];
 		$nginx['networks']    = $network_default;
 
-		// PhpMyAdmin configuration.
-		$phpmyadmin['service_name'] = [ 'name' => 'phpmyadmin' ];
-		$phpmyadmin['image']        = [ 'name' => 'easyengine/phpmyadmin:' . $img_versions['easyengine/phpmyadmin'] ];
-		$phpmyadmin['restart']      = $restart_default;
-		$phpmyadmin['environment']  = [
-			'env' => [
-				[ 'name' => 'PMA_ABSOLUTE_URI=http://${VIRTUAL_HOST}/ee-admin/pma/' ],
-				[ 'name' => $v_host ],
-				[ 'name' => 'VIRTUAL_PATH=/ee-admin/pma/' ],
-			],
-		];
-		$phpmyadmin['labels']       = [
-			'label' => [
-				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
-			],
-		];
-		$phpmyadmin['networks']     = $network_default;
-
 		// mailhog configuration.
 		$mailhog['service_name'] = [ 'name' => 'mailhog' ];
 		$mailhog['image']        = [ 'name' => 'easyengine/mailhog:' . $img_versions['easyengine/mailhog'] ];
@@ -180,7 +162,6 @@ class Site_WP_Docker {
 		$base[] = $php;
 		$base[] = $nginx;
 		$base[] = $mailhog;
-		$base[] = $phpmyadmin;
 		$base[] = $postfix;
 
 		if ( in_array( 'redis', $filters, true ) ) {
