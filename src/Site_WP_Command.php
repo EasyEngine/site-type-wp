@@ -85,7 +85,7 @@ class Site_WP_Command extends EE_Site_Command {
 
 	public function __construct() {
 
-		$this->level   = 0;
+		$this->level = 0;
 		pcntl_signal( SIGTERM, [ $this, "rollback" ] );
 		pcntl_signal( SIGHUP, [ $this, "rollback" ] );
 		pcntl_signal( SIGUSR1, [ $this, "rollback" ] );
@@ -209,8 +209,8 @@ class Site_WP_Command extends EE_Site_Command {
 		$this->ssl             = EE\Utils\get_flag_value( $assoc_args, 'ssl' );
 		$this->ssl_wildcard    = EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
 		$this->site['title']   = EE\Utils\get_flag_value( $assoc_args, 'title', $this->site['url'] );
-		$this->site['wp_user']    = EE\Utils\get_flag_value( $assoc_args, 'admin_user', 'admin' );
-		$this->site['wp_pass']    = EE\Utils\get_flag_value( $assoc_args, 'admin_pass', EE\Utils\random_password() );
+		$this->site['wp_user'] = EE\Utils\get_flag_value( $assoc_args, 'admin_user', 'admin' );
+		$this->site['wp_pass'] = EE\Utils\get_flag_value( $assoc_args, 'admin_pass', EE\Utils\random_password() );
 		$this->db['name']      = str_replace( [ '.', '-' ], '_', $this->site['url'] );
 		$this->db['host']      = EE\Utils\get_flag_value( $assoc_args, 'dbhost' );
 		//TODO: Generate db user according to site
@@ -230,9 +230,9 @@ class Site_WP_Command extends EE_Site_Command {
 		}
 
 		$this->site['wp_email'] = EE\Utils\get_flag_value( $assoc_args, 'admin_email', strtolower( 'mail@' . $this->site['url'] ) );
-		$this->skip_install  = EE\Utils\get_flag_value( $assoc_args, 'skip-install' );
-		$this->skip_chk      = EE\Utils\get_flag_value( $assoc_args, 'skip-status-check' );
-		$this->force         = EE\Utils\get_flag_value( $assoc_args, 'force' );
+		$this->skip_install     = EE\Utils\get_flag_value( $assoc_args, 'skip-install' );
+		$this->skip_chk         = EE\Utils\get_flag_value( $assoc_args, 'skip-status-check' );
+		$this->force            = EE\Utils\get_flag_value( $assoc_args, 'force' );
 
 		EE\SiteUtils\init_checks();
 
@@ -257,27 +257,26 @@ class Site_WP_Command extends EE_Site_Command {
 		}
 		$ssl    = $this->ssl ? 'Enabled' : 'Not Enabled';
 		$prefix = ( $this->ssl ) ? 'https://' : 'http://';
-		$info   = [
-			[ 'Site', $prefix . $this->site['url'] ],
-			[ 'Access phpMyAdmin', $prefix . $this->site['url'] . '/ee-admin/pma/' ],
-			[ 'Site Title', $this->site['title'] ],
-			[ 'DB Root Password', $this->db['root_pass'] ],
-			[ 'DB Name', $this->db['name'] ],
-			[ 'DB User', $this->db['user'] ],
-			[ 'DB Password', $this->db['pass'] ],
-			[ 'E-Mail', $this->site['wp_email'] ],
-			[ 'Cache', $this->cache_type ? 'Enabled' : 'None' ],
-			[ 'SSL', $ssl ],
-		];
-
-		if( $this->ssl ) {
-			$info[] = [ 'SSL Wildcard', $this->ssl_wildcard ? 'Yes': 'No' ];
+		$info   = [ [ 'Site', $prefix . $this->site['url'] ] ];
+		if ( ! empty( $this->site['admin_tools'] ) ) {
+			$info [] = [ 'Access admin-tools', $prefix . $this->site['url'] . '/ee-admin/' ];
 		}
-
+		$info [] = [ 'Site Title', $this->site['title'] ];
 		if ( ! empty( $this->site['wp_user'] ) && ! $this->skip_install ) {
 			$info[] = [ 'WordPress Username', $this->site['wp_user'] ];
 			$info[] = [ 'WordPress Password', $this->site['wp_pass'] ];
 		}
+		$info [] = [ 'DB Root Password', $this->db['root_pass'] ];
+		$info [] = [ 'DB Name', $this->db['name'] ];
+		$info [] = [ 'DB User', $this->db['user'] ];
+		$info [] = [ 'DB Password', $this->db['pass'] ];
+		$info [] = [ 'E-Mail', $this->site['wp_email'] ];
+		$info [] = [ 'SSL', $ssl ];
+
+		if ( $this->ssl ) {
+			$info[] = [ 'SSL Wildcard', $this->ssl_wildcard ? 'Yes' : 'No' ];
+		}
+		$info [] = [ 'Cache', $this->cache_type ? 'Enabled' : 'None' ];
 
 		EE\Utils\format_table( $info );
 
@@ -349,9 +348,9 @@ class Site_WP_Command extends EE_Site_Command {
 	/**
 	 * Function to generate default.conf from mustache templates.
 	 *
-	 * @param string  $site_type   Type of site (subdom, subdir etc..).
-	 * @param boolean $cache_type  Cache enabled or not.
-	 * @param string  $server_name Name of server to use in virtual_host.
+	 * @param string $site_type   Type of site (subdom, subdir etc..).
+	 * @param boolean $cache_type Cache enabled or not.
+	 * @param string $server_name Name of server to use in virtual_host.
 	 *
 	 * @return string Parsed mustache template string output.
 	 */
@@ -564,9 +563,9 @@ class Site_WP_Command extends EE_Site_Command {
 	private function create_site_db_entry() {
 		$ssl = null;
 
-		if( $this->ssl ) {
+		if ( $this->ssl ) {
 			$ssl = 'letsencrypt';
-			if( 'subdom' === $this->site['app_sub_type'] ) {
+			if ( 'subdom' === $this->site['app_sub_type'] ) {
 				$ssl = 'wildcard';
 			}
 		}
@@ -617,11 +616,12 @@ class Site_WP_Command extends EE_Site_Command {
 	private function populate_site_info( $args ) {
 
 		$this->site['url'] = EE\Utils\remove_trailing_slash( $args[0] );
-		$site = Site::find( $this->site['url'] );
+		$site              = Site::find( $this->site['url'] );
 
 		if ( $site ) {
 			$this->site['type']         = $site->site_type;
 			$this->site['app_sub_type'] = $site->app_sub_type;
+			$this->site['admin_tools']  = $site->admin_tools;
 			$this->site['title']        = $site->app_admin_url;
 			$this->cache_type           = $site->cache_nginx_fullpage;
 			$this->site['root']         = $site->site_fs_path;
