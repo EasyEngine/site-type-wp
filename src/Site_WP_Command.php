@@ -107,12 +107,8 @@ class Site_WP_Command extends EE_Site_Command {
 	 * <site-name>
 	 * : Name of website.
 	 *
-	 * [--wp]
-	 * : WordPress website.
-	 *
 	 * [--cache]
 	 * : Use redis cache for WordPress.
-	 *
 	 *
 	 * [--mu=<subdir>]
 	 * : WordPress sub-dir Multi-site.
@@ -166,7 +162,7 @@ class Site_WP_Command extends EE_Site_Command {
 	 * : If set, the database connection is not checked.
 	 *
 	 * [--version=<version>]
-	 * : Select which wordpress version you want to download. Accepts a version number, ‘latest’ or ‘nightly’.
+	 * : Select which WordPress version you want to download. Accepts a version number, ‘latest’ or ‘nightly’.
 	 *
 	 * [--skip-content]
 	 * : Download WP without the default themes and plugins.
