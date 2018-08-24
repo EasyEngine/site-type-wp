@@ -104,8 +104,12 @@ class Site_WP_Docker {
 				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
 			],
 		];
-		$nginx['networks']    = $network_default;
-		//$nginx['networks']    = [ 'name' => 'global-network' ];
+		$nginx['networks']    = [
+			'net' => [
+				$network_default,
+				['name' => 'global-network'],
+			]
+		];
 
 		// mailhog configuration.
 		$mailhog['service_name'] = [ 'name' => 'mailhog' ];
