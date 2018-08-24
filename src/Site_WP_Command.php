@@ -485,7 +485,10 @@ class Site_WP_Command extends EE_Site_Command {
 		EE::exec( $chown_command );
 
 		$core_download_command = "docker-compose exec --user='www-data' php wp core download --locale='$this->locale' $core_download_arguments";
-		EE::exec( $core_download_command );
+
+		if ( EE::exec( $core_download_command ) ) {
+			EE::error('Unable to download wp core.', false );
+		}
 
 		// TODO: Look for better way to handle mysql healthcheck
 		if ( 'db' === $this->db['host'] ) {
