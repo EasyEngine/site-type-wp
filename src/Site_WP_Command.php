@@ -119,13 +119,13 @@ class Site_WP_Command extends EE_Site_Command {
 	 * [--title=<title>]
 	 * : Title of your site.
 	 *
-	 * [--admin_user=<admin_user>]
+	 * [--admin-user=<admin-user>]
 	 * : Username of the administrator.
 	 *
-	 * [--admin_pass=<admin_pass>]
+	 * [--admin-pass=<admin-pass>]
 	 * : Password for the the administrator.
 	 *
-	 * [--admin_email=<admin_email>]
+	 * [--admin-email=<admin-email>]
 	 * : E-Mail of the administrator.
 	 *
 	 * [--dbname=<dbname>]
@@ -205,8 +205,8 @@ class Site_WP_Command extends EE_Site_Command {
 		$this->ssl             = EE\Utils\get_flag_value( $assoc_args, 'ssl' );
 		$this->ssl_wildcard    = EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
 		$this->site['title']   = EE\Utils\get_flag_value( $assoc_args, 'title', $this->site['url'] );
-		$this->site['wp_user'] = EE\Utils\get_flag_value( $assoc_args, 'admin_user', 'admin' );
-		$this->site['wp_pass'] = EE\Utils\get_flag_value( $assoc_args, 'admin_pass', EE\Utils\random_password() );
+		$this->site['wp_user'] = EE\Utils\get_flag_value( $assoc_args, 'admin-user', 'admin' );
+		$this->site['wp_pass'] = EE\Utils\get_flag_value( $assoc_args, 'admin-pass', EE\Utils\random_password() );
 		$this->db['name']      = str_replace( [ '.', '-' ], '_', $this->site['url'] );
 		$this->db['host']      = EE\Utils\get_flag_value( $assoc_args, 'dbhost' );
 		$this->db['port']      = '3306';
@@ -225,7 +225,7 @@ class Site_WP_Command extends EE_Site_Command {
 			$this->db['port'] = empty( $arg_host_port[1] ) ? '3306' : $arg_host_port[1];
 		}
 
-		$this->site['wp_email'] = EE\Utils\get_flag_value( $assoc_args, 'admin_email', strtolower( 'mail@' . $this->site['url'] ) );
+		$this->site['wp_email'] = EE\Utils\get_flag_value( $assoc_args, 'admin-email', strtolower( 'mail@' . $this->site['url'] ) );
 		$this->skip_install     = EE\Utils\get_flag_value( $assoc_args, 'skip-install' );
 		$this->skip_chk         = EE\Utils\get_flag_value( $assoc_args, 'skip-status-check' );
 		$this->force            = EE\Utils\get_flag_value( $assoc_args, 'force' );
