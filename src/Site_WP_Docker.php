@@ -18,7 +18,11 @@ class Site_WP_Docker {
 		$base         = [];
 
 		$restart_default = [ 'name' => 'always' ];
-		$network_default = [ 'name' => 'site-network' ];
+		$network_default = [
+			'net' => [
+				[ 'name' => 'site-network' ]
+			]
+		];
 
 		// db configuration.
 		$db['service_name'] = [ 'name' => 'db' ];
@@ -106,8 +110,8 @@ class Site_WP_Docker {
 		];
 		$nginx['networks']    = [
 			'net' => [
-				$network_default,
-				['name' => 'global-network'],
+				[ 'name' => 'site-network' ],
+				[ 'name' => 'global-network' ],
 			]
 		];
 
