@@ -42,7 +42,9 @@ services:
     {{/environment}}
     {{#networks}}
     networks:
+    {{#net}}
       - {{name}}
+    {{/net}}
     {{/networks}}
 
 {{/services}}
@@ -50,6 +52,7 @@ services:
 {{#network}}
 networks:
   site-network:
+  global-network:
     external:
-      name: ${VIRTUAL_HOST}
+      name: ee-global-network
 {{/network}}

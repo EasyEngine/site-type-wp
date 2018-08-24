@@ -412,7 +412,6 @@ class Site_WP_Command extends EE_Site_Command {
 		try {
 			EE\SiteUtils\create_site_root( $this->site['root'], $this->site['url'] );
 			$this->level = 2;
-			EE\SiteUtils\setup_site_network( $this->site['url'] );
 			$this->maybe_verify_remote_db_connection();
 			$this->level = 3;
 			$this->configure_site_files();
@@ -486,7 +485,10 @@ class Site_WP_Command extends EE_Site_Command {
 		EE::exec( $chown_command );
 
 		$core_download_command = "docker-compose exec --user='www-data' php wp core download --locale='$this->locale' $core_download_arguments";
-		EE::exec( $core_download_command );
+
+		if ( EE::exec( $core_download_command ) ) {
+			EE::error('Unable to download wp core.', false );
+		}
 
 		// TODO: Look for better way to handle mysql healthcheck
 		if ( 'db' === $this->db['host'] ) {

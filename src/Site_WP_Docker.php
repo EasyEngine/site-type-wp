@@ -18,7 +18,11 @@ class Site_WP_Docker {
 		$base         = [];
 
 		$restart_default = [ 'name' => 'always' ];
-		$network_default = [ 'name' => 'site-network' ];
+		$network_default = [
+			'net' => [
+				[ 'name' => 'site-network' ]
+			]
+		];
 
 		// db configuration.
 		$db['service_name'] = [ 'name' => 'db' ];
@@ -104,7 +108,12 @@ class Site_WP_Docker {
 				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
 			],
 		];
-		$nginx['networks']    = $network_default;
+		$nginx['networks']    = [
+			'net' => [
+				[ 'name' => 'site-network' ],
+				[ 'name' => 'global-network' ],
+			]
+		];
 
 		// mailhog configuration.
 		$mailhog['service_name'] = [ 'name' => 'mailhog' ];
