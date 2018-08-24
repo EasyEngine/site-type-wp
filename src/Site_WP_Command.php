@@ -412,7 +412,6 @@ class Site_WP_Command extends EE_Site_Command {
 		try {
 			EE\SiteUtils\create_site_root( $this->site['root'], $this->site['url'] );
 			$this->level = 2;
-			EE\SiteUtils\setup_site_network( $this->site['url'] );
 			$this->maybe_verify_remote_db_connection();
 			$this->level = 3;
 			$this->configure_site_files();
