@@ -225,7 +225,7 @@ class Site_WP_Command extends EE_Site_Command {
 			$this->db['port'] = empty( $arg_host_port[1] ) ? '3306' : $arg_host_port[1];
 		}
 
-		$this->site['wp_email'] = EE\Utils\get_flag_value( $assoc_args, 'admin_email', strtolower( 'mail@' . $this->site['url'] ) );
+		$this->site['wp_email'] = EE\Utils\get_flag_value( $assoc_args, 'admin_email', strtolower( 'admin@' . $this->site['url'] ) );
 		$this->skip_install     = EE\Utils\get_flag_value( $assoc_args, 'skip-install' );
 		$this->skip_chk         = EE\Utils\get_flag_value( $assoc_args, 'skip-status-check' );
 		$this->force            = EE\Utils\get_flag_value( $assoc_args, 'force' );
@@ -334,8 +334,12 @@ class Site_WP_Command extends EE_Site_Command {
 			'group_id'      => $process_user['gid'],
 		];
 
+		$php_ini_data = [
+			'admin_email' => $this->site['wp_email'],
+		];
+
 		$env_content     = EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/.env.mustache', $env_data );
-		$php_ini_content = EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/php-fpm/php.ini.mustache', [] );
+		$php_ini_content = EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/php-fpm/php.ini.mustache', $php_ini_data );
 
 		try {
 			$this->fs->dumpFile( $site_docker_yml, $docker_compose_content );
@@ -486,7 +490,7 @@ class Site_WP_Command extends EE_Site_Command {
 
 		$core_download_command = "docker-compose exec --user='www-data' php wp core download --locale='$this->locale' $core_download_arguments";
 
-		if ( EE::exec( $core_download_command ) ) {
+		if ( ! EE::exec( $core_download_command ) ) {
 			EE::error('Unable to download wp core.', false );
 		}
 
