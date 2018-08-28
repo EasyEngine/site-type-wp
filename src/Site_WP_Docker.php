@@ -1,9 +1,9 @@
 <?php
 
-namespace EE\Site\Type\WP;
+namespace EE\Site\Type;
 use function \EE\Utils\mustache_render;
 
-class Docker_Compose_Generator {
+class Site_WP_Docker {
 
 	/**
 	 * Generate docker-compose.yml according to requirement.

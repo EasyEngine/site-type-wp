@@ -2,7 +2,7 @@
 
 declare( ticks=1 );
 
-namespace EE\Site\Type\WP;
+namespace EE\Site\Type;
 use \Symfony\Component\Filesystem\Filesystem;
 use EE\Model\Site;
 
@@ -313,7 +313,7 @@ class WP extends EE_Site_Command {
 		$filter[]               = $this->site['app_sub_type'];
 		$filter[]               = $this->cache_type ? 'redis' : 'none';
 		$filter[]               = $this->db['host'];
-		$site_docker            = new Docker_Compose_Generator();
+		$site_docker            = new Site_WP_Docker();
 		$docker_compose_content = $site_docker->generate_docker_compose_yml( $filter );
 		$default_conf_content   = $this->generate_default_conf( $this->site['app_sub_type'], $this->cache_type, $server_name );
 		$local                  = ( 'db' === $this->db['host'] ) ? true : false;
