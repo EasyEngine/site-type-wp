@@ -53,19 +53,19 @@ class Site_WP_Docker {
 		$php['service_name'] = [ 'name' => 'php' ];
 		$php['image']        = [ 'name' => 'easyengine/php:' . $img_versions['easyengine/php'] ];
 
-		$php['depends_on']['dependency'][]   = [ 'name' => 'db' ];
+		$php['depends_on']['dependency'][] = [ 'name' => 'db' ];
 
 		if ( in_array( 'redis', $filters, true ) ) {
-			$php['depends_on']['dependency'][]   = [ 'name' => 'redis' ];
+			$php['depends_on']['dependency'][] = [ 'name' => 'redis' ];
 		}
 
-		$php['restart']      = $restart_default;
-		$php['labels']       = [
+		$php['restart']     = $restart_default;
+		$php['labels']      = [
 			'label' => [
 				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
 			],
 		];
-		$php['volumes']      = [
+		$php['volumes']     = [
 			[
 				'vol' => [
 					[ 'name' => './app/src:/var/www/htdocs' ],
@@ -73,7 +73,7 @@ class Site_WP_Docker {
 				],
 			],
 		];
-		$php['environment']  = [
+		$php['environment'] = [
 			'env' => [
 				[ 'name' => 'WORDPRESS_DB_HOST' ],
 				[ 'name' => 'WORDPRESS_DB_NAME' ],
@@ -84,13 +84,13 @@ class Site_WP_Docker {
 				[ 'name' => 'VIRTUAL_HOST' ],
 			],
 		];
-		$php['networks']     = $network_default;
+		$php['networks']    = $network_default;
 
 		// nginx configuration.
-		$nginx['service_name'] = [ 'name' => 'nginx' ];
-		$nginx['image']        = [ 'name' => 'easyengine/nginx:' . $img_versions['easyengine/nginx'] ];
-		$nginx['depends_on']['dependency'][]   = [ 'name' => 'php' ];
-		$nginx['restart']      = $restart_default;
+		$nginx['service_name']               = [ 'name' => 'nginx' ];
+		$nginx['image']                      = [ 'name' => 'easyengine/nginx:' . $img_versions['easyengine/nginx'] ];
+		$nginx['depends_on']['dependency'][] = [ 'name' => 'php' ];
+		$nginx['restart']                    = $restart_default;
 
 		$v_host = in_array( 'subdom', $filters, true ) ? 'VIRTUAL_HOST=${VIRTUAL_HOST},*.${VIRTUAL_HOST}' : 'VIRTUAL_HOST';
 
