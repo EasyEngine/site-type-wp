@@ -353,7 +353,7 @@ class WP extends EE_Site_Command {
 			\EE\Site\Utils\set_postfix_files( $this->site['url'], $site_conf_dir );
 
 			\EE::success( 'Configuration files copied.' );
-		} catch ( Exception $e ) {
+		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
 		}
 	}
@@ -444,7 +444,7 @@ class WP extends EE_Site_Command {
 				\EE\Site\Utils\add_site_redirects( $this->site['url'], true, 'inherit' === $this->ssl );
 				\EE\Site\Utils\reload_proxy_configuration();
 			}
-		} catch ( Exception $e ) {
+		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
 		}
 
@@ -537,7 +537,7 @@ class WP extends EE_Site_Command {
 					}
 				}
 			}
-		} catch ( Exception $e ) {
+		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
 		}
 
@@ -621,7 +621,7 @@ class WP extends EE_Site_Command {
 			} else {
 				throw new Exception( 'Error creating site entry in database.' );
 			}
-		} catch ( Exception $e ) {
+		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
 		}
 	}
@@ -708,7 +708,7 @@ class WP extends EE_Site_Command {
 	/**
 	 * Catch and clean exceptions.
 	 *
-	 * @param Exception $e
+	 * @param \Exception $e
 	 */
 	private function catch_clean( $e ) {
 		\EE\Utils\delem_log( 'site cleanup start' );
