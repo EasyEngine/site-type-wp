@@ -52,7 +52,13 @@ class Site_WP_Docker {
 		// PHP configuration.
 		$php['service_name'] = [ 'name' => 'php' ];
 		$php['image']        = [ 'name' => 'easyengine/php:' . $img_versions['easyengine/php'] ];
-		$php['depends_on']   = [ 'name' => 'db' ];
+
+		$php['depends_on']['dependency'][]   = [ 'name' => 'db' ];
+
+		if ( in_array( 'redis', $filters, true ) ) {
+			$php['depends_on']['dependency'][]   = [ 'name' => 'redis' ];
+		}
+
 		$php['restart']      = $restart_default;
 		$php['labels']       = [
 			'label' => [
@@ -83,7 +89,7 @@ class Site_WP_Docker {
 		// nginx configuration.
 		$nginx['service_name'] = [ 'name' => 'nginx' ];
 		$nginx['image']        = [ 'name' => 'easyengine/nginx:' . $img_versions['easyengine/nginx'] ];
-		$nginx['depends_on']   = [ 'name' => 'php' ];
+		$nginx['depends_on']['dependency'][]   = [ 'name' => 'php' ];
 		$nginx['restart']      = $restart_default;
 
 		$v_host = in_array( 'subdom', $filters, true ) ? 'VIRTUAL_HOST=${VIRTUAL_HOST},*.${VIRTUAL_HOST}' : 'VIRTUAL_HOST';
