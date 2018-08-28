@@ -13,4 +13,4 @@ if ( file_exists( $autoload ) ) {
 	require_once $autoload;
 }
 
-EE::add_command( 'wp', 'Site_WP_Command' );
+Site_Command::add_site_type( 'wp', 'EE\Site\Type\WP' );
