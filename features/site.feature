@@ -49,7 +49,7 @@ Feature: Site Command
         | HTTP/1.1 200 OK  |
 
   Scenario: Create wp site successfully
-    When I run 'bin/ee site create wp.test --type=wp --cache'
+    When I run 'bin/ee site create wpcache.test --type=wp --cache'
     Then After delay of 5 seconds
     And The site 'wpcache.test' should have webroot
     And The site 'wpcache.test' should have WordPress
