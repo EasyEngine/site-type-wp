@@ -2,7 +2,7 @@
 
 declare( ticks=1 );
 
-
+namespace EE\Site\Type\WP;
 use \Symfony\Component\Filesystem\Filesystem;
 use EE\Model\Site;
 
@@ -16,7 +16,7 @@ use EE\Model\Site;
  *
  * @package ee-cli
  */
-class Site_WP_Command extends EE_Site_Command {
+class WP extends EE_Site_Command {
 
 	/**
 	 * @var array $site Associative array containing essential site related information.
@@ -313,7 +313,7 @@ class Site_WP_Command extends EE_Site_Command {
 		$filter[]               = $this->site['app_sub_type'];
 		$filter[]               = $this->cache_type ? 'redis' : 'none';
 		$filter[]               = $this->db['host'];
-		$site_docker            = new Site_WP_Docker();
+		$site_docker            = new Docker_Compose_Generator();
 		$docker_compose_content = $site_docker->generate_docker_compose_yml( $filter );
 		$default_conf_content   = $this->generate_default_conf( $this->site['app_sub_type'], $this->cache_type, $server_name );
 		$local                  = ( 'db' === $this->db['host'] ) ? true : false;
