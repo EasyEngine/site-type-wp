@@ -19,19 +19,14 @@ use EE\Model\Site;
 class Site_WP_Command extends EE_Site_Command {
 
 	/**
-	 * @var array $site Associative array containing essential site related information.
+	 * @var string $site url of the site.
 	 */
-	private $site;
+	private $site_url;
 
 	/**
-	 * @var string $cache_type Type of caching being used.
+	 * @var string $site directory on which site is installed.
 	 */
-	private $cache_type;
-
-	/**
-	 * @var array $db Associative array containing essential site database related information.
-	 */
-	private $db;
+	private $site_root;
 
 	/**
 	 * @var object $docker Object to access `EE::docker()` functions.
@@ -49,36 +44,6 @@ class Site_WP_Command extends EE_Site_Command {
 	private $logger;
 
 	/**
-	 * @var bool $ssl Whether the site has SSL.
-	 */
-	private $ssl;
-
-	/**
-	 * @var bool $ssl Whether the site SSL type is wildcard.
-	 */
-	private $ssl_wildcard;
-
-	/**
-	 * @var string $locale Language to install WordPress in.
-	 */
-	private $locale;
-
-	/**
-	 * @var bool $skip_install To skip installation of WordPress.
-	 */
-	private $skip_install;
-
-	/**
-	 * @var bool $skip_chk To skip site status check pre-installation.
-	 */
-	private $skip_chk;
-
-	/**
-	 * @var bool $force To reset remote database.
-	 */
-	private $force;
-
-	/**
 	 * @var Filesystem $fs Symfony Filesystem object.
 	 */
 	private $fs;
@@ -86,17 +51,15 @@ class Site_WP_Command extends EE_Site_Command {
 	public function __construct() {
 
 		$this->level = 0;
-		pcntl_signal( SIGTERM, [ $this, "rollback" ] );
-		pcntl_signal( SIGHUP, [ $this, "rollback" ] );
-		pcntl_signal( SIGUSR1, [ $this, "rollback" ] );
-		pcntl_signal( SIGINT, [ $this, "rollback" ] );
+		pcntl_signal( SIGTERM, [ $this, 'rollback' ] );
+		pcntl_signal( SIGHUP,  [ $this, 'rollback' ] );
+		pcntl_signal( SIGUSR1, [ $this, 'rollback' ] );
+		pcntl_signal( SIGINT,  [ $this, 'rollback' ] );
 		$shutdown_handler = new Shutdown_Handler();
-		register_shutdown_function( [ $shutdown_handler, "cleanup" ], [ &$this ] );
+		register_shutdown_function( [ $shutdown_handler, 'cleanup' ], [ &$this ] );
 		$this->docker = EE::docker();
 		$this->logger = EE::get_file_logger()->withName( 'site_wp_command' );
 		$this->fs     = new Filesystem();
-
-		$this->site['type'] = 'wp';
 	}
 
 	/**
@@ -188,53 +151,60 @@ class Site_WP_Command extends EE_Site_Command {
 		EE::warning( 'This is a beta version. Please don\'t use it in production.' );
 		$this->logger->debug( 'args:', $args );
 		$this->logger->debug( 'assoc_args:', empty( $assoc_args ) ? array( 'NULL' ) : $assoc_args );
-		$this->site['url'] = strtolower( EE\Utils\remove_trailing_slash( $args[0] ) );
+		$site_config['url'] = strtolower( EE\Utils\remove_trailing_slash( $args[0] ) );
 
 		$mu = EE\Utils\get_flag_value( $assoc_args, 'mu' );
 
 		if ( isset( $assoc_args['mu'] ) && ! in_array( $mu, [ 'subdom', 'subdir' ], true ) ) {
 			EE::error( "Unrecognized multi-site parameter: $mu. Only `--mu=subdom` and `--mu=subdir` are supported." );
 		}
-		$this->site['app_sub_type'] = $mu ?? 'wp';
+		$site_config['app_sub_type'] = $mu ?? 'wp';
 
-		if ( Site::find( $this->site['url'] ) ) {
-			EE::error( sprintf( "Site %1\$s already exists. If you want to re-create it please delete the older one using:\n`ee site delete %1\$s`", $this->site['url'] ) );
+		if ( Site::find( $site_config['url'] ) ) {
+			EE::error( sprintf( "Site %1\$s already exists. If you want to re-create it please delete the older one using:\n`ee site delete %1\$s`", $site_config['url'] ) );
 		}
 
-		$this->cache_type      = EE\Utils\get_flag_value( $assoc_args, 'cache' );
-		$this->ssl             = EE\Utils\get_flag_value( $assoc_args, 'ssl' );
-		$this->ssl_wildcard    = EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
-		$this->site['title']   = EE\Utils\get_flag_value( $assoc_args, 'title', $this->site['url'] );
-		$this->site['wp_user'] = EE\Utils\get_flag_value( $assoc_args, 'admin-user', 'admin' );
-		$this->site['wp_pass'] = EE\Utils\get_flag_value( $assoc_args, 'admin-pass', EE\Utils\random_password() );
-		$this->db['name']      = str_replace( [ '.', '-' ], '_', $this->site['url'] );
-		$this->db['host']      = EE\Utils\get_flag_value( $assoc_args, 'dbhost' );
-		$this->db['port']      = '3306';
-		$this->db['user']      = EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site['url'] ) );
-		$this->db['pass']      = EE\Utils\get_flag_value( $assoc_args, 'dbpass', EE\Utils\random_password() );
-		$this->locale          = EE\Utils\get_flag_value( $assoc_args, 'locale', EE::get_config( 'locale' ) );
-		$this->db['root_pass'] = EE\Utils\random_password();
+		$site_config['cache_nginx_browser']  = EE\Utils\get_flag_value( $assoc_args, 'cache', false );
+		$site_config['cache_nginx_fullpage'] = EE\Utils\get_flag_value( $assoc_args, 'cache', false );
+		$site_config['cache_mysql_query']    = EE\Utils\get_flag_value( $assoc_args, 'cache', false );
+		$site_config['cache_app_object']     = EE\Utils\get_flag_value( $assoc_args, 'cache', false );
+		$site_config['ssl']                  = EE\Utils\get_flag_value( $assoc_args, 'ssl' );
+		$site_config['ssl_wildcard']         = EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
+		$site_config['title']                = EE\Utils\get_flag_value( $assoc_args, 'title', $site_config['url'] );
+		$site_config['wp_user']              = EE\Utils\get_flag_value( $assoc_args, 'admin-user', 'admin' );
+		$site_config['wp_pass']              = EE\Utils\get_flag_value( $assoc_args, 'admin-pass', EE\Utils\random_password() );
+		$site_config['db_name']              = str_replace( [ '.', '-' ], '_', $site_config['url'] );
+		$site_config['db_host']              = EE\Utils\get_flag_value( $assoc_args, 'dbhost' );
+		$site_config['db_port']              = '3306';
+		$site_config['db_user']              = EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $site_config['url'] ) );
+		$site_config['db_pass']              = EE\Utils\get_flag_value( $assoc_args, 'dbpass', EE\Utils\random_password() );
+		$site_config['locale']               = EE\Utils\get_flag_value( $assoc_args, 'locale', EE::get_config( 'locale' ) );
+		$site_config['db_root_pass']         = EE\Utils\random_password();
+		$site_config['root']                 = WEBROOT . $site_config['url'];
+
+		$this->site_url  = $site_config['url'];
+		$this->site_root = $site_config['root'];
 
 		// If user wants to connect to remote database
-		if ( 'db' !== $this->db['host'] ) {
+		if ( 'db' !== $site_config['db_host'] ) {
 			if ( ! isset( $assoc_args['dbuser'] ) || ! isset( $assoc_args['dbpass'] ) ) {
 				EE::error( '`--dbuser` and `--dbpass` are required for remote db host.' );
 			}
-			$arg_host_port    = explode( ':', $this->db['host'] );
-			$this->db['host'] = $arg_host_port[0];
-			$this->db['port'] = empty( $arg_host_port[1] ) ? '3306' : $arg_host_port[1];
+			$arg_host_port          = explode( ':', $site_config['db_host'] );
+			$site_config['db_host'] = $arg_host_port[0];
+			$site_config['db_port'] = empty( $arg_host_port[1] ) ? '3306' : $arg_host_port[1];
 		}
 
-		$this->site['wp_email'] = EE\Utils\get_flag_value( $assoc_args, 'admin_email', strtolower( 'admin@' . $this->site['url'] ) );
-		$this->skip_install     = EE\Utils\get_flag_value( $assoc_args, 'skip-install' );
-		$this->skip_chk         = EE\Utils\get_flag_value( $assoc_args, 'skip-status-check' );
-		$this->force            = EE\Utils\get_flag_value( $assoc_args, 'force' );
+		$site_config['wp_email'] = EE\Utils\get_flag_value( $assoc_args, 'admin_email', strtolower( 'admin@' . $site_config['url'] ) );
+		$site_config['skip_install']      = EE\Utils\get_flag_value( $assoc_args, 'skip-install' );
+		$site_config['skip_check']          = EE\Utils\get_flag_value( $assoc_args, 'skip-status-check' );
+		$site_config['force']             = EE\Utils\get_flag_value( $assoc_args, 'force' );
 
 		EE\SiteUtils\init_checks();
 
 		EE::log( 'Configuring project.' );
 
-		$this->create_site( $assoc_args );
+		$this->create_site( $assoc_args, $site_config );
 		EE\Utils\delem_log( 'site create end' );
 	}
 
@@ -258,35 +228,51 @@ class Site_WP_Command extends EE_Site_Command {
 	 * [<site-name>]
 	 * : Name of the website whose info is required.
 	 */
-	public function info( $args, $assoc_args ) {
+	public function info( $args, $assoc_args, $site_config = [] ) {
 
 		EE\Utils\delem_log( 'site info start' );
-		if ( ! isset( $this->site['url'] ) ) {
-			$args = EE\SiteUtils\auto_site_name( $args, 'wp', __FUNCTION__ );
-			$this->populate_site_info( $args );
+
+		if ( ! isset( $site_config['url'] ) ) {
+			$args                               = EE\SiteUtils\auto_site_name( $args, 'wp', __FUNCTION__ );
+			$site_url                           = EE\Utils\remove_trailing_slash( $args[0] );
+			$site                               = $this->get_site( $site_url );
+			$site_config['ssl']                 = $site->site_ssl;
+			$site_config['url']                 = $site_url;
+			$site_config['title']               = $site->app_admin_url;
+			$site_config['ssl_wildcard']        = $site->site_ssl_wildcard;
+			$site_config['admin_tools']         = $site->admin_tools;
+			$site_config['wp_user']             = $site->app_admin_username;
+			$site_config['wp_pass']             = $site->app_admin_password;
+			$site_config['db_root_pass']        = $site->db_root_password;
+			$site_config['db_name']             = $site->db_name;
+			$site_config['db_user']             = $site->db_user;
+			$site_config['db_pass']             = $site->db_password;
+			$site_config['wp_email']            = $site->app_admin_email;
+			$site_config['cache_nginx_browser'] = $site->cache_nginx_browser;
 		}
-		$ssl    = $this->ssl ? 'Enabled' : 'Not Enabled';
-		$prefix = ( $this->ssl ) ? 'https://' : 'http://';
-		$info   = [ [ 'Site', $prefix . $this->site['url'] ] ];
-		if ( ! empty( $this->site['admin_tools'] ) ) {
-			$info[] = [ 'Access admin-tools', $prefix . $this->site['url'] . '/ee-admin/' ];
+
+		$ssl    = $site_config['ssl'] ? 'Enabled' : 'Not Enabled';
+		$prefix = ( $site_config['ssl'] ) ? 'https://' : 'http://';
+		$info   = [ [ 'Site', $prefix . $site_config['url'] ] ];
+		if ( ! empty( $site_config['admin_tools'] ) ) {
+			$info[] = [ 'Access admin-tools', $prefix . $site_config['url'] . '/ee-admin/' ];
 		}
-		$info[] = [ 'Site Title', $this->site['title'] ];
-		if ( ! empty( $this->site['wp_user'] ) && ! $this->skip_install ) {
-			$info[] = [ 'WordPress Username', $this->site['wp_user'] ];
-			$info[] = [ 'WordPress Password', $this->site['wp_pass'] ];
+		$info[] = [ 'Site Title', $site_config['title'] ];
+		if ( ! empty( $site_config['wp_user'] ) && ! empty( $site_config['skip_install'] ) ) {
+			$info[] = [ 'WordPress Username', $site_config['wp_user'] ];
+			$info[] = [ 'WordPress Password', $site_config['wp_pass'] ];
 		}
-		$info[] = [ 'DB Root Password', $this->db['root_pass'] ];
-		$info[] = [ 'DB Name', $this->db['name'] ];
-		$info[] = [ 'DB User', $this->db['user'] ];
-		$info[] = [ 'DB Password', $this->db['pass'] ];
-		$info[] = [ 'E-Mail', $this->site['wp_email'] ];
+		$info[] = [ 'DB Root Password', $site_config['db_root_pass'] ];
+		$info[] = [ 'DB Name', $site_config['db_name'] ];
+		$info[] = [ 'DB User', $site_config['db_user'] ];
+		$info[] = [ 'DB Password', $site_config['db_pass'] ];
+		$info[] = [ 'E-Mail', $site_config['wp_email'] ];
 		$info[] = [ 'SSL', $ssl ];
 
-		if ( $this->ssl ) {
-			$info[] = [ 'SSL Wildcard', $this->ssl_wildcard ? 'Yes' : 'No' ];
+		if ( $site_config['ssl'] ) {
+			$info[] = [ 'SSL Wildcard', $site_config['ssl_wildcard'] ? 'Yes' : 'No' ];
 		}
-		$info[] = [ 'Cache', $this->cache_type ? 'Enabled' : 'None' ];
+		$info[] = [ 'Cache', $site_config['cache_nginx_browser'] ? 'Enabled' : 'None' ];
 
 		EE\Utils\format_table( $info );
 
@@ -295,47 +281,48 @@ class Site_WP_Command extends EE_Site_Command {
 
 	/**
 	 * Function to configure site and copy all the required files.
+	 *
+	 * @param array $site_config site build configuration
 	 */
-	private function configure_site_files() {
-
-		$site_conf_dir           = $this->site['root'] . '/config';
-		$site_docker_yml         = $this->site['root'] . '/docker-compose.yml';
-		$site_conf_env           = $this->site['root'] . '/.env';
+	private function configure_site_files( array $site_config ) {
+		$site_conf_dir           = $site_config['root'] . '/config';
+		$site_docker_yml         = $site_config['root'] . '/docker-compose.yml';
+		$site_conf_env           = $site_config['root'] . '/.env';
 		$site_nginx_default_conf = $site_conf_dir . '/nginx/default.conf';
 		$site_php_ini            = $site_conf_dir . '/php-fpm/php.ini';
-		$server_name             = ( 'subdom' === $this->site['app_sub_type'] ) ? $this->site['url'] . ' *.' . $this->site['url'] : $this->site['url'];
+		$server_name             = ( 'subdom' === $site_config['app_sub_type'] ) ? $site_config['url'] . ' *.' . $site_config['url'] : $site_config['url'];
 		$process_user            = posix_getpwuid( posix_geteuid() );
 
-		EE::log( 'Creating WordPress site ' . $this->site['url'] );
+		EE::log( 'Creating WordPress site ' . $site_config['url'] );
 		EE::log( 'Copying configuration files.' );
 
 		$filter                 = [];
-		$filter[]               = $this->site['app_sub_type'];
-		$filter[]               = $this->cache_type ? 'redis' : 'none';
-		$filter[]               = $this->db['host'];
+		$filter[]               = $site_config['app_sub_type'];
+		$filter[]               = $site_config['cache_nginx_browser'] ? 'redis' : 'none';
+		$filter[]               = $site_config['db_host'];
 		$site_docker            = new Site_WP_Docker();
 		$docker_compose_content = $site_docker->generate_docker_compose_yml( $filter );
-		$default_conf_content   = $this->generate_default_conf( $this->site['app_sub_type'], $this->cache_type, $server_name );
-		$local                  = ( 'db' === $this->db['host'] ) ? true : false;
+		$default_conf_content   = $this->generate_default_conf( $site_config['app_sub_type'], $site_config['cache_nginx_browser'], $server_name );
+		$local                  = ( 'db' === $site_config['db_host'] ) ? true : false;
 
-		$db_host  = $local ? $this->db['host'] : $this->db['host'] . ':' . $this->db['port'];
+		$db_host  = $local ? $site_config['db_host'] : $site_config['db_host'] . ':' . $site_config['db_port'];
 		$env_data = [
 			'local'         => $local,
-			'virtual_host'  => $this->site['url'],
-			'root_password' => $this->db['root_pass'],
-			'database_name' => $this->db['name'],
-			'database_user' => $this->db['user'],
-			'user_password' => $this->db['pass'],
+			'virtual_host'  => $site_config['url'],
+			'root_password' => $site_config['db_root_pass'],
+			'database_name' => $site_config['db_name'],
+			'database_user' => $site_config['db_user'],
+			'user_password' => $site_config['db_pass'],
 			'wp_db_host'    => $db_host,
-			'wp_db_user'    => $this->db['user'],
-			'wp_db_name'    => $this->db['name'],
-			'wp_db_pass'    => $this->db['pass'],
+			'wp_db_user'    => $site_config['db_user'],
+			'wp_db_name'    => $site_config['db_name'],
+			'wp_db_pass'    => $site_config['db_pass'],
 			'user_id'       => $process_user['uid'],
 			'group_id'      => $process_user['gid'],
 		];
 
 		$php_ini_data = [
-			'admin_email' => $this->site['wp_email'],
+			'admin_email' => $site_config['wp_email'],
 		];
 
 		$env_content     = EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/.env.mustache', $env_data );
@@ -350,11 +337,11 @@ class Site_WP_Command extends EE_Site_Command {
 			$this->fs->mkdir( $site_conf_dir . '/php-fpm' );
 			$this->fs->dumpFile( $site_php_ini, $php_ini_content );
 
-			EE\SiteUtils\set_postfix_files( $this->site['url'], $site_conf_dir );
+			EE\SiteUtils\set_postfix_files( $site_config['url'], $site_conf_dir );
 
 			EE::success( 'Configuration files copied.' );
 		} catch ( Exception $e ) {
-			$this->catch_clean( $e );
+			$this->catch_clean( $e, $site_config );
 		}
 	}
 
@@ -373,33 +360,40 @@ class Site_WP_Command extends EE_Site_Command {
 		$default_conf_data['site_type']             = $site_type;
 		$default_conf_data['server_name']           = $server_name;
 		$default_conf_data['include_php_conf']      = ! $cache_type;
-		$default_conf_data['include_wpsubdir_conf'] = $site_type === 'subdir';
+		$default_conf_data['include_wpsubdir_conf'] = 'subdir' === $site_type;
 		$default_conf_data['include_redis_conf']    = $cache_type;
 
 		return EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/nginx/default.conf.mustache', $default_conf_data );
 	}
 
-	private function maybe_verify_remote_db_connection() {
+	/**
+	 * Verifies remote db connection if remote db is not used
+	 *
+	 * @param array $site_config site build configuration
+	 *
+	 * @throws Exception
+	 */
+	private function maybe_verify_remote_db_connection( array $site_config ) {
 
-		if ( 'db' === $this->db['host'] ) {
+		if ( 'db' === $site_config['db_host'] ) {
 			return;
 		}
 
 		// Docker needs special handling if we want to connect to host machine.
 		// The since we're inside the container and we want to access host machine,
 		// we would need to replace localhost with default gateway
-		if ( $this->db['host'] === '127.0.0.1' || $this->db['host'] === 'localhost' ) {
-			$launch = EE::exec( sprintf( "docker network inspect %s --format='{{ (index .IPAM.Config 0).Gateway }}'", $this->site['url'] ), false, true );
+		if ( '127.0.0.1' === $site_config['db_host'] || 'localhost' === $site_config['db_host'] ) {
+			$launch = EE::exec( sprintf( "docker network inspect %s --format='{{ (index .IPAM.Config 0).Gateway }}'", $site_config['url'] ), false, true );
 
 			if ( ! $launch->return_code ) {
-				$this->db['host'] = trim( $launch->stdout, "\n" );
+				$site_config['db_host'] = trim( $launch->stdout, "\n" );
 			} else {
 				throw new Exception( 'There was a problem inspecting network. Please check the logs' );
 			}
 		}
 		\EE::log( 'Verifying connection to remote database' );
 
-		if ( ! EE::exec( sprintf( "docker run -it --rm --network='%s' mysql sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"", $this->site['url'], $this->db['host'], $this->db['port'], $this->db['user'], $this->db['pass'] ) ) ) {
+		if ( ! EE::exec( sprintf( "docker run -it --rm --network='%s' mysql sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"", $site_config['url'], $site_config['db_host'], $site_config['db_port'], $site_config['db_user'], $site_config['db_pass'] ) ) ) {
 			throw new Exception( 'Unable to connect to remote db' );
 		}
 
@@ -408,54 +402,61 @@ class Site_WP_Command extends EE_Site_Command {
 
 	/**
 	 * Function to create the site.
+	 *
+	 * @param $assoc_args  array Associative args passed to site create
+	 * @param $site_config array site build configuration
 	 */
-	private function create_site( $assoc_args ) {
+	private function create_site( $assoc_args, $site_config ) {
 
-		$this->site['root'] = WEBROOT . $this->site['url'];
 		$this->level        = 1;
 		try {
-			EE\SiteUtils\create_site_root( $this->site['root'], $this->site['url'] );
+			EE\SiteUtils\create_site_root( $site_config['root'], $site_config['url'] );
 			$this->level = 2;
-			$this->maybe_verify_remote_db_connection();
+			$this->maybe_verify_remote_db_connection( $site_config );
 			$this->level = 3;
-			$this->configure_site_files();
+			$this->configure_site_files( $site_config );
 
-			EE\SiteUtils\start_site_containers( $this->site['root'], [ 'nginx', 'postfix' ] );
-			EE\SiteUtils\configure_postfix( $this->site['url'], $this->site['root'] );
-			$this->wp_download_and_config( $assoc_args );
+			EE\SiteUtils\start_site_containers( $site_config['root'], [ 'nginx', 'postfix' ] );
+			EE\SiteUtils\configure_postfix( $site_config['url'], $site_config['root'] );
+			$this->wp_download_and_config( $assoc_args, $site_config );
 
-			if ( ! $this->skip_install ) {
-				EE\SiteUtils\create_etc_hosts_entry( $this->site['url'] );
-				if ( ! $this->skip_chk ) {
+			if ( ! $site_config['skip_install'] ) {
+				EE\SiteUtils\create_etc_hosts_entry( $site_config['url'] );
+				if ( ! $site_config['skip_check'] ) {
 					$this->level = 4;
-					EE\SiteUtils\site_status_check( $this->site['url'] );
+					EE\SiteUtils\site_status_check( $site_config['url'] );
 				}
-				$this->install_wp();
+				$this->install_wp( $site_config );
 			}
 
-			EE\SiteUtils\add_site_redirects( $this->site['url'], false, 'inherit' === $this->ssl );
+			EE\SiteUtils\add_site_redirects( $site_config['url'], false, 'inherit' === $site_config['ssl'] );
 			EE\SiteUtils\reload_proxy_configuration();
 
-			if ( $this->ssl ) {
-				$wildcard = 'subdom' === $this->site['app_sub_type'] || $this->ssl_wildcard;
-				EE::debug( "Wildcard in site wp command: $this->ssl_wildcard" );
-				$this->init_ssl( $this->site['url'], $this->site['root'], $this->ssl, $wildcard );
+			if ( $site_config['ssl'] ) {
+				$wildcard = 'subdom' === $site_config['app_sub_type'] || $site_config['ssl_wildcard'];
+				EE::debug( "Wildcard in site wp command: ${site_config['ssl_wildcard']}" );
+				$this->init_ssl( $site_config['url'], $site_config['root'], $site_config['ssl'], $wildcard );
 
-				EE\SiteUtils\add_site_redirects( $this->site['url'], true, 'inherit' === $this->ssl );
+				EE\SiteUtils\add_site_redirects( $site_config['url'], true, 'inherit' === $site_config['ssl'] );
 				EE\SiteUtils\reload_proxy_configuration();
 			}
 		} catch ( Exception $e ) {
-			$this->catch_clean( $e );
+			$this->catch_clean( $e, $site_config );
 		}
 
-		$this->info( [ $this->site['url'] ], [] );
-		$this->create_site_db_entry();
+		$this->create_site_db_entry( $site_config );
+		$this->info( [ $site_config['url'] ], [], $site_config );
 	}
 
 	/**
 	 * Download and configure WordPress according to the user passed parameters.
+	 *
+	 * @param $assoc_args  array associative args passed to site create
+	 * @param $site_config array site build configuration
+	 *
+	 * @throws \EE\ExitException
 	 */
-	private function wp_download_and_config( $assoc_args ) {
+	private function wp_download_and_config( $assoc_args, $site_config ) {
 
 		$core_download_args = [
 			'version',
@@ -485,19 +486,19 @@ class Site_WP_Command extends EE_Site_Command {
 
 		EE::log( 'Downloading and configuring WordPress.' );
 
-		$chown_command = "docker-compose exec --user=root php chown -R www-data: /var/www/";
+		$chown_command = 'docker-compose exec --user=root php chown -R www-data: /var/www/';
 		EE::exec( $chown_command );
 
-		$core_download_command = "docker-compose exec --user='www-data' php wp core download --locale='$this->locale' $core_download_arguments";
+		$core_download_command = "docker-compose exec --user='www-data' php wp core download --locale='${site_config['locale']}' $core_download_arguments";
 
 		if ( ! EE::exec( $core_download_command ) ) {
-			EE::error('Unable to download wp core.', false );
+			EE::error( 'Unable to download wp core.', false );
 		}
 
 		// TODO: Look for better way to handle mysql healthcheck
-		if ( 'db' === $this->db['host'] ) {
+		if ( 'db' === $site_config['db_host'] ) {
 			$mysql_unhealthy = true;
-			$health_chk      = sprintf( "docker-compose exec --user='www-data' php mysql --user='root' --password='%s' --host='db' -e exit", $this->db['root_pass'] );
+			$health_chk      = sprintf( "docker-compose exec --user='www-data' php mysql --user='root' --password='%s' --host='db' -e exit", $site_config['db_root_pass'] );
 			$count           = 0;
 			while ( $mysql_unhealthy ) {
 				$mysql_unhealthy = ! EE::exec( $health_chk );
@@ -508,27 +509,27 @@ class Site_WP_Command extends EE_Site_Command {
 			}
 		}
 
-		$db_host                  = isset( $this->db['port'] ) ? $this->db['host'] . ':' . $this->db['port'] : $this->db['host'];
-		$wp_config_create_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp config create --dbuser=\'%s\' --dbname=\'%s\' --dbpass=\'%s\' --dbhost=\'%s\' %s --extra-php="if ( isset( \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] ) && \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] == \'https\'){\$_SERVER[\'HTTPS\']=\'on\';}"', $this->db['user'], $this->db['name'], $this->db['pass'], $db_host, $config_arguments );
+		$db_host                  = isset( $site_config['db_port'] ) ? $site_config['db_host'] . ':' . $site_config['db_port'] : $site_config['db_host'];
+		$wp_config_create_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp config create --dbuser=\'%s\' --dbname=\'%s\' --dbpass=\'%s\' --dbhost=\'%s\' %s --extra-php="if ( isset( \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] ) && \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] == \'https\'){\$_SERVER[\'HTTPS\']=\'on\';}"', $site_config['db_user'], $site_config['db_name'], $site_config['db_pass'], $db_host, $config_arguments );
 
 		try {
 			if ( ! EE::exec( $wp_config_create_command ) ) {
-				throw new Exception( sprintf( 'Couldn\'t connect to %s:%s or there was issue in `wp config create`. Please check logs.', $this->db['host'], $this->db['port'] ) );
+				throw new Exception( sprintf( 'Couldn\'t connect to %s:%s or there was issue in `wp config create`. Please check logs.', $site_config['db_host'], $site_config['db_port'] ) );
 			}
-			if ( 'db' !== $this->db['host'] ) {
-				$name            = str_replace( '_', '\_', $this->db['name'] );
-				$check_db_exists = sprintf( "docker-compose exec php bash -c \"mysqlshow --user='%s' --password='%s' --host='%s' --port='%s' '%s'", $this->db['user'], $this->db['pass'], $this->db['host'], $this->db['port'], $name );
+			if ( 'db' !== $site_config['db_host'] ) {
+				$name            = str_replace( '_', '\_', $site_config['db_name'] );
+				$check_db_exists = sprintf( "docker-compose exec php bash -c \"mysqlshow --user='%s' --password='%s' --host='%s' --port='%s' '%s'", $site_config['db_user'], $site_config['db_pass'], $site_config['db_host'], $site_config['db_port'], $name );
 
 				if ( ! EE::exec( $check_db_exists ) ) {
-					EE::log( sprintf( 'Database `%s` does not exist. Attempting to create it.', $this->db['name'] ) );
-					$create_db_command = sprintf( 'docker-compose exec php bash -c "mysql --host=%s --port=%s --user=%s --password=%s --execute="CREATE DATABASE %s;"', $this->db['host'], $this->db['port'], $this->db['user'], $this->db['pass'], $this->db['name'] );
+					EE::log( sprintf( 'Database `%s` does not exist. Attempting to create it.', $site_config['db_name'] ) );
+					$create_db_command = sprintf( 'docker-compose exec php bash -c "mysql --host=%s --port=%s --user=%s --password=%s --execute="CREATE DATABASE %s;"', $site_config['db_host'], $site_config['db_port'], $site_config['db_user'], $site_config['db_pass'], $site_config['db_name'] );
 
 					if ( ! EE::exec( $create_db_command ) ) {
-						throw new Exception( sprintf( 'Could not create database `%s` on `%s:%s`. Please check if %s has rights to create database or manually create a database and pass with `--dbname` parameter.', $this->db['name'], $this->db['host'], $this->db['port'], $this->db['user'] ) );
+						throw new Exception( sprintf( 'Could not create database `%s` on `%s:%s`. Please check if %s has rights to create database or manually create a database and pass with `--dbname` parameter.', $site_config['db_name'], $site_config['db_host'], $site_config['db_port'], $site_config['db_user'] ) );
 					}
 					$this->level = 4;
 				} else {
-					if ( $this->force ) {
+					if ( $site_config['force'] ) {
 						EE::exec( 'docker-compose exec --user=\'www-data\' php wp db reset --yes' );
 					}
 					$check_tables = 'docker-compose exec --user=\'www-data\' php wp db tables';
@@ -538,30 +539,32 @@ class Site_WP_Command extends EE_Site_Command {
 				}
 			}
 		} catch ( Exception $e ) {
-			$this->catch_clean( $e );
+			$this->catch_clean( $e, $site_config );
 		}
 
 	}
 
 	/**
-	 * Install wordpress with given credentials.
+	 * Install WordPress with given credentials.
+	 *
+	 * @param $site_config array site build configuration
 	 */
-	private function install_wp() {
+	private function install_wp( array $site_config ) {
 
-		EE::log( "Installing WordPress site." );
-		chdir( $this->site['root'] );
+		EE::log( 'Installing WordPress site.' );
+		chdir( $site_config['root'] );
 
 		$wp_install_command   = 'install';
 		$maybe_multisite_type = '';
 
-		if ( 'subdom' === $this->site['app_sub_type'] || 'subdir' === $this->site['app_sub_type'] ) {
+		if ( 'subdom' === $site_config['app_sub_type'] || 'subdir' === $site_config['app_sub_type'] ) {
 			$wp_install_command   = 'multisite-install';
-			$maybe_multisite_type = $this->site['app_sub_type'] === 'subdom' ? '--subdomains' : '';
+			$maybe_multisite_type = $site_config['app_sub_type'] === 'subdom' ? '--subdomains' : '';
 		}
 
-		$install_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp core %s --url=\'%s\' --title=\'%s\' --admin_user=\'%s\'', $wp_install_command, $this->site['url'], $this->site['title'], $this->site['wp_user'] );
-		$install_command .= $this->site['wp_pass'] ? sprintf( ' --admin_password=\'%s\'', $this->site['wp_pass'] ) : '';
-		$install_command .= sprintf( ' --admin_email=\'%s\' %s', $this->site['wp_email'], $maybe_multisite_type );
+		$install_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp core %s --url=\'%s\' --title=\'%s\' --admin_user=\'%s\'', $wp_install_command, $site_config['url'], $site_config['title'], $site_config['wp_user'] );
+		$install_command .= $site_config['wp_pass'] ? sprintf( ' --admin_password=\'%s\'', $site_config['wp_pass'] ) : '';
+		$install_command .= sprintf( ' --admin_email=\'%s\' %s', $site_config['wp_email'], $maybe_multisite_type );
 
 		$core_install = EE::exec( $install_command );
 
@@ -569,50 +572,52 @@ class Site_WP_Command extends EE_Site_Command {
 			EE::warning( 'WordPress install failed. Please check logs.' );
 		}
 
-		$prefix = ( $this->ssl ) ? 'https://' : 'http://';
-		EE::success( $prefix . $this->site['url'] . ' has been created successfully!' );
+		$prefix = ( $site_config['ssl'] ) ? 'https://' : 'http://';
+		EE::success( $prefix . $site_config['url'] . ' has been created successfully!' );
 	}
 
 	/**
 	 * Function to save the site configuration entry into database.
+	 *
+	 * @param array $site_config site build configuration
 	 */
-	private function create_site_db_entry() {
+	private function create_site_db_entry( array $site_config ) {
 		$ssl = null;
 
-		if ( $this->ssl ) {
+		if ( $site_config['ssl'] ) {
 			$ssl = 'letsencrypt';
-			if ( 'subdom' === $this->site['app_sub_type'] ) {
+			if ( 'subdom' === $site_config['app_sub_type'] ) {
 				$ssl = 'wildcard';
 			}
 		}
 
 		$data = [
-			'site_url'             => $this->site['url'],
-			'site_type'            => $this->site['type'],
-			'app_admin_url'        => $this->site['title'],
-			'app_admin_email'      => $this->site['wp_email'],
+			'site_url'             => $site_config['url'],
+			'site_type'            => 'wp',
+			'app_admin_url'        => $site_config['title'],
+			'app_admin_email'      => $site_config['wp_email'],
 			'app_mail'             => 'postfix',
-			'app_sub_type'         => $this->site['app_sub_type'],
-			'cache_nginx_browser'  => (int) $this->cache_type,
-			'cache_nginx_fullpage' => (int) $this->cache_type,
-			'cache_mysql_query'    => (int) $this->cache_type,
-			'cache_app_object'     => (int) $this->cache_type,
-			'site_fs_path'         => $this->site['root'],
-			'db_name'              => $this->db['name'],
-			'db_user'              => $this->db['user'],
-			'db_host'              => $this->db['host'],
-			'db_port'              => isset( $this->db['port'] ) ? $this->db['port'] : '',
-			'db_password'          => $this->db['pass'],
-			'db_root_password'     => $this->db['root_pass'],
+			'app_sub_type'         => $site_config['app_sub_type'],
+			'cache_nginx_browser'  => $site_config['cache_nginx_browser'],
+			'cache_nginx_fullpage' => $site_config['cache_nginx_fullpage'],
+			'cache_mysql_query'    => $site_config['cache_mysql_query'],
+			'cache_app_object'     => $site_config['cache_app_object'],
+			'site_fs_path'         => $site_config['root'],
+			'db_name'              => $site_config['db_name'],
+			'db_user'              => $site_config['db_user'],
+			'db_host'              => $site_config['db_host'],
+			'db_port'              => isset( $site_config['db_port'] ) ? $site_config['db_port'] : '',
+			'db_password'          => $site_config['db_pass'],
+			'db_root_password'     => $site_config['db_root_pass'],
 			'site_ssl'             => $ssl,
-			'site_ssl_wildcard'    => 'subdom' === $this->site['app_sub_type'] || $this->ssl_wildcard ? 1 : 0,
+			'site_ssl_wildcard'    => 'subdom' === $site_config['app_sub_type'] || $site_config['ssl_wildcard'] ? 1 : 0,
 			'php_version'          => '7.2',
 			'created_on'           => date( 'Y-m-d H:i:s', time() ),
 		];
 
-		if ( ! $this->skip_install ) {
-			$data['app_admin_username'] = $this->site['wp_user'];
-			$data['app_admin_password'] = $this->site['wp_pass'];
+		if ( ! $site_config['skip_install'] ) {
+			$data['app_admin_username'] = $site_config['wp_user'];
+			$data['app_admin_password'] = $site_config['wp_pass'];
 		}
 
 		try {
@@ -622,39 +627,25 @@ class Site_WP_Command extends EE_Site_Command {
 				throw new Exception( 'Error creating site entry in database.' );
 			}
 		} catch ( Exception $e ) {
-			$this->catch_clean( $e );
+			$this->catch_clean( $e, $site_config );
 		}
 	}
 
 	/**
 	 * Populate basic site info from db.
+	 *
+	 * @param string $site_url
+	 *
+	 * @throws \EE\ExitException
+	 * @return Site
 	 */
-	private function populate_site_info( $args ) {
-
-		$this->site['url'] = EE\Utils\remove_trailing_slash( $args[0] );
-		$site              = Site::find( $this->site['url'] );
+	private function get_site( string $site_url ) : Site {
+		$site = Site::find( $site_url );
 
 		if ( $site ) {
-			$this->site['type']         = $site->site_type;
-			$this->site['app_sub_type'] = $site->app_sub_type;
-			$this->site['admin_tools']  = $site->admin_tools;
-			$this->site['title']        = $site->app_admin_url;
-			$this->cache_type           = $site->cache_nginx_fullpage;
-			$this->site['root']         = $site->site_fs_path;
-			$this->db['user']           = $site->db_user;
-			$this->db['name']           = $site->db_name;
-			$this->db['host']           = $site->db_host;
-			$this->db['port']           = $site->db_port;
-			$this->db['pass']           = $site->db_password;
-			$this->db['root_pass']      = $site->db_root_password;
-			$this->site['wp_user']      = $site->app_admin_username;
-			$this->site['wp_pass']      = $site->app_admin_password;
-			$this->site['wp_email']     = $site->app_admin_email;
-			$this->ssl                  = $site->site_ssl;
-			$this->ssl_wildcard         = $site->site_ssl_wildcard;
-
+			return $site;
 		} else {
-			EE::error( "Site $this->site['url'] does not exist." );
+			EE::error( "Site $site_url does not exist." );
 		}
 	}
 
@@ -709,12 +700,15 @@ class Site_WP_Command extends EE_Site_Command {
 	 * Catch and clean exceptions.
 	 *
 	 * @param Exception $e
+	 * @param array     $site_config
+	 *
+	 * @throws \EE\ExitException
 	 */
-	private function catch_clean( $e ) {
+	private function catch_clean( Exception $e, array $site_config ) {
 		EE\Utils\delem_log( 'site cleanup start' );
 		EE::warning( $e->getMessage() );
 		EE::warning( 'Initiating clean-up.' );
-		$this->delete_site( $this->level, $this->site['url'], $this->site['root'] );
+		$this->delete_site( $this->level, $this->site_url, $this->site_root );
 		EE\Utils\delem_log( 'site cleanup end' );
 		exit;
 	}
@@ -725,7 +719,7 @@ class Site_WP_Command extends EE_Site_Command {
 	private function rollback() {
 		EE::warning( 'Exiting gracefully after rolling back. This may take some time.' );
 		if ( $this->level > 0 ) {
-			$this->delete_site( $this->level, $this->site['url'], $this->site['root'] );
+			$this->delete_site( $this->level, $this->site_url, $this->site_root );
 		}
 		EE::success( 'Rollback complete. Exiting now.' );
 		exit;
