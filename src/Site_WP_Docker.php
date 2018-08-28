@@ -15,7 +15,7 @@ class Site_WP_Docker {
 	 * @return String docker-compose.yml content string.
 	 */
 	public function generate_docker_compose_yml( array $filters = [] ) {
-		$img_versions = EE\Utils\get_image_versions();
+		$img_versions = \EE\Utils\get_image_versions();
 		$base         = [];
 
 		$restart_default = [ 'name' => 'always' ];
