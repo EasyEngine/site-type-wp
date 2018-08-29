@@ -235,7 +235,7 @@ class Site_WP_Command extends EE_Site_Command {
 		if ( ! isset( $site_config['url'] ) ) {
 			$args                               = EE\SiteUtils\auto_site_name( $args, 'wp', __FUNCTION__ );
 			$site_url                           = EE\Utils\remove_trailing_slash( $args[0] );
-			$site                               = $this->get_site( $site_url );
+			$site                               = $this->get_site_or_exit( $site_url );
 			$site_config['ssl']                 = $site->site_ssl;
 			$site_config['url']                 = $site_url;
 			$site_config['title']               = $site->app_admin_url;
@@ -559,7 +559,7 @@ class Site_WP_Command extends EE_Site_Command {
 
 		if ( 'subdom' === $site_config['app_sub_type'] || 'subdir' === $site_config['app_sub_type'] ) {
 			$wp_install_command   = 'multisite-install';
-			$maybe_multisite_type = $site_config['app_sub_type'] === 'subdom' ? '--subdomains' : '';
+			$maybe_multisite_type = 'subdom' === $site_config['app_sub_type'] ? '--subdomains' : '';
 		}
 
 		$install_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp core %s --url=\'%s\' --title=\'%s\' --admin_user=\'%s\'', $wp_install_command, $site_config['url'], $site_config['title'], $site_config['wp_user'] );
@@ -632,14 +632,14 @@ class Site_WP_Command extends EE_Site_Command {
 	}
 
 	/**
-	 * Populate basic site info from db.
+	 * Returns site if found else exits.
 	 *
-	 * @param string $site_url
+	 * @param string $site_url url of site to find
 	 *
 	 * @throws \EE\ExitException
 	 * @return Site
 	 */
-	private function get_site( string $site_url ) : Site {
+	private function get_site_or_exit( string $site_url ) : Site {
 		$site = Site::find( $site_url );
 
 		if ( $site ) {
