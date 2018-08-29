@@ -3,6 +3,7 @@
 declare( ticks=1 );
 
 namespace EE\Site\Type;
+
 use \Symfony\Component\Filesystem\Filesystem;
 use \EE\Model\Site;
 
@@ -85,13 +86,8 @@ class WordPress extends EE_Site_Command {
 
 	public function __construct() {
 
-		$this->level = 0;
-		pcntl_signal( SIGTERM, [ $this, "rollback" ] );
-		pcntl_signal( SIGHUP, [ $this, "rollback" ] );
-		pcntl_signal( SIGUSR1, [ $this, "rollback" ] );
-		pcntl_signal( SIGINT, [ $this, "rollback" ] );
-		$shutdown_handler = new Shutdown_Handler();
-		register_shutdown_function( [ $shutdown_handler, "cleanup" ], [ &$this ] );
+		parent::__construct();
+		$this->level  = 0;
 		$this->docker = \EE::docker();
 		$this->logger = \EE::get_file_logger()->withName( 'site_wp_command' );
 		$this->fs     = new Filesystem();
@@ -245,10 +241,11 @@ class WordPress extends EE_Site_Command {
 	 *
 	 * @return string Generated db user
 	 */
-	private function create_site_db_user( string $site_url ) : string {
+	private function create_site_db_user( string $site_url ): string {
 		if ( strlen( $site_url ) > 53 ) {
 			$site_url = substr( $site_url, 0, 53 );
 		}
+
 		return $site_url . '-' . \EE\Utils\random_password( 6 );
 	}
 
@@ -491,7 +488,7 @@ class WordPress extends EE_Site_Command {
 		$core_download_command = "docker-compose exec --user='www-data' php wp core download --locale='$this->locale' $core_download_arguments";
 
 		if ( ! \EE::exec( $core_download_command ) ) {
-			\EE::error('Unable to download wp core.', false );
+			\EE::error( 'Unable to download wp core.', false );
 		}
 
 		// TODO: Look for better way to handle mysql healthcheck
@@ -722,7 +719,7 @@ class WordPress extends EE_Site_Command {
 	/**
 	 * Roll back on interrupt.
 	 */
-	private function rollback() {
+	protected function rollback() {
 		\EE::warning( 'Exiting gracefully after rolling back. This may take some time.' );
 		if ( $this->level > 0 ) {
 			$this->delete_site( $this->level, $this->site['url'], $this->site['root'] );
@@ -731,19 +728,4 @@ class WordPress extends EE_Site_Command {
 		exit;
 	}
 
-	/**
-	 * Shutdown function to catch and rollback from fatal errors.
-	 */
-	private function shutDownFunction() {
-
-		$error = error_get_last();
-		if ( isset( $error ) && $error['type'] === E_ERROR ) {
-			\EE::warning( 'An Error occurred. Initiating clean-up.' );
-			$this->logger->error( 'Type: ' . $error['type'] );
-			$this->logger->error( 'Message: ' . $error['message'] );
-			$this->logger->error( 'File: ' . $error['file'] );
-			$this->logger->error( 'Line: ' . $error['line'] );
-			$this->rollback();
-		}
-	}
 }
