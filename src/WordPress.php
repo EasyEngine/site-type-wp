@@ -491,7 +491,6 @@ class WordPress extends EE_Site_Command {
 			\EE::error( 'Unable to download wp core.', false );
 		}
 
-		// TODO: Look for better way to handle mysql healthcheck
 		if ( 'db' === $this->db['host'] ) {
 			$mysql_unhealthy = true;
 			$health_chk      = sprintf( "docker-compose exec --user='www-data' php mysql --user='root' --password='%s' --host='db' -e exit", $this->db['root_pass'] );
