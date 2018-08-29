@@ -16,7 +16,7 @@ use \EE\Model\Site;
  *
  * @package ee-cli
  */
-class WP extends EE_Site_Command {
+class WordPress extends EE_Site_Command {
 
 	/**
 	 * @var array $site Associative array containing essential site related information.
