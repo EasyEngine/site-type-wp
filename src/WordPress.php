@@ -208,7 +208,7 @@ class WordPress extends EE_Site_Command {
 			$this->site_data['db_port'] = empty( $arg_host_port[1] ) ? '3306' : $arg_host_port[1];
 		}
 
-		$this->site_data['app_admin_email'] = \EE\Utils\get_flag_value( $assoc_args, 'admin_email', strtolower( 'admin@' . $this->site_data['site_url'] ) );
+		$this->site_data['app_admin_email'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-email', strtolower( 'admin@' . $this->site_data['site_url'] ) );
 		$this->skip_install                 = \EE\Utils\get_flag_value( $assoc_args, 'skip-install' );
 		$this->skip_status_check            = \EE\Utils\get_flag_value( $assoc_args, 'skip-status-check' );
 		$this->force                        = \EE\Utils\get_flag_value( $assoc_args, 'force' );
