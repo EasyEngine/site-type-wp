@@ -548,7 +548,8 @@ class WordPress extends EE_Site_Command {
 			$maybe_multisite_type = $this->site_data['app_sub_type'] === 'subdom' ? '--subdomains' : '';
 		}
 
-		$install_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp core %s --url=\'%s\' --title=\'%s\' --admin_user=\'%s\'', $wp_install_command, $this->site_data['site_url'], $this->site_data['app_admin_url'], $this->site_data['app_admin_username'] );
+		$prefix          = ( $this->site_data['site_ssl'] ) ? 'https://' : 'http://';
+		$install_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp core %s --url=\'%s%s\' --title=\'%s\' --admin_user=\'%s\'', $wp_install_command, $prefix, $this->site_data['site_url'], $this->site_data['app_admin_url'], $this->site_data['app_admin_username'] );
 		$install_command .= $this->site_data['app_admin_password'] ? sprintf( ' --admin_password=\'%s\'', $this->site_data['app_admin_password'] ) : '';
 		$install_command .= sprintf( ' --admin_email=\'%s\' %s', $this->site_data['app_admin_email'], $maybe_multisite_type );
 
@@ -558,7 +559,6 @@ class WordPress extends EE_Site_Command {
 			\EE::warning( 'WordPress install failed. Please check logs.' );
 		}
 
-		$prefix = ( $this->site_data['site_ssl'] ) ? 'https://' : 'http://';
 		\EE::success( $prefix . $this->site_data['site_url'] . ' has been created successfully!' );
 	}
 
