@@ -419,7 +419,7 @@ class WordPress extends EE_Site_Command {
 			}
 
 			\EE\Site\Utils\add_site_redirects( $this->site_data['site_url'], false, 'inherit' === $this->site_data['site_ssl'] );
-			\EE\Site\Utils\reload_proxy_configuration();
+			\EE\Site\Utils\reload_global_nginx_proxy();
 
 			if ( $this->site_data['site_ssl'] ) {
 				$wildcard = 'subdom' === $this->site_data['app_sub_type'] || $this->site_data['site_ssl_wildcard'];
@@ -427,7 +427,7 @@ class WordPress extends EE_Site_Command {
 				$this->init_ssl( $this->site_data['site_url'], $this->site_data['site_fs_path'], $this->site_data['site_ssl'], $wildcard );
 
 				\EE\Site\Utils\add_site_redirects( $this->site_data['site_url'], true, 'inherit' === $this->site_data['site_ssl'] );
-				\EE\Site\Utils\reload_proxy_configuration();
+				\EE\Site\Utils\reload_global_nginx_proxy();
 			}
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
