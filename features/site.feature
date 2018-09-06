@@ -48,6 +48,15 @@ Feature: Site Command
         | header           |
         | HTTP/1.1 200 OK  |
 
+  Scenario: Create wp site successfully
+    When I run 'bin/ee site create wpcache.test --type=wp --cache'
+    Then After delay of 5 seconds
+    And The site 'wpcache.test' should have webroot
+    And The site 'wpcache.test' should have WordPress
+    And Request on 'wpcache.test' should contain following headers:
+      | header           |
+      | HTTP/1.1 200 OK  |
+
   Scenario: List the sites
     When I run 'bin/ee site list --format=text'
     Then STDOUT should return exactly
@@ -55,6 +64,7 @@ Feature: Site Command
     wp.test
     wpsubdir.test
     wpsubdom.test
+    wpcache.test
     """
 
   Scenario: Delete the sites

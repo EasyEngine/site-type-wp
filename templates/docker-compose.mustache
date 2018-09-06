@@ -14,7 +14,9 @@ services:
     {{/hostname}}
     {{#depends_on}}
     depends_on:
+    {{#dependency}}
       - {{name}}
+	{{/dependency}}
     {{/depends_on}}
     {{#restart}}
     restart: {{name}}
