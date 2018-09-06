@@ -65,6 +65,8 @@ class FeatureContext implements Context
 	{
 		$this->commands = [];
 		$this->ee_path = getcwd();
+		$config_contents = \Mustangostang\Spyc::YAMLDump(['le-mail' => 'abc@example.com']);
+		file_put_contents( EE_CONF_ROOT . '/config.yml', $config_contents );
 	}
 
 	/**
@@ -403,7 +405,8 @@ class FeatureContext implements Context
 			'www.example1.test',
 			'example2.test',
 			'www.example3.test',
-			'labels.test'
+			'labels.test',
+			'wpcache.test',
 		];
 
 		$result = EE::launch( 'sudo bin/ee site list --format=text',false, true );

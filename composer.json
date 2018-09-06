@@ -1,8 +1,8 @@
 {
-    "name": "easyengine/site-wp-command",
-    "description": "EasyEngine package for WordPress site creation.",
+    "name": "easyengine/site-type-wp",
+    "description": "EasyEngine site type package for WordPress site creation.",
     "type": "ee-cli-package",
-    "homepage": "https://github.com/easyengine/site-wp-command",
+    "homepage": "https://github.com/easyengine/site-type-wp",
     "license": "MIT",
     "authors": [],
     "minimum-stability": "dev",
@@ -11,7 +11,10 @@
         "psr-4": {
             "": "src/"
         },
-        "files": [ "site-wp-command.php" ]
+        "files": [ "site-type-wp.php" ]
+    },
+    "require-dev": {
+        "wp-cli/mustangostang-spyc": "^0.6.3"
     },
     "extra": {
         "branch-alias": {

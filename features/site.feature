@@ -19,7 +19,8 @@ Feature: Site Command
 
   Scenario: Create wp site successfully
     When I run 'bin/ee site create wp.test --type=wp'
-    Then The site 'wp.test' should have webroot
+    Then After delay of 5 seconds
+      And The site 'wp.test' should have webroot
       And The site 'wp.test' should have WordPress
       And Request on 'wp.test' should contain following headers:
         | header           |
@@ -28,7 +29,8 @@ Feature: Site Command
   Scenario: Create wpsubdir site successfully
     When I run 'bin/ee site create wpsubdir.test --type=wp --mu=subdir'
       And I create subsite '1' in 'wpsubdir.test'
-    Then The site 'wpsubdir.test' should have webroot
+    Then After delay of 5 seconds
+      And The site 'wpsubdir.test' should have webroot
       And The site 'wpsubdir.test' should have WordPress
       And The site 'wpsubdir.test' should be 'subdir' multisite
       And Request on 'wpsubdir.test' should contain following headers:
@@ -38,12 +40,22 @@ Feature: Site Command
   Scenario: Create wpsubdom site successfully
     When I run 'bin/ee site create wpsubdom.test --type=wp --mu=subdom'
       And I create subsite '1' in 'wpsubdom.test'
-    Then The site 'wpsubdom.test' should have webroot
+    Then After delay of 5 seconds
+      And The site 'wpsubdom.test' should have webroot
       And The site 'wpsubdom.test' should have WordPress
       And The site 'wpsubdom.test' should be 'subdomain' multisite
       And Request on 'wpsubdom.test' should contain following headers:
         | header           |
         | HTTP/1.1 200 OK  |
+
+  Scenario: Create wp site successfully
+    When I run 'bin/ee site create wpcache.test --type=wp --cache'
+    Then After delay of 5 seconds
+    And The site 'wpcache.test' should have webroot
+    And The site 'wpcache.test' should have WordPress
+    And Request on 'wpcache.test' should contain following headers:
+      | header           |
+      | HTTP/1.1 200 OK  |
 
   Scenario: List the sites
     When I run 'bin/ee site list --format=text'
@@ -52,6 +64,7 @@ Feature: Site Command
     wp.test
     wpsubdir.test
     wpsubdom.test
+    wpcache.test
     """
 
   Scenario: Delete the sites
