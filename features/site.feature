@@ -64,6 +64,7 @@ Feature: Site Command
     wp.test
     wpsubdir.test
     wpsubdom.test
+    wpcache.test
     """
 
   Scenario: Delete the sites
