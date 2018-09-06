@@ -374,7 +374,7 @@ class WordPress extends EE_Site_Command {
 		// The since we're inside the container and we want to access host machine,
 		// we would need to replace localhost with default gateway.
 		if ( $this->site_data['db_host'] === '127.0.0.1' || $this->site_data['db_host'] === 'localhost' ) {
-			$launch = \EE::exec( sprintf( "docker network inspect %s --format='{{ (index .IPAM.Config 0).Gateway }}'", $this->site_data['site_url'] ), false, true );
+			$launch = \EE::launch( sprintf( "docker network inspect %s --format='{{ (index .IPAM.Config 0).Gateway }}'", $this->site_data['site_url'] ) );
 
 			if ( ! $launch->return_code ) {
 				$this->site_data['db_host'] = trim( $launch->stdout, "\n" );
@@ -419,7 +419,7 @@ class WordPress extends EE_Site_Command {
 			}
 
 			\EE\Site\Utils\add_site_redirects( $this->site_data['site_url'], false, 'inherit' === $this->site_data['site_ssl'] );
-			\EE\Site\Utils\reload_proxy_configuration();
+			\EE\Site\Utils\reload_global_nginx_proxy();
 
 			if ( $this->site_data['site_ssl'] ) {
 				$wildcard = 'subdom' === $this->site_data['app_sub_type'] || $this->site_data['site_ssl_wildcard'];
@@ -427,7 +427,7 @@ class WordPress extends EE_Site_Command {
 				$this->init_ssl( $this->site_data['site_url'], $this->site_data['site_fs_path'], $this->site_data['site_ssl'], $wildcard );
 
 				\EE\Site\Utils\add_site_redirects( $this->site_data['site_url'], true, 'inherit' === $this->site_data['site_ssl'] );
-				\EE\Site\Utils\reload_proxy_configuration();
+				\EE\Site\Utils\reload_global_nginx_proxy();
 			}
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
@@ -553,7 +553,11 @@ class WordPress extends EE_Site_Command {
 		$install_command .= $this->site_data['app_admin_password'] ? sprintf( ' --admin_password=\'%s\'', $this->site_data['app_admin_password'] ) : '';
 		$install_command .= sprintf( ' --admin_email=\'%s\' %s', $this->site_data['app_admin_email'], $maybe_multisite_type );
 
-		$core_install = \EE::exec( $install_command );
+		$core_install = \EE::exec( $install_command, false, false, [
+			$this->site_data['app_admin_username'],
+			$this->site_data['app_admin_email'],
+			$this->site_data['app_admin_password'],
+		] );
 
 		if ( ! $core_install ) {
 			\EE::warning( 'WordPress install failed. Please check logs.' );
