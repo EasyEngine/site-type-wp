@@ -10,12 +10,7 @@ use function EE\Site\Utils\auto_site_name;
 use function EE\Site\Utils\get_site_info;
 
 /**
- * Creates a simple WordPress Website.
- *
- * ## EXAMPLES
- *
- *     # Create simple WordPress site
- *     $ ee site create example.com --wp
+ * Adds `wp` site type to `ee site` command.
  *
  * @package ee-cli
  */
@@ -181,6 +176,12 @@ class WordPress extends EE_Site_Command {
 	 *
 	 *     # Create WordPress site with wildcard ssl
 	 *     $ ee site create example.com --type=wp --ssl=le --wildcard
+	 *
+	 *     # Create WordPress site with remote database
+	 *     $ ee site create example.com --type=wp --dbhost=localhost --dbuser=username --dbpass=password
+	 *
+	 *     # Create WordPress site with custom site title, admin user, admin email and admin password
+	 *     $ ee site create example.com --type=wp --title=easyengine --admin-email=easyengine@example.com --admin-user=easyengine --admin-pass=easyengine
 	 *
 	 */
 	public function create( $args, $assoc_args ) {
