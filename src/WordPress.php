@@ -180,8 +180,8 @@ class WordPress extends EE_Site_Command {
 	 *     # Create WordPress site with remote database
 	 *     $ ee site create example.com --type=wp --dbhost=localhost --dbuser=username --dbpass=password
 	 *
-	 *     # Create WordPress site with custom site title, admin user, admin email and admin password
-	 *     $ ee site create example.com --type=wp --title=easyengine --admin-email=easyengine@example.com --admin-user=easyengine --admin-pass=easyengine
+	 *     # Create WordPress site with custom site title, locale, admin user, admin email and admin password
+	 *     $ ee site create example.com --type=wp --title=easyengine  --locale=nl_NL --admin-email=easyengine@example.com --admin-user=easyengine --admin-pass=easyengine
 	 *
 	 */
 	public function create( $args, $assoc_args ) {
