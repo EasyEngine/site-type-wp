@@ -667,6 +667,9 @@ class WordPress extends EE_Site_Command {
 	 *     # Restart all containers of site
 	 *     $ ee site restart example.com
 	 *
+	 *     # Restart single container of site
+	 *     $ ee site restart example.com --nginx
+	 *
 	 */
 	public function restart( $args, $assoc_args, $whitelisted_containers = [] ) {
 		$whitelisted_containers = [ 'nginx', 'php', 'db' ];
@@ -693,6 +696,9 @@ class WordPress extends EE_Site_Command {
 	 *
 	 *     # Reload all containers of site
 	 *     $ ee site reload example.com
+	 *
+	 *     # Reload single containers of site
+	 *     $ ee site reload example.com --nginx
 	 *
 	 */
 	public function reload( $args, $assoc_args, $whitelisted_containers = [], $reload_commands = [] ) {
