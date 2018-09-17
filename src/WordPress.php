@@ -292,6 +292,7 @@ class WordPress extends EE_Site_Command {
 			$info[] = [ 'WordPress Username', $this->site_data['app_admin_username'] ];
 			$info[] = [ 'WordPress Password', $this->site_data['app_admin_password'] ];
 		}
+		$info[] = [ 'DB Host', $this->site_data['db_host'] ];
 		$info[] = [ 'DB Root Password', $this->site_data['db_root_password'] ];
 		$info[] = [ 'DB Name', $this->site_data['db_name'] ];
 		$info[] = [ 'DB User', $this->site_data['db_user'] ];
