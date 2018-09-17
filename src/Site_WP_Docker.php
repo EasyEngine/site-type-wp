@@ -87,12 +87,16 @@ class Site_WP_Docker {
 				[ 'name' => 'VIRTUAL_HOST' ],
 			],
 		];
-		$php['networks']    = [
-			'net' => [
-				[ 'name' => 'site-network' ],
-				[ 'name' => 'global-network' ],
-			]
-		];
+		if ( in_array( GLOBAL_DB, $filters, true ) ) {
+			$php['networks'] = [
+				'net' => [
+					[ 'name' => 'site-network' ],
+					[ 'name' => 'global-network' ],
+				],
+			];
+		} else {
+			$php['networks'] = $network_default;
+		}
 
 		// nginx configuration.
 		$nginx['service_name']               = [ 'name' => 'nginx' ];
