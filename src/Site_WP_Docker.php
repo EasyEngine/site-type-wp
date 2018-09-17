@@ -54,7 +54,9 @@ class Site_WP_Docker {
 		$php['service_name'] = [ 'name' => 'php' ];
 		$php['image']        = [ 'name' => 'easyengine/php:' . $img_versions['easyengine/php'] ];
 
-		$php['depends_on']['dependency'][] = [ 'name' => 'db' ];
+		if ( in_array( 'db', $filters, true ) ) {
+			$php['depends_on']['dependency'][] = [ 'name' => 'db' ];
+		}
 
 		if ( in_array( 'redis', $filters, true ) ) {
 			$php['depends_on']['dependency'][] = [ 'name' => 'redis' ];
@@ -85,7 +87,12 @@ class Site_WP_Docker {
 				[ 'name' => 'VIRTUAL_HOST' ],
 			],
 		];
-		$php['networks']    = $network_default;
+		$php['networks']    = [
+			'net' => [
+				[ 'name' => 'site-network' ],
+				[ 'name' => 'global-network' ],
+			]
+		];
 
 		// nginx configuration.
 		$nginx['service_name']               = [ 'name' => 'nginx' ];
