@@ -106,7 +106,7 @@ class WordPress extends EE_Site_Command {
 	 * [--admin-email=<admin-email>]
 	 * : E-Mail of the administrator.
 	 *
-	 * [--localdb]
+	 * [--local-db]
 	 * : Create separate db container instead of using global db.
 	 *
 	 * [--dbname=<dbname>]
@@ -216,7 +216,7 @@ class WordPress extends EE_Site_Command {
 
 		\EE\Site\Utils\init_checks();
 
-		if ( \EE\Utils\get_flag_value( $assoc_args, 'localdb' ) ) {
+		if ( \EE\Utils\get_flag_value( $assoc_args, 'local-db' ) ) {
 			$this->site_data['db_host'] = 'db';
 		}
 
