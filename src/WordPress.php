@@ -212,13 +212,13 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['db_user']            = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
 		$this->site_data['db_password']        = \EE\Utils\get_flag_value( $assoc_args, 'dbpass', \EE\Utils\random_password() );
 		$this->locale                          = \EE\Utils\get_flag_value( $assoc_args, 'locale', \EE::get_config( 'locale' ) );
-		$this->site_data['db_root_password']   = \EE\Utils\random_password();
-
-		\EE\Site\Utils\init_checks();
 
 		if ( \EE\Utils\get_flag_value( $assoc_args, 'local-db' ) ) {
 			$this->site_data['db_host'] = 'db';
 		}
+		$this->site_data['db_root_password'] = ( 'db' === $this->site_data['db_host'] ) ? \EE\Utils\random_password() : '';
+
+		\EE\Site\Utils\init_checks();
 
 		if ( GLOBAL_DB === $this->site_data['db_host'] ) {
 			\EE\Site\Utils\init_global_db();
@@ -226,8 +226,8 @@ class WordPress extends EE_Site_Command {
 			$this->site_data['db_name']     = $user_data['db_name'];
 			$this->site_data['db_user']     = $user_data['db_user'];
 			$this->site_data['db_password'] = $user_data['db_pass'];
-		} // If user wants to connect to remote database.
-		elseif ( 'db' !== $this->site_data['db_host'] ) {
+		} elseif ( 'db' !== $this->site_data['db_host'] ) {
+			// If user wants to connect to remote database.
 			if ( ! isset( $assoc_args['dbuser'] ) || ! isset( $assoc_args['dbpass'] ) ) {
 				\EE::error( '`--dbuser` and `--dbpass` are required for remote db host.' );
 			}
@@ -293,7 +293,9 @@ class WordPress extends EE_Site_Command {
 			$info[] = [ 'WordPress Password', $this->site_data['app_admin_password'] ];
 		}
 		$info[] = [ 'DB Host', $this->site_data['db_host'] ];
-		$info[] = [ 'DB Root Password', $this->site_data['db_root_password'] ];
+		if ( ! empty( $this->site_data['db_root_password'] ) ) {
+			$info[] = [ 'DB Root Password', $this->site_data['db_root_password'] ];
+		}
 		$info[] = [ 'DB Name', $this->site_data['db_name'] ];
 		$info[] = [ 'DB User', $this->site_data['db_user'] ];
 		$info[] = [ 'DB Password', $this->site_data['db_password'] ];
@@ -396,7 +398,7 @@ class WordPress extends EE_Site_Command {
 		return \EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/nginx/default.conf.mustache', $default_conf_data );
 	}
 
-	
+
 	private function maybe_verify_remote_db_connection() {
 
 		if ( in_array( $this->site_data['db_host'], [ 'db', GLOBAL_DB ] ) ) {
