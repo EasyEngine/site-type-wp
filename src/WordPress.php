@@ -396,9 +396,10 @@ class WordPress extends EE_Site_Command {
 		return \EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/nginx/default.conf.mustache', $default_conf_data );
 	}
 
+	
 	private function maybe_verify_remote_db_connection() {
 
-		if ( 'db' === $this->site_data['db_host'] ) {
+		if ( in_array( $this->site_data['db_host'], [ 'db', GLOBAL_DB ] ) ) {
 			return;
 		}
 
@@ -414,11 +415,10 @@ class WordPress extends EE_Site_Command {
 				throw new \Exception( 'There was a problem inspecting network. Please check the logs' );
 			}
 		}
-		if ( GLOBAL_DB !== $this->site_data['db_host'] ) {
-			\EE::log( 'Verifying connection to remote database' );
-		}
+
+		\EE::log( 'Verifying connection to remote database' );
 		$img_versions = \EE\Utils\get_image_versions();
-		
+
 		$network = ( GLOBAL_DB === $this->site_data['db_host'] ) ? "--network='" . GLOBAL_NETWORK . "'" : '';
 
 		if ( ! \EE::exec( sprintf( "docker run -it --rm %s easyengine/mariadb:%s sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"", $network, $img_versions['easyengine/mariadb'], $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'] ) ) ) {
