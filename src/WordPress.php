@@ -457,11 +457,14 @@ class WordPress extends EE_Site_Command {
 			$this->catch_clean( $e );
 		}
 
-		$this->info( [ $this->site_data['site_url'] ], [] );
 		$this->create_site_db_entry();
 
-		\EE::runcommand( 'cron create ' . $this->site_data['site_url'] . '--command=\'wp cron event run --due-now\' --schedule=\'@every 5m\'' );
-		\EE::exec( 'cd ' . $this->site_data['site_fs_path'] . '&& docker-compose exec php wp cron event run --due-now' );
+		\EE::log( 'Creating cron entry' );
+		\EE::runcommand( 'cron create ' . $this->site_data['site_url'] . ' --user=www-data --command=\'wp cron event run --due-now\' --schedule=\'@every 5m\'' );
+		\EE::exec( 'cd ' . $this->site_data['site_fs_path'] . ' && docker-compose exec php wp cron event run --due-now' );
+
+		$this->info( [ $this->site_data['site_url'] ], [] );
+		\EE::log( 'Site entry created.' );
 	}
 
 	/**
@@ -636,9 +639,7 @@ class WordPress extends EE_Site_Command {
 		}
 
 		try {
-			if ( Site::create( $data ) ) {
-				\EE::log( 'Site entry created.' );
-			} else {
+			if ( ! Site::create( $data ) ) {
 				throw new \Exception( 'Error creating site entry in database.' );
 			}
 		} catch ( \Exception $e ) {
