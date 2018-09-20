@@ -311,9 +311,10 @@ class WordPress extends EE_Site_Command {
 		$site_docker_yml         = $this->site_data['site_fs_path'] . '/docker-compose.yml';
 		$site_conf_env           = $this->site_data['site_fs_path'] . '/.env';
 		$site_nginx_default_conf = $site_conf_dir . '/nginx/main.conf';
-		$site_nginx_custom_conf  = $site_conf_dir . '/nginx/user/custom.conf';
 		$site_php_ini            = $site_conf_dir . '/php-fpm/php.ini';
 		$server_name             = ( 'subdom' === $this->site_data['app_sub_type'] ) ? $this->site_data['site_url'] . ' *.' . $this->site_data['site_url'] : $this->site_data['site_url'];
+		$custom_conf_dest        = $site_conf_dir . '/nginx/user/custom.conf';
+		$custom_conf_source      = SITE_WP_TEMPLATE_ROOT . '/config/nginx/custom.conf.mustache';
 		$process_user            = posix_getpwuid( posix_geteuid() );
 
 		\EE::log( 'Creating WordPress site ' . $this->site_data['site_url'] );
@@ -326,7 +327,6 @@ class WordPress extends EE_Site_Command {
 		$site_docker            = new Site_WP_Docker();
 		$docker_compose_content = $site_docker->generate_docker_compose_yml( $filter );
 		$default_conf_content   = $this->generate_default_conf( $this->site_data['app_sub_type'], $this->cache_type, $server_name );
-		$custom_conf_content    = \EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/nginx/custom.conf.mustache', [] );
 		$local                  = ( 'db' === $this->site_data['db_host'] ) ? true : false;
 
 		$db_host  = $local ? $this->site_data['db_host'] : $this->site_data['db_host'] . ':' . $this->site_data['db_port'];
@@ -356,7 +356,7 @@ class WordPress extends EE_Site_Command {
 			$this->fs->dumpFile( $site_docker_yml, $docker_compose_content );
 			$this->fs->dumpFile( $site_conf_env, $env_content );
 			$this->fs->dumpFile( $site_nginx_default_conf, $default_conf_content );
-			$this->fs->dumpFile( $site_nginx_custom_conf, $custom_conf_content );
+			$this->fs->copy( $custom_conf_source, $custom_conf_dest );
 			$this->fs->dumpFile( $site_php_ini, $php_ini_content );
 
 			\EE\Site\Utils\set_postfix_files( $this->site_data['site_url'], $site_conf_dir );
