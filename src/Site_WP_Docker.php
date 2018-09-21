@@ -128,7 +128,14 @@ class Site_WP_Docker {
 		];
 		$nginx['networks']    = [
 			'net' => [
-				[ 'name' => 'site-network' ],
+				[
+					'name' => 'site-network',
+					'aliases' => [
+						'alias' => [
+							'name' => '${VIRTUAL_HOST}',
+						],
+					],
+				],
 				[ 'name' => 'global-network' ],
 			]
 		];
@@ -175,7 +182,6 @@ class Site_WP_Docker {
 			],
 		];
 		$postfix['networks']     = $network_default;
-
 
 		// redis configuration.
 		$redis['service_name'] = [ 'name' => 'redis' ];
