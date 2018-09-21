@@ -11,29 +11,6 @@ Quick links: [Using](#using) | [Contributing](#contributing) | [Support](#suppor
 
 This package implements the following commands:
 
-### ee site delete
-
-Deletes a website.
-
-~~~
-ee site delete <site-name> [--yes]
-~~~
-
-**OPTIONS**
-
-	<site-name>
-		Name of website to be deleted.
-
-	[--yes]
-		Do not prompt for confirmation.
-
-**EXAMPLES**
-
-    # Delete site
-    $ ee site delete example.com
-
-
-
 ### ee site create --type=wp
 
 Runs the standard WordPress Site installation.
@@ -144,6 +121,29 @@ ee site create --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [
 
     # Create WordPress site with custom site title, locale, admin user, admin email and admin password
     $ ee site create example.com --type=wp --title=easyengine  --locale=nl_NL --admin-email=easyengine@example.com --admin-user=easyengine --admin-pass=easyengine
+
+
+
+### ee site delete
+
+Deletes a website.
+
+~~~
+ee site delete <site-name> [--yes]
+~~~
+
+**OPTIONS**
+
+	<site-name>
+		Name of website to be deleted.
+
+	[--yes]
+		Do not prompt for confirmation.
+
+**EXAMPLES**
+
+    # Delete site
+    $ ee site delete example.com
 
 
 
@@ -260,12 +260,12 @@ ee site info --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [--
 
 
 
-### ee site up
+### ee site enable
 
 Enables a website. It will start the docker containers of the website if they are stopped.
 
 ~~~
-ee site up [<site-name>] [--force]
+ee site enable [<site-name>] [--force]
 ~~~
 
 **OPTIONS**
@@ -279,16 +279,16 @@ ee site up [<site-name>] [--force]
 **EXAMPLES**
 
     # Enable site
-    $ ee site up example.com
+    $ ee site enable example.com
 
 
 
-### ee site down
+### ee site disable
 
 Disables a website. It will stop and remove the docker containers of the website if they are running.
 
 ~~~
-ee site down [<site-name>]
+ee site disable [<site-name>]
 ~~~
 
 **OPTIONS**
@@ -299,7 +299,7 @@ ee site down [<site-name>]
 **EXAMPLES**
 
     # Disable site
-    $ ee site down example.com
+    $ ee site disable example.com
 
 
 
@@ -321,12 +321,12 @@ ee site info [<site-name>]
 
 
 
-### ee site le
+### ee site ssl
 
-Runs the acme le.
+Verifies ssl challenge and also renews certificates(if expired).
 
 ~~~
-ee site le <site-name> [--force]
+ee site ssl <site-name> [--force]
 ~~~
 
 **OPTIONS**

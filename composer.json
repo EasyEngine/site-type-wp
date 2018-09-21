@@ -22,13 +22,13 @@
         },
         "bundled": true,
         "commands": [
-            "site delete",
             "site create --type=wp",
+            "site delete",
             "site info --type=wp",
-            "site up",
-            "site down",
+            "site enable",
+            "site disable",
             "site info",
-            "site le",
+            "site ssl",
             "site list",
             "site reload --type=wp",
             "site restart --type=wp"
