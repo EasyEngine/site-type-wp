@@ -268,7 +268,7 @@ class WordPress extends EE_Site_Command {
 		$ssl             = $assoc_args['ssl'] ?? false;
 		$cache           = $assoc_args['cache'] ?? false;
 		$this->site_data = get_site_info( $args );
-		$site = Site::find( $this->site_data['site_url'] );
+		$site            = Site::find( $this->site_data['site_url'] );
 
 		if ( $ssl ) {
 			chdir( $this->site_data['site_fs_path'] );
@@ -276,14 +276,20 @@ class WordPress extends EE_Site_Command {
 		}
 
 		if ( $cache ) {
-			$filter                 = [];
-			$filter[]               = $this->site_data['app_sub_type'];
-			$filter[]               = 'redis';
-			$filter[]               = $this->site_data['db_host'];
-			$site_docker_yml        = $this->site_data['site_fs_path'] . '/docker-compose.yml';
-			$site_docker            = new Site_WP_Docker();
-			$docker_compose_content = $site_docker->generate_docker_compose_yml( $filter );
+			$this->cache_type        = 'redis';
+			$filter                  = [];
+			$filter[]                = $this->site_data['app_sub_type'];
+			$filter[]                = 'redis';
+			$filter[]                = $this->site_data['db_host'];
+			$server_name             = ( 'subdom' === $this->site_data['app_sub_type'] ) ? $this->site_data['site_url'] . ' *.' . $this->site_data['site_url'] : $this->site_data['site_url'];
+			$site_docker_yml         = $this->site_data['site_fs_path'] . '/docker-compose.yml';
+			$site_docker             = new Site_WP_Docker();
+			$docker_compose_content  = $site_docker->generate_docker_compose_yml( $filter );
+			$default_conf_content    = $this->generate_default_conf( $this->site_data['app_sub_type'], $this->cache_type, $server_name );
+			$site_nginx_default_conf = $this->site_data['site_fs_path'] . '/config/nginx/default.conf';
+
 			$this->fs->dumpFile( $site_docker_yml, $docker_compose_content );
+			$this->fs->dumpFile( $site_nginx_default_conf, $default_conf_content );
 			\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'] );
 
 			$site->cache_nginx_browser  = true;
