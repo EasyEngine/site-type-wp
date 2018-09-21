@@ -241,18 +241,58 @@ class WordPress extends EE_Site_Command {
 	}
 
 	/**
-	 * @inheritdoc
+	 * Update between site types.
+	 *
+	 * [<site-name>]
+	 * : Name of the site.
+	 *
+	 * [--ssl=<ssl>]
+	 * : Enable ssl on site
+	 *
+	 * [--cache]
+	 * : Enable cache on site
+	 *
+	 * [--wildcard]
+	 * : Enable wildcard SSL on site.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Add SSL to site
+	 *     $ ee site update example.com --ssl=le
+	 *
 	 */
 	public function update( $args, $assoc_args ) {
 		parent::update( $args, $assoc_args );
 
-		$args = auto_site_name( $args, 'site', __FUNCTION__ );
-		$ssl = $assoc_args['ssl'] ?? false;
+		$args            = auto_site_name( $args, 'site', __FUNCTION__ );
+		$ssl             = $assoc_args['ssl'] ?? false;
+		$cache           = $assoc_args['cache'] ?? false;
 		$this->site_data = get_site_info( $args );
+		$site = Site::find( $this->site_data['site_url'] );
 
 		if ( $ssl ) {
-			\EE::exec( sprintf( 'cd %s && docker-compose exec php wp search-replace http://%s https://%s', $this->site_data['site_fs_path'], $this->site_data['site_url'], $this->site_data['site_url'] ) );
+			chdir( $this->site_data['site_fs_path'] );
+			\EE::exec( sprintf( 'docker-compose exec php wp search-replace http://%1$s https://%1$s', $this->site_data['site_url'] ) );
 		}
+
+		if ( $cache ) {
+			$filter                 = [];
+			$filter[]               = $this->site_data['app_sub_type'];
+			$filter[]               = 'redis';
+			$filter[]               = $this->site_data['db_host'];
+			$site_docker_yml        = $this->site_data['site_fs_path'] . '/docker-compose.yml';
+			$site_docker            = new Site_WP_Docker();
+			$docker_compose_content = $site_docker->generate_docker_compose_yml( $filter );
+			$this->fs->dumpFile( $site_docker_yml, $docker_compose_content );
+			\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'] );
+
+			$site->cache_nginx_browser  = true;
+			$site->cache_nginx_fullpage = true;
+			$site->cache_mysql_query    = true;
+			$site->cache_app_object     = true;
+		}
+
+		$site->save();
 	}
 
 	/**
