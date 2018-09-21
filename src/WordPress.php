@@ -239,6 +239,21 @@ class WordPress extends EE_Site_Command {
 		$this->create_site( $assoc_args );
 		\EE\Utils\delem_log( 'site create end' );
 	}
+q
+	/**
+	 * @inheritdoc
+	 */
+	public function update( $args, $assoc_args ) {
+		parent::update( $args, $assoc_args );
+
+		$args = auto_site_name( $args, 'site', __FUNCTION__ );
+		$ssl = $assoc_args['ssl'] ?? false;
+		$this->site_data = get_site_info( $args );
+
+		if ( $ssl ) {
+			\EE::exec( sprintf( 'cd %s && docker-compose exec php wp search-replace http://%s https://%s', $this->site_data['site_fs_path'], $this->site_data['site_url'], $this->site_data['site_url'] ) );
+		}
+	}
 
 	/**
 	 * Creates database user for a site
@@ -247,7 +262,7 @@ class WordPress extends EE_Site_Command {
 	 *
 	 * @return string Generated db user.
 	 */
-	private function create_site_db_user( string $site_url ): string {
+	private function create_site_db_user( string $site_url ) : string {
 		if ( strlen( $site_url ) > 53 ) {
 			$site_url = substr( $site_url, 0, 53 );
 		}
