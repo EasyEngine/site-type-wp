@@ -238,10 +238,6 @@ class WordPress extends EE_Site_Command {
 
 		$this->create_site( $assoc_args );
 
-		if ( isset( $assoc_args['cache'] ) ) {
-			$this->enable_redis_cache();
-		}
-
 		\EE\Utils\delem_log( 'site create end' );
 	}
 
@@ -249,46 +245,43 @@ class WordPress extends EE_Site_Command {
 	 * Enable redis object cache on wordpress site.
 	 */
 	private function enable_redis_cache() {
-		// install and activate wp-redis plugin
+
 		$activate_wp_redis_plugin = "docker-compose exec --user='www-data' php wp plugin install wp-redis --activate";
-		if ( ! \EE::exec( $activate_wp_redis_plugin ) ) {
-			\EE::warning( 'Unable to download and activate wp-redis plugin.', false );
+		$enable_redis_cache       = "docker-compose exec --user='www-data' php wp redis enable";
+		$clone_nginx_helper       = 'docker-compose exec --user=\'www-data\' php git clone https://github.com/rtCamp/nginx-helper.git';
+		$activate_nginx_helper    = 'docker-compose exec --user=\'www-data\' php wp plugin activate nginx-helper';
+		$nginx_helper_fail_msg    = 'Unable to activate nginx-helper plugin';
+
+		$this->execute_system_command( $activate_wp_redis_plugin, 'Unable to download and activate wp-redis plugin.' );
+		$this->execute_system_command( $enable_redis_cache, 'Unable to enable object cache' );
+		$this->execute_system_command( $clone_nginx_helper, 'Unable to clone nginx-helper plugin' );
+
+		if ( \EE::exec( $activate_nginx_helper ) ) {
+			\EE::warning( $nginx_helper_fail_msg );
+		} else {
+			$add_hostname_constant = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_HOSTNAME ee-global-redis --add=true --type=constant";
+			$add_port_constant     = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PORT 6379 --add=true --type=constant";
+			$add_prefix_constant   = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX nginx-cache: --add=true --type=constant";
+
+			$this->execute_system_command( $add_hostname_constant, $nginx_helper_fail_msg );
+			$this->execute_system_command( $add_port_constant, $nginx_helper_fail_msg );
+			$this->execute_system_command( $add_prefix_constant, $nginx_helper_fail_msg );
+
 		}
+	}
 
-		$enable_redis_cache = "docker-compose exec --user='www-data' php wp redis enable";
-		if ( ! \EE::exec( $enable_redis_cache ) ) {
-			\EE::warning( 'Unable to enable object cache' );
+	/**
+	 *  Execute command with fail msg.
+	 *
+	 * @param string $command  Command to execute.
+	 * @param string $fail_msg failure message.
+	 */
+	private function execute_system_command( $command, $fail_msg = '' ) {
+		if ( empty( $command ) ) {
+			return;
 		}
-
-		// install and activate nginx-helper plugin.
-		$clone_nginx_helper = 'docker-compose exec --user=\'www-data\' php git clone https://github.com/rtCamp/nginx-helper.git';
-		if ( ! \EE::exec( $clone_nginx_helper ) ) {
-			\EE::warning( 'Unable to clone nginx-helper plugin' );
-		}
-
-		$activate_nginx_helper = 'docker-compose exec --user=\'www-data\' php wp plugin activate nginx-helper';
-		if ( ! \EE::exec( $activate_nginx_helper ) ) {
-			\EE::warning( 'Unable to activate nginx-helper plugin' );
-		}
-
-		// hostname-constant
-		$add_hostname_constant = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_HOSTNAME ee-global-redis --add=true --type=constant";
-
-		if ( ! \EE::exec( $add_hostname_constant ) ) {
-			\EE::warning( 'Unable to set "RT_WP_NGINX_HELPER_REDIS_HOSTNAME" constant. Add it manually' );
-		}
-
-		// port-constant
-		$add_port_constant = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PORT 6379 --add=true --type=constant";
-
-		if ( ! \EE::exec( $add_port_constant ) ) {
-			\EE::warning( 'Unable to set "RT_WP_NGINX_HELPER_REDIS_PORT" constant. Add it manually' );
-		}
-
-		$add_prefix_constant = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX nginx-cache --add=true --type=constant";
-
-		if ( ! \EE::exec( $add_prefix_constant ) ) {
-			\EE::warning( 'Unable to set "RT_WP_NGINX_HELPER_REDIS_PREFIX" constant. Add it manually' );
+		if ( ! \EE::exec( $command ) ) {
+			\EE::warning( $fail_msg );
 		}
 	}
 
@@ -507,6 +500,10 @@ class WordPress extends EE_Site_Command {
 			}
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
+		}
+
+		if ( isset( $assoc_args['cache'] ) ) {
+			$this->enable_redis_cache();
 		}
 
 		$this->info( [ $this->site_data['site_url'] ], [] );
