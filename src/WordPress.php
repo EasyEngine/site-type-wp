@@ -239,7 +239,7 @@ class WordPress extends EE_Site_Command {
 		$this->create_site( $assoc_args );
 		\EE\Utils\delem_log( 'site create end' );
 	}
-q
+
 	/**
 	 * @inheritdoc
 	 */
