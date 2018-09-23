@@ -265,8 +265,8 @@ class WordPress extends EE_Site_Command {
 		parent::update( $args, $assoc_args );
 
 		$args            = auto_site_name( $args, 'site', __FUNCTION__ );
-		$ssl             = $assoc_args['ssl'] ?? false;
-		$cache           = $assoc_args['cache'] ?? false;
+		$ssl             = $assoc_args['ssl'] ?? null;
+		$cache           = $assoc_args['cache'] ?? null;
 		$this->site_data = get_site_info( $args );
 		$site            = Site::find( $this->site_data['site_url'] );
 
@@ -275,11 +275,23 @@ class WordPress extends EE_Site_Command {
 			\EE::exec( sprintf( 'docker-compose exec php wp search-replace http://%1$s https://%1$s', $this->site_data['site_url'] ) );
 		}
 
-		if ( $cache ) {
-			$this->cache_type        = 'redis';
-			$filter                  = [];
+		if ( true === $cache || false === $cache ) {
+			if ( true === $cache ) {
+				if ( '1' === $site->cache_nginx_browser ) {
+					\EE::error( 'Site already has cache enabled' );
+				}
+				$this->cache_type        = 'redis';
+				$filter[]                = 'redis';
+			}
+
+			if ( false === $cache ) {
+				if ( '0' === $site->cache_nginx_browser ) {
+					\EE::error( 'Site already has cache disabled' );
+				}
+				$this->cache_type        = false;
+			}
+
 			$filter[]                = $this->site_data['app_sub_type'];
-			$filter[]                = 'redis';
 			$filter[]                = $this->site_data['db_host'];
 			$server_name             = ( 'subdom' === $this->site_data['app_sub_type'] ) ? $this->site_data['site_url'] . ' *.' . $this->site_data['site_url'] : $this->site_data['site_url'];
 			$site_docker_yml         = $this->site_data['site_fs_path'] . '/docker-compose.yml';
@@ -292,13 +304,16 @@ class WordPress extends EE_Site_Command {
 			$this->fs->dumpFile( $site_nginx_default_conf, $default_conf_content );
 			\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'] );
 
-			$site->cache_nginx_browser  = true;
-			$site->cache_nginx_fullpage = true;
-			$site->cache_mysql_query    = true;
-			$site->cache_app_object     = true;
+			$site->cache_nginx_browser  = $cache;
+			$site->cache_nginx_fullpage = $cache;
+			$site->cache_mysql_query    = $cache;
+			$site->cache_app_object     = $cache;
 		}
 
 		$site->save();
+
+		\EE::success( 'Updated site ' . $this->site_data['site_ssl'] );
+		\EE\Utils\delem_log( 'site reload end' );
 	}
 
 	/**
