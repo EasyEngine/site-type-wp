@@ -251,9 +251,9 @@ class WordPress extends EE_Site_Command {
 		$activate_nginx_helper    = 'docker-compose exec --user=\'www-data\' php wp plugin activate nginx-helper';
 		$nginx_helper_fail_msg    = 'Unable to activate nginx-helper plugin';
 
-		$this->execute_system_command( $activate_wp_redis_plugin, 'Unable to download and activate wp-redis plugin.' );
-		$this->execute_system_command( $enable_redis_cache, 'Unable to enable object cache' );
-		$this->execute_system_command( $clone_nginx_helper, 'Unable to clone nginx-helper plugin' );
+		$this->docker_compose_exec( $activate_wp_redis_plugin, 'Unable to download and activate wp-redis plugin.' );
+		$this->docker_compose_exec( $enable_redis_cache, 'Unable to enable object cache' );
+		$this->docker_compose_exec( $clone_nginx_helper, 'Unable to clone nginx-helper plugin' );
 
 		if ( \EE::exec( $activate_nginx_helper ) ) {
 			\EE::warning( $nginx_helper_fail_msg );
@@ -262,9 +262,9 @@ class WordPress extends EE_Site_Command {
 			$add_port_constant     = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PORT 6379 --add=true --type=constant";
 			$add_prefix_constant   = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX nginx-cache: --add=true --type=constant";
 
-			$this->execute_system_command( $add_hostname_constant, $nginx_helper_fail_msg );
-			$this->execute_system_command( $add_port_constant, $nginx_helper_fail_msg );
-			$this->execute_system_command( $add_prefix_constant, $nginx_helper_fail_msg );
+			$this->docker_compose_exec( $add_hostname_constant, $nginx_helper_fail_msg );
+			$this->docker_compose_exec( $add_port_constant, $nginx_helper_fail_msg );
+			$this->docker_compose_exec( $add_prefix_constant, $nginx_helper_fail_msg );
 
 		}
 	}
@@ -275,7 +275,7 @@ class WordPress extends EE_Site_Command {
 	 * @param string $command  Command to execute.
 	 * @param string $fail_msg failure message.
 	 */
-	private function execute_system_command( $command, $fail_msg = '' ) {
+	private function docker_compose_exec( $command, $fail_msg = '' ) {
 		if ( empty( $command ) ) {
 			return;
 		}
