@@ -1,4 +1,4 @@
-# Add your custom config in custom.conf
+# Add your custom config in custom/user.conf
 # ALL CHANGES IN THIS FILE WILL BE LOST AFTER EasyEngine Update
 
 server {
@@ -187,4 +187,6 @@ server {
 	{{! /locations.conf }}
 
 	client_max_body_size 100m;
+
+	include custom/*.conf;
 }
