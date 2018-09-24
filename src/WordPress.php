@@ -237,7 +237,6 @@ class WordPress extends EE_Site_Command {
 		\EE::log( 'Configuring project.' );
 
 		$this->create_site( $assoc_args );
-
 		\EE\Utils\delem_log( 'site create end' );
 	}
 
@@ -502,7 +501,7 @@ class WordPress extends EE_Site_Command {
 			$this->catch_clean( $e );
 		}
 
-		if ( isset( $assoc_args['cache'] ) ) {
+		if ( ! empty( $this->cache_type ) ) {
 			$this->enable_redis_cache();
 		}
 
