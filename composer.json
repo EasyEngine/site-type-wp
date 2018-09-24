@@ -20,6 +20,18 @@
         "branch-alias": {
             "dev-master": "1.x-dev"
         },
-        "bundled": true
+        "bundled": true,
+        "commands": [
+            "site create --type=wp",
+            "site delete",
+            "site info --type=wp",
+            "site enable",
+            "site disable",
+            "site info",
+            "site ssl",
+            "site list",
+            "site reload --type=wp",
+            "site restart --type=wp"
+        ]
     }
 }
