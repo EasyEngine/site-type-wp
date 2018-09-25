@@ -515,7 +515,7 @@ class WordPress extends EE_Site_Command {
 		$random_string = random_password();
 		file_put_contents( $this->site_data['site_fs_path'] . '/app/src/ssl_check.php', $random_string );
 
-		$site_url = $this->site_data['site_url'] . '/ssl_check.php';
+		$site_url = 'www.' . $this->site_data['site_url'] . '/ssl_check.php';
 		$curl     = curl_init();
 		curl_setopt( $curl, CURLOPT_URL, $site_url );
 		curl_setopt( $curl, CURLOPT_RETURNTRANSFER, true );
