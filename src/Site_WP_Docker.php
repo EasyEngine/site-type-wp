@@ -54,7 +54,9 @@ class Site_WP_Docker {
 		$php['service_name'] = [ 'name' => 'php' ];
 		$php['image']        = [ 'name' => 'easyengine/php:' . $img_versions['easyengine/php'] ];
 
-		$php['depends_on']['dependency'][] = [ 'name' => 'db' ];
+		if ( in_array( 'db', $filters, true ) ) {
+			$php['depends_on']['dependency'][] = [ 'name' => 'db' ];
+		}
 
 		if ( in_array( 'redis', $filters, true ) ) {
 			$php['depends_on']['dependency'][] = [ 'name' => 'redis' ];
@@ -85,7 +87,16 @@ class Site_WP_Docker {
 				[ 'name' => 'VIRTUAL_HOST' ],
 			],
 		];
-		$php['networks']    = $network_default;
+		if ( in_array( GLOBAL_DB, $filters, true ) ) {
+			$php['networks'] = [
+				'net' => [
+					[ 'name' => 'site-network' ],
+					[ 'name' => 'global-backend-network' ],
+				],
+			];
+		} else {
+			$php['networks'] = $network_default;
+		}
 
 		// nginx configuration.
 		$nginx['service_name']               = [ 'name' => 'nginx' ];
@@ -102,6 +113,9 @@ class Site_WP_Docker {
 				[ 'name' => 'HSTS=off' ],
 			],
 		];
+		if ( ! empty( $filters['nohttps'] ) ) {
+			$nginx['environment']['env'][] = [ 'name' => 'HTTPS_METHOD=nohttps' ];
+		}
 		$nginx['volumes']     = [
 			'vol' => [
 				[ 'name' => './app/src:/var/www/htdocs' ],
@@ -125,7 +139,7 @@ class Site_WP_Docker {
 						],
 					],
 				],
-				[ 'name' => 'global-network' ],
+				[ 'name' => 'global-frontend-network' ],
 			]
 		];
 
@@ -149,7 +163,7 @@ class Site_WP_Docker {
 		$mailhog['networks']     = [
 			'net' => [
 				[ 'name' => 'site-network' ],
-				[ 'name' => 'global-network' ],
+				[ 'name' => 'global-frontend-network' ],
 			]
 		];
 
