@@ -113,7 +113,7 @@ class Site_WP_Docker {
 				[ 'name' => 'HSTS=off' ],
 			],
 		];
-		if ( ! empty( $filters['nohttps'] ) && $filters['nohttps'] ) {
+		if ( ! empty( $filters['nohttps'] ) ) {
 			$nginx['environment']['env'][] = [ 'name' => 'HTTPS_METHOD=nohttps' ];
 		}
 		$nginx['volumes']     = [
