@@ -477,11 +477,14 @@ class WordPress extends EE_Site_Command {
 			\EE\Site\Utils\reload_global_nginx_proxy();
 
 			if ( $this->site_data['site_ssl'] ) {
+				$allow_le = $this->check_www_site_dns();
 				$wildcard = 'subdom' === $this->site_data['app_sub_type'] || $this->site_data['site_ssl_wildcard'];
 				\EE::debug( 'Wildcard in site wp command: ' . $this->site_data['site_ssl_wildcard'] );
-				$this->init_ssl( $this->site_data['site_url'], $this->site_data['site_fs_path'], $this->site_data['site_ssl'], $wildcard );
+				$this->init_ssl( $this->site_data['site_url'], $this->site_data['site_fs_path'], $this->site_data['site_ssl'], $wildcard, $allow_le );
 
-				\EE\Site\Utils\add_site_redirects( $this->site_data['site_url'], true, 'inherit' === $this->site_data['site_ssl'] );
+				if ( true === $allow_le ) {
+					\EE\Site\Utils\add_site_redirects( $this->site_data['site_url'], true, 'inherit' === $this->site_data['site_ssl'] );
+				}
 
 				$this->dump_docker_compose_yml( [ 'nohttps' => false ] );
 				\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'], ['nginx'] );
@@ -500,6 +503,30 @@ class WordPress extends EE_Site_Command {
 
 		$this->info( [ $this->site_data['site_url'] ], [] );
 		\EE::log( 'Site entry created.' );
+	}
+
+
+	/**
+	 * Check www is working with site domain.
+	 *
+	 * @return bool
+	 */
+	private function check_www_site_dns() {
+		$random_string = random_password();
+		file_put_contents( $this->site_data['site_fs_path'] . '/app/src/ssl_check.php', $random_string );
+
+		$site_url = $this->site_data['site_url'] . '/ssl_check.php';
+		$curl     = curl_init();
+		curl_setopt( $curl, CURLOPT_URL, $site_url );
+		curl_setopt( $curl, CURLOPT_RETURNTRANSFER, true );
+		curl_setopt( $curl, CURLOPT_HEADER, false );
+		$data = curl_exec( $curl );
+		curl_close( $curl );
+
+		if ( ! empty( $data ) && $random_string === $data ) {
+			return true;
+		}
+		return false;
 	}
 
 	/**
