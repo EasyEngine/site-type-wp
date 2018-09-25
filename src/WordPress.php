@@ -247,13 +247,11 @@ class WordPress extends EE_Site_Command {
 
 		$activate_wp_redis_plugin = "docker-compose exec --user='www-data' php wp plugin install wp-redis --activate";
 		$enable_redis_cache       = "docker-compose exec --user='www-data' php wp redis enable";
-		$clone_nginx_helper       = 'docker-compose exec --user=\'www-data\' php git clone https://github.com/rtCamp/nginx-helper.git';
-		$activate_nginx_helper    = 'docker-compose exec --user=\'www-data\' php wp plugin activate nginx-helper';
-		$nginx_helper_fail_msg    = 'Unable to activate nginx-helper plugin';
+		$activate_nginx_helper    = 'docker-compose exec --user=\'www-data\' php wp plugin install nginx-helper --activate';
+		$nginx_helper_fail_msg    = 'Unable to download or activate nginx-helper plugin';
 
-		$this->docker_compose_exec( $activate_wp_redis_plugin, 'Unable to download and activate wp-redis plugin.' );
+		$this->docker_compose_exec( $activate_wp_redis_plugin, 'Unable to download or activate wp-redis plugin.' );
 		$this->docker_compose_exec( $enable_redis_cache, 'Unable to enable object cache' );
-		$this->docker_compose_exec( $clone_nginx_helper, 'Unable to clone nginx-helper plugin' );
 
 		if ( \EE::exec( $activate_nginx_helper ) ) {
 			\EE::warning( $nginx_helper_fail_msg );
