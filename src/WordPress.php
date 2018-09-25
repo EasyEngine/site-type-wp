@@ -318,7 +318,6 @@ class WordPress extends EE_Site_Command {
 	private function configure_site_files() {
 
 		$site_conf_dir           = $this->site_data['site_fs_path'] . '/config';
-		$site_docker_yml         = $this->site_data['site_fs_path'] . '/docker-compose.yml';
 		$site_conf_env           = $this->site_data['site_fs_path'] . '/.env';
 		$site_nginx_default_conf = $site_conf_dir . '/nginx/main.conf';
 		$site_php_ini            = $site_conf_dir . '/php-fpm/php.ini';
@@ -330,12 +329,6 @@ class WordPress extends EE_Site_Command {
 		\EE::log( 'Creating WordPress site ' . $this->site_data['site_url'] );
 		\EE::log( 'Copying configuration files.' );
 
-		$filter                 = [];
-		$filter[]               = $this->site_data['app_sub_type'];
-		$filter[]               = $this->cache_type ? 'redis' : 'none';
-		$filter[]               = $this->site_data['db_host'];
-		$site_docker            = new Site_WP_Docker();
-		$docker_compose_content = $site_docker->generate_docker_compose_yml( $filter );
 		$default_conf_content   = $this->generate_default_conf( $this->site_data['app_sub_type'], $this->cache_type, $server_name );
 		$local                  = ( 'db' === $this->site_data['db_host'] ) ? true : false;
 
@@ -363,7 +356,7 @@ class WordPress extends EE_Site_Command {
 		$php_ini_content = \EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/php-fpm/php.ini.mustache', $php_ini_data );
 
 		try {
-			$this->fs->dumpFile( $site_docker_yml, $docker_compose_content );
+			$this->dump_docker_compose_yml( [ 'nohttps' => true ] );
 			$this->fs->dumpFile( $site_conf_env, $env_content );
 			$this->fs->dumpFile( $site_nginx_default_conf, $default_conf_content );
 			$this->fs->copy( $custom_conf_source, $custom_conf_dest );
@@ -375,6 +368,29 @@ class WordPress extends EE_Site_Command {
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
 		}
+	}
+
+	/**
+	 * Generate and place docker-compose.yml file.
+	 *
+	 * @param array $additional_filters Filters to alter docker-compose file.
+	 */
+	private function dump_docker_compose_yml( $additional_filters = [] ) {
+
+		$site_docker_yml = $this->site_data['site_fs_path'] . '/docker-compose.yml';
+
+		$filter                 = [];
+		$filter[]               = $this->site_data['app_sub_type'];
+		$filter[]               = $this->cache_type ? 'redis' : 'none';
+		$filter[]               = $this->site_data['db_host'];
+		$site_docker            = new Site_WP_Docker();
+
+		foreach ( $additional_filters as $key => $addon_filter ) {
+			$filter[ $key ] = $addon_filter;
+		}
+
+		$docker_compose_content = $site_docker->generate_docker_compose_yml( $filter );
+		$this->fs->dumpFile( $site_docker_yml, $docker_compose_content );
 	}
 
 
@@ -421,7 +437,7 @@ class WordPress extends EE_Site_Command {
 		\EE::log( 'Verifying connection to remote database' );
 		$img_versions = \EE\Utils\get_image_versions();
 
-		$network = ( GLOBAL_DB === $this->site_data['db_host'] ) ? "--network='" . GLOBAL_NETWORK . "'" : '';
+		$network = ( GLOBAL_DB === $this->site_data['db_host'] ) ? "--network='" . GLOBAL_FRONTEND_NETWORK . "'" : '';
 
 		if ( ! \EE::exec( sprintf( "docker run -it --rm %s easyengine/mariadb:%s sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"", $network, $img_versions['easyengine/mariadb'], $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'] ) ) ) {
 			throw new \Exception( 'Unable to connect to remote db' );
@@ -466,6 +482,10 @@ class WordPress extends EE_Site_Command {
 				$this->init_ssl( $this->site_data['site_url'], $this->site_data['site_fs_path'], $this->site_data['site_ssl'], $wildcard );
 
 				\EE\Site\Utils\add_site_redirects( $this->site_data['site_url'], true, 'inherit' === $this->site_data['site_ssl'] );
+
+				$this->dump_docker_compose_yml( [ 'nohttps' => false ] );
+				\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'], ['nginx'] );
+
 				\EE\Site\Utils\reload_global_nginx_proxy();
 			}
 		} catch ( \Exception $e ) {

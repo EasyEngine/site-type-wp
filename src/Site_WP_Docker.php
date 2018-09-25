@@ -91,7 +91,7 @@ class Site_WP_Docker {
 			$php['networks'] = [
 				'net' => [
 					[ 'name' => 'site-network' ],
-					[ 'name' => 'global-network' ],
+					[ 'name' => 'global-backend-network' ],
 				],
 			];
 		} else {
@@ -113,6 +113,9 @@ class Site_WP_Docker {
 				[ 'name' => 'HSTS=off' ],
 			],
 		];
+		if ( ! empty( $filters['nohttps'] ) ) {
+			$nginx['environment']['env'][] = [ 'name' => 'HTTPS_METHOD=nohttps' ];
+		}
 		$nginx['volumes']     = [
 			'vol' => [
 				[ 'name' => './app/src:/var/www/htdocs' ],
@@ -136,7 +139,7 @@ class Site_WP_Docker {
 						],
 					],
 				],
-				[ 'name' => 'global-network' ],
+				[ 'name' => 'global-frontend-network' ],
 			]
 		];
 
@@ -160,7 +163,7 @@ class Site_WP_Docker {
 		$mailhog['networks']     = [
 			'net' => [
 				[ 'name' => 'site-network' ],
-				[ 'name' => 'global-network' ],
+				[ 'name' => 'global-frontend-network' ],
 			]
 		];
 
