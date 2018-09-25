@@ -106,11 +106,11 @@ class WordPress extends EE_Site_Command {
 	 * [--admin-email=<admin-email>]
 	 * : E-Mail of the administrator.
 	 *
+	 * [--local-db]
+	 * : Create separate db container instead of using global db.
+	 *
 	 * [--dbname=<dbname>]
 	 * : Set the database name.
-	 * ---
-	 * default: wordpress
-	 * ---
 	 *
 	 * [--dbuser=<dbuser>]
 	 * : Set the database user.
@@ -120,9 +120,6 @@ class WordPress extends EE_Site_Command {
 	 *
 	 * [--dbhost=<dbhost>]
 	 * : Set the database host. Pass value only when remote dbhost is required.
-	 * ---
-	 * default: db
-	 * ---
 	 *
 	 * [--dbprefix=<dbprefix>]
 	 * : Set the database table prefix.
@@ -209,16 +206,28 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
 		$this->site_data['app_admin_username'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', 'admin' );
 		$this->site_data['app_admin_password'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', \EE\Utils\random_password() );
-		$this->site_data['db_name']            = str_replace( [ '.', '-' ], '_', $this->site_data['site_url'] );
-		$this->site_data['db_host']            = \EE\Utils\get_flag_value( $assoc_args, 'dbhost' );
+		$this->site_data['db_name']            = \EE\Utils\get_flag_value( $assoc_args, 'dbname', str_replace( [ '.', '-' ], '_', $this->site_data['site_url'] ) );
+		$this->site_data['db_host']            = \EE\Utils\get_flag_value( $assoc_args, 'dbhost', GLOBAL_DB );
 		$this->site_data['db_port']            = '3306';
 		$this->site_data['db_user']            = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
 		$this->site_data['db_password']        = \EE\Utils\get_flag_value( $assoc_args, 'dbpass', \EE\Utils\random_password() );
 		$this->locale                          = \EE\Utils\get_flag_value( $assoc_args, 'locale', \EE::get_config( 'locale' ) );
-		$this->site_data['db_root_password']   = \EE\Utils\random_password();
 
-		// If user wants to connect to remote database.
-		if ( 'db' !== $this->site_data['db_host'] ) {
+		if ( \EE\Utils\get_flag_value( $assoc_args, 'local-db' ) ) {
+			$this->site_data['db_host'] = 'db';
+		}
+		$this->site_data['db_root_password'] = ( 'db' === $this->site_data['db_host'] ) ? \EE\Utils\random_password() : '';
+
+		\EE\Site\Utils\init_checks();
+
+		if ( GLOBAL_DB === $this->site_data['db_host'] ) {
+			\EE\Site\Utils\init_global_db();
+			$user_data                      = \EE\Site\Utils\create_user_in_db( GLOBAL_DB, $this->site_data['db_name'], $this->site_data['db_user'], $this->site_data['db_password'] );
+			$this->site_data['db_name']     = $user_data['db_name'];
+			$this->site_data['db_user']     = $user_data['db_user'];
+			$this->site_data['db_password'] = $user_data['db_pass'];
+		} elseif ( 'db' !== $this->site_data['db_host'] ) {
+			// If user wants to connect to remote database.
 			if ( ! isset( $assoc_args['dbuser'] ) || ! isset( $assoc_args['dbpass'] ) ) {
 				\EE::error( '`--dbuser` and `--dbpass` are required for remote db host.' );
 			}
@@ -231,8 +240,6 @@ class WordPress extends EE_Site_Command {
 		$this->skip_install                 = \EE\Utils\get_flag_value( $assoc_args, 'skip-install' );
 		$this->skip_status_check            = \EE\Utils\get_flag_value( $assoc_args, 'skip-status-check' );
 		$this->force                        = \EE\Utils\get_flag_value( $assoc_args, 'force' );
-
-		\EE\Site\Utils\init_checks();
 
 		\EE::log( 'Configuring project.' );
 
@@ -329,7 +336,10 @@ class WordPress extends EE_Site_Command {
 			$info[] = [ 'WordPress Username', $this->site_data['app_admin_username'] ];
 			$info[] = [ 'WordPress Password', $this->site_data['app_admin_password'] ];
 		}
-		$info[] = [ 'DB Root Password', $this->site_data['db_root_password'] ];
+		$info[] = [ 'DB Host', $this->site_data['db_host'] ];
+		if ( ! empty( $this->site_data['db_root_password'] ) ) {
+			$info[] = [ 'DB Root Password', $this->site_data['db_root_password'] ];
+		}
 		$info[] = [ 'DB Name', $this->site_data['db_name'] ];
 		$info[] = [ 'DB User', $this->site_data['db_user'] ];
 		$info[] = [ 'DB Password', $this->site_data['db_password'] ];
@@ -432,16 +442,17 @@ class WordPress extends EE_Site_Command {
 		return \EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/nginx/main.conf.mustache', $default_conf_data );
 	}
 
+
 	private function maybe_verify_remote_db_connection() {
 
-		if ( 'db' === $this->site_data['db_host'] ) {
+		if ( in_array( $this->site_data['db_host'], [ 'db', GLOBAL_DB ] ) ) {
 			return;
 		}
 
 		// Docker needs special handling if we want to connect to host machine.
 		// The since we're inside the container and we want to access host machine,
 		// we would need to replace localhost with default gateway.
-		if ( $this->site_data['db_host'] === '127.0.0.1' || $this->site_data['db_host'] === 'localhost' ) {
+		if ( '127.0.0.1' === $this->site_data['db_host'] || 'localhost' === $this->site_data['db_host'] ) {
 			$launch = \EE::launch( sprintf( "docker network inspect %s --format='{{ (index .IPAM.Config 0).Gateway }}'", $this->site_data['site_url'] ) );
 
 			if ( ! $launch->return_code ) {
@@ -450,9 +461,13 @@ class WordPress extends EE_Site_Command {
 				throw new \Exception( 'There was a problem inspecting network. Please check the logs' );
 			}
 		}
-		\EE::log( 'Verifying connection to remote database' );
 
-		if ( ! \EE::exec( sprintf( "docker run -it --rm --network='%s' mysql sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"", $this->site_data['site_url'], $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'] ) ) ) {
+		\EE::log( 'Verifying connection to remote database' );
+		$img_versions = \EE\Utils\get_image_versions();
+
+		$network = ( GLOBAL_DB === $this->site_data['db_host'] ) ? "--network='" . GLOBAL_NETWORK . "'" : '';
+
+		if ( ! \EE::exec( sprintf( "docker run -it --rm %s easyengine/mariadb:%s sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"", $network, $img_versions['easyengine/mariadb'], $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'] ) ) ) {
 			throw new \Exception( 'Unable to connect to remote db' );
 		}
 
@@ -577,12 +592,12 @@ class WordPress extends EE_Site_Command {
 				throw new \Exception( sprintf( 'Couldn\'t connect to %s:%s or there was issue in `wp config create`. Please check logs.', $this->site_data['db_host'], $this->site_data['db_port'] ) );
 			}
 			if ( 'db' !== $this->site_data['db_host'] ) {
-				$name            = str_replace( '_', '\_', $this->site_data['db_name'] );
-				$check_db_exists = sprintf( "docker-compose exec php bash -c \"mysqlshow --user='%s' --password='%s' --host='%s' --port='%s' '%s'", $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_host'], $this->site_data['db_port'], $name );
+				$name            = $this->site_data['db_name'];
+				$check_db_exists = sprintf( "docker-compose exec php bash -c \"mysqlshow --user='%s' --password='%s' --host='%s' --port='%s' '%s'\"", $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_host'], $this->site_data['db_port'], $name );
 
 				if ( ! \EE::exec( $check_db_exists ) ) {
 					\EE::log( sprintf( 'Database `%s` does not exist. Attempting to create it.', $this->site_data['db_name'] ) );
-					$create_db_command = sprintf( 'docker-compose exec php bash -c "mysql --host=%s --port=%s --user=%s --password=%s --execute="CREATE DATABASE %s;"', $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_name'] );
+					$create_db_command = sprintf( 'docker-compose exec php bash -c "mysql --host=%s --port=%s --user=%s --password=%s --execute="CREATE DATABASE %s;""', $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_name'] );
 
 					if ( ! \EE::exec( $create_db_command ) ) {
 						throw new \Exception( sprintf( 'Could not create database `%s` on `%s:%s`. Please check if %s has rights to create database or manually create a database and pass with `--dbname` parameter.', $this->site_data['db_name'], $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'] ) );
@@ -593,7 +608,7 @@ class WordPress extends EE_Site_Command {
 						\EE::exec( 'docker-compose exec --user=\'www-data\' php wp db reset --yes' );
 					}
 					$check_tables = 'docker-compose exec --user=\'www-data\' php wp db tables';
-					if ( \EE::exec( $check_tables ) ) {
+					if ( \EE::exec( $check_tables, false, false ) ) {
 						throw new \Exception( 'WordPress tables already seem to exist. Please backup and reset the database or use `--force` in the site create command to reset it.' );
 					}
 				}
@@ -765,7 +780,12 @@ class WordPress extends EE_Site_Command {
 		\EE\Utils\delem_log( 'site cleanup start' );
 		\EE::warning( $e->getMessage() );
 		\EE::warning( 'Initiating clean-up.' );
-		$this->delete_site( $this->level, $this->site_data['site_url'], $this->site_data['site_fs_path'] );
+		$db_data = ( empty( $this->site_data['db_host'] ) || 'db' === $this->site_data['db_host'] ) ? [] : [
+			'db_host' => $this->site_data['db_host'],
+			'db_user' => $this->site_data['db_user'],
+			'db_name' => $this->site_data['db_name'],
+		];
+		$this->delete_site( $this->level, $this->site_data['site_url'], $this->site_data['site_fs_path'], $db_data );
 		\EE\Utils\delem_log( 'site cleanup end' );
 		exit;
 	}
@@ -776,7 +796,12 @@ class WordPress extends EE_Site_Command {
 	protected function rollback() {
 		\EE::warning( 'Exiting gracefully after rolling back. This may take some time.' );
 		if ( $this->level > 0 ) {
-			$this->delete_site( $this->level, $this->site_data['site_url'], $this->site_data['site_fs_path'] );
+			$db_data = ( empty( $this->site_data['db_host'] ) || 'db' === $this->site_data['db_host'] ) ? [] : [
+				'db_host' => $this->site_data['db_host'],
+				'db_user' => $this->site_data['db_user'],
+				'db_name' => $this->site_data['db_name'],
+			];
+			$this->delete_site( $this->level, $this->site_data['site_url'], $this->site_data['site_fs_path'], $db_data );
 		}
 		\EE::success( 'Rollback complete. Exiting now.' );
 		exit;
