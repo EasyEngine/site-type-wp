@@ -1,7 +1,7 @@
 <?php
 
 namespace EE\Site\Type;
-use function \EE\Utils\mustache_render;
+use function EE\Utils\mustache_render;
 
 class Site_WP_Docker {
 
@@ -54,7 +54,9 @@ class Site_WP_Docker {
 		$php['service_name'] = [ 'name' => 'php' ];
 		$php['image']        = [ 'name' => 'easyengine/php:' . $img_versions['easyengine/php'] ];
 
-		$php['depends_on']['dependency'][] = [ 'name' => 'db' ];
+		if ( in_array( 'db', $filters, true ) ) {
+			$php['depends_on']['dependency'][] = [ 'name' => 'db' ];
+		}
 
 		if ( in_array( 'redis', $filters, true ) ) {
 			$php['depends_on']['dependency'][] = [ 'name' => 'redis' ];
@@ -85,7 +87,16 @@ class Site_WP_Docker {
 				[ 'name' => 'VIRTUAL_HOST' ],
 			],
 		];
-		$php['networks']    = $network_default;
+		if ( in_array( GLOBAL_DB, $filters, true ) ) {
+			$php['networks'] = [
+				'net' => [
+					[ 'name' => 'site-network' ],
+					[ 'name' => 'global-network' ],
+				],
+			];
+		} else {
+			$php['networks'] = $network_default;
+		}
 
 		// nginx configuration.
 		$nginx['service_name']               = [ 'name' => 'nginx' ];
@@ -105,9 +116,9 @@ class Site_WP_Docker {
 		$nginx['volumes']     = [
 			'vol' => [
 				[ 'name' => './app/src:/var/www/htdocs' ],
-				[ 'name' => './config/nginx/default.conf:/etc/nginx/conf.d/default.conf' ],
+				[ 'name' => './config/nginx/main.conf:/etc/nginx/conf.d/default.conf' ],
+				[ 'name' => './config/nginx/custom:/etc/nginx/custom' ],
 				[ 'name' => './logs/nginx:/var/log/nginx' ],
-				[ 'name' => './config/nginx/common:/usr/local/openresty/nginx/conf/common' ],
 			],
 		];
 		$nginx['labels']      = [
@@ -117,7 +128,14 @@ class Site_WP_Docker {
 		];
 		$nginx['networks']    = [
 			'net' => [
-				[ 'name' => 'site-network' ],
+				[
+					'name' => 'site-network',
+					'aliases' => [
+						'alias' => [
+							'name' => '${VIRTUAL_HOST}',
+						],
+					],
+				],
 				[ 'name' => 'global-network' ],
 			]
 		];
@@ -164,7 +182,6 @@ class Site_WP_Docker {
 			],
 		];
 		$postfix['networks']     = $network_default;
-
 
 		// redis configuration.
 		$redis['service_name'] = [ 'name' => 'redis' ];
