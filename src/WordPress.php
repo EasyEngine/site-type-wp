@@ -421,7 +421,7 @@ class WordPress extends EE_Site_Command {
 		\EE::log( 'Verifying connection to remote database' );
 		$img_versions = \EE\Utils\get_image_versions();
 
-		$network = ( GLOBAL_DB === $this->site_data['db_host'] ) ? "--network='" . GLOBAL_NETWORK . "'" : '';
+		$network = ( GLOBAL_DB === $this->site_data['db_host'] ) ? "--network='" . GLOBAL_FRONTEND_NETWORK . "'" : '';
 
 		if ( ! \EE::exec( sprintf( "docker run -it --rm %s easyengine/mariadb:%s sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"", $network, $img_versions['easyengine/mariadb'], $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'] ) ) ) {
 			throw new \Exception( 'Unable to connect to remote db' );
