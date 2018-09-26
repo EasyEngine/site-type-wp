@@ -142,6 +142,9 @@ class Site_WP_Docker {
 				[ 'name' => 'global-frontend-network' ],
 			]
 		];
+		if ( in_array( GLOBAL_REDIS, $filters, true ) ) {
+			$nginx['networks']['net'][] = [ 'name' => 'global-backend-network' ];
+		}
 
 		// mailhog configuration.
 		$mailhog['service_name'] = [ 'name' => 'mailhog' ];
