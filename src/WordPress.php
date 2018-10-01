@@ -109,6 +109,9 @@ class WordPress extends EE_Site_Command {
 	 * [--local-db]
 	 * : Create separate db container instead of using global db.
 	 *
+	 * [--with-local-redis]
+	 * : Enable cache with local redis container.
+	 *
 	 * [--dbname=<dbname>]
 	 * : Set the database name.
 	 *
@@ -212,16 +215,25 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['db_user']            = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
 		$this->site_data['db_password']        = \EE\Utils\get_flag_value( $assoc_args, 'dbpass', \EE\Utils\random_password() );
 		$this->locale                          = \EE\Utils\get_flag_value( $assoc_args, 'locale', \EE::get_config( 'locale' ) );
+		$local_cache                           = \EE\Utils\get_flag_value( $assoc_args, 'with-local-redis' );
+		$this->site_data['cache_host']         = '';
+		if ( $this->cache_type ) {
+			$this->site_data['cache_host'] = $local_cache ? 'redis' : 'global-redis';
+		}
 
 		if ( \EE\Utils\get_flag_value( $assoc_args, 'local-db' ) ) {
 			$this->site_data['db_host'] = 'db';
 		}
 		$this->site_data['db_root_password'] = ( 'db' === $this->site_data['db_host'] ) ? \EE\Utils\random_password() : '';
 
-		\EE\Site\Utils\init_checks();
+		\EE\Service\Utils\nginx_proxy_check();
+
+		if ( $this->cache_type && ! $local_cache ) {
+			\EE\Service\Utils\init_global_container( GLOBAL_REDIS );
+		}
 
 		if ( GLOBAL_DB === $this->site_data['db_host'] ) {
-			\EE\Site\Utils\init_global_db();
+			\EE\Service\Utils\init_global_container( GLOBAL_DB );
 			$user_data                      = \EE\Site\Utils\create_user_in_db( GLOBAL_DB, $this->site_data['db_name'], $this->site_data['db_user'], $this->site_data['db_password'] );
 			$this->site_data['db_name']     = $user_data['db_name'];
 			$this->site_data['db_user']     = $user_data['db_user'];
@@ -457,7 +469,7 @@ class WordPress extends EE_Site_Command {
 
 		$filter                 = [];
 		$filter[]               = $this->site_data['app_sub_type'];
-		$filter[]               = $this->cache_type ? 'redis' : 'none';
+		$filter[]               = $this->site_data['cache_host'];
 		$filter[]               = $this->site_data['db_host'];
 		$site_docker            = new Site_WP_Docker();
 
@@ -486,6 +498,7 @@ class WordPress extends EE_Site_Command {
 		$default_conf_data['include_php_conf']      = ! $cache_type;
 		$default_conf_data['include_wpsubdir_conf'] = $site_type === 'subdir';
 		$default_conf_data['include_redis_conf']    = $cache_type;
+		$default_conf_data['cache_host']            = $this->site_data['cache_host'];
 
 		return \EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/nginx/main.conf.mustache', $default_conf_data );
 	}
