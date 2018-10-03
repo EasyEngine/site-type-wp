@@ -260,6 +260,55 @@ class WordPress extends EE_Site_Command {
 	}
 
 	/**
+	 * Enable object cache.
+	 */
+	private function enable_object_cache() {
+		$redis_plugin_constant    = 'docker-compose exec --user=\'www-data\' php wp config set --type=variable redis_server "array(\'host\'=> \'ee-global-redis\',\'port\'=> 6379,)" --raw';
+		$activate_wp_redis_plugin = "docker-compose exec --user='www-data' php wp plugin install wp-redis --activate";
+		$enable_redis_cache       = "docker-compose exec --user='www-data' php wp redis enable";
+
+		$this->docker_compose_exec( $redis_plugin_constant, 'Unable to download or activate wp-redis plugin.' );
+		$this->docker_compose_exec( $activate_wp_redis_plugin, 'Unable to download or activate wp-redis plugin.' );
+		$this->docker_compose_exec( $enable_redis_cache, 'Unable to enable object cache' );
+	}
+
+	/**
+	 * Enable page cache.
+	 */
+	private function enable_page_cache() {
+		$activate_nginx_helper = 'docker-compose exec --user=\'www-data\' php wp plugin install nginx-helper --activate';
+		$nginx_helper_fail_msg = 'Unable to download or activate nginx-helper plugin';
+		$salt_value            = $this->site_data['site_url'] . ':';
+		$add_hostname_constant = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_HOSTNAME ee-global-redis --add=true --type=constant";
+		$add_port_constant     = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PORT 6379 --add=true --type=constant";
+		$add_prefix_constant   = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX nginx-cache: --add=true --type=constant";
+		$add_cache_key_salt    = "docker-compose exec --user='www-data' php wp config set WP_CACHE_KEY_SALT $salt_value --add=true --type=constant";
+		$add_redis_maxttl      = "docker-compose exec --user='www-data' php wp config set WP_REDIS_MAXTTL 14400 --add=true --type=constant";
+
+		$this->docker_compose_exec( $add_hostname_constant, $nginx_helper_fail_msg );
+		$this->docker_compose_exec( $add_port_constant, $nginx_helper_fail_msg );
+		$this->docker_compose_exec( $add_prefix_constant, $nginx_helper_fail_msg );
+		$this->docker_compose_exec( $add_cache_key_salt, $nginx_helper_fail_msg );
+		$this->docker_compose_exec( $activate_nginx_helper, $nginx_helper_fail_msg );
+		$this->docker_compose_exec( $add_redis_maxttl, $nginx_helper_fail_msg );
+	}
+
+	/**
+	 *  Execute command with fail msg.
+	 *
+	 * @param string $command  Command to execute.
+	 * @param string $fail_msg failure message.
+	 */
+	private function docker_compose_exec( $command, $fail_msg = '' ) {
+		if ( empty( $command ) ) {
+			return;
+		}
+		if ( ! \EE::exec( $command ) ) {
+			\EE::warning( $fail_msg );
+		}
+	}
+
+	/**
 	 * Creates database user for a site
 	 *
 	 * @param string $site_url URL of site.
@@ -505,6 +554,12 @@ class WordPress extends EE_Site_Command {
 			$this->catch_clean( $e );
 		}
 
+		if ( ! empty( $this->cache_type ) ) {
+			$this->enable_object_cache();
+			$this->enable_page_cache();
+		}
+
+		$this->info( [ $this->site_data['site_url'] ], [] );
 		$this->create_site_db_entry();
 
 		\EE::log( 'Creating cron entry' );
