@@ -62,9 +62,9 @@ Feature: Site Command
     Then STDOUT should return exactly
     """
     wp.test
+    wpcache.test
     wpsubdir.test
     wpsubdom.test
-    wpcache.test
     """
 
   Scenario: Delete the sites
