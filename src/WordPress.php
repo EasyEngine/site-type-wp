@@ -509,8 +509,36 @@ class WordPress extends EE_Site_Command {
 		if ( ! \EE::exec( sprintf( "docker exec %s sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"", $container_name, $db_host, $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'] ) ) ) {
 			throw new \Exception( 'Unable to connect to remote db' );
 		}
-		\EE::exec( "docker rm -f $container_name" );
 		\EE::success( 'Connection to remote db verified' );
+
+		$name            = str_replace( '_', '\_', $this->site_data['db_name'] );
+		$check_db_exists = sprintf( "docker exec %s bash -c \"mysqlshow --user='%s' --password='%s' --host='%s' --port='%s' '%s'\"", $container_name, $this->site_data['db_user'], $this->site_data['db_password'], $db_host, $this->site_data['db_port'], $name );
+
+		if ( ! \EE::exec( $check_db_exists ) ) {
+			\EE::log( sprintf( 'Database `%s` does not exist. Attempting to create it.', $this->site_data['db_name'] ) );
+			$create_db_command = sprintf( "docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='CREATE DATABASE %s;'\"", $container_name, $db_host, $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_name'] );
+
+			if ( ! \EE::exec( $create_db_command ) ) {
+				throw new \Exception( sprintf( 'Could not create database `%s` on `%s:%s`. Please check if %s has rights to create database or manually create a database and pass with `--dbname` parameter.', $this->site_data['db_name'], $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'] ) );
+			}
+		} else {
+			if ( $this->force ) {
+				\EE::exec( sprintf( "docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='DROP DATABASE %s;'\"", $container_name, $db_host, $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_name'] ) );
+				\EE::exec( sprintf( "docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='CREATE DATABASE %s;'\"", $container_name, $db_host, $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_name'] ) );
+			}
+			$check_tables = sprintf( "docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='USE %s; show tables;'\"", $container_name, $db_host, $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_name'] );
+
+			$launch = \EE::launch( $check_tables );
+			if ( ! $launch->return_code ) {
+				$tables = trim( $launch->stdout, "\n" );
+				if ( ! empty( $tables ) ) {
+					throw new \Exception( sprintf( 'Some database tables seem to exist in database %s. Please backup and reset the database or use `--force` in the site create command to reset it.', $this->site_data['db_name'] ) );
+				}
+			} else {
+				throw new \Exception( 'There was a problem in connecting and the database. Please check the logs' );
+			}
+		}
+		\EE::exec( "docker rm -f $container_name" );
 	}
 
 	/**
@@ -627,28 +655,6 @@ class WordPress extends EE_Site_Command {
 		try {
 			if ( ! \EE::exec( $wp_config_create_command ) ) {
 				throw new \Exception( sprintf( 'Couldn\'t connect to %s:%s or there was issue in `wp config create`. Please check logs.', $this->site_data['db_host'], $this->site_data['db_port'] ) );
-			}
-			if ( 'db' !== $this->site_data['db_host'] ) {
-				$name            = $this->site_data['db_name'];
-				$check_db_exists = sprintf( "docker-compose exec php bash -c \"mysqlshow --user='%s' --password='%s' --host='%s' --port='%s' '%s'\"", $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_host'], $this->site_data['db_port'], $name );
-
-				if ( ! \EE::exec( $check_db_exists ) ) {
-					\EE::log( sprintf( 'Database `%s` does not exist. Attempting to create it.', $this->site_data['db_name'] ) );
-					$create_db_command = sprintf( 'docker-compose exec php bash -c "mysql --host=%s --port=%s --user=%s --password=%s --execute="CREATE DATABASE %s;""', $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_name'] );
-
-					if ( ! \EE::exec( $create_db_command ) ) {
-						throw new \Exception( sprintf( 'Could not create database `%s` on `%s:%s`. Please check if %s has rights to create database or manually create a database and pass with `--dbname` parameter.', $this->site_data['db_name'], $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'] ) );
-					}
-					$this->level = 4;
-				} else {
-					if ( $this->force ) {
-						\EE::exec( 'docker-compose exec --user=\'www-data\' php wp db reset --yes' );
-					}
-					$check_tables = 'docker-compose exec --user=\'www-data\' php wp db tables';
-					if ( \EE::exec( $check_tables, false, false ) ) {
-						throw new \Exception( 'WordPress tables already seem to exist. Please backup and reset the database or use `--force` in the site create command to reset it.' );
-					}
-				}
 			}
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
