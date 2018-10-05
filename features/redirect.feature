@@ -1,7 +1,8 @@
 Feature: Site Redirection
 
   Scenario: no_www-no_ssl redirection works properly
-    When I run 'bin/ee site create example.test --type=wp'
+    When I run '/bin/bash -c 'echo "127.0.0.1 www.example.test" >> /etc/hosts''
+    And I run 'bin/ee site create example.test --type=wp'
     Then After delay of 5 seconds
     And Request on 'localhost' with header 'Host: www.example.test' should contain following headers:
     | header                         |
@@ -9,7 +10,8 @@ Feature: Site Redirection
     | Location: http://example.test/ |
 
   Scenario: www-no_ssl redirection works properly
-    When I run 'bin/ee site create www.example1.test --type=wp'
+    When I run '/bin/bash -c 'echo "127.0.0.1 example1.test" >> /etc/hosts''
+    And I run 'bin/ee site create www.example1.test --type=wp'
     Then After delay of 5 seconds
     And Request on 'localhost' with header 'Host: example1.test' should contain following headers:
     | header                              |

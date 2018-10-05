@@ -17,11 +17,6 @@ use function EE\Site\Utils\get_site_info;
 class WordPress extends EE_Site_Command {
 
 	/**
-	 * @var array $site_data Associative array containing essential site related information.
-	 */
-	private $site_data;
-
-	/**
 	 * @var string $cache_type Type of caching being used.
 	 */
 	private $cache_type;
@@ -436,7 +431,7 @@ class WordPress extends EE_Site_Command {
 	 *
 	 * @param array $additional_filters Filters to alter docker-compose file.
 	 */
-	private function dump_docker_compose_yml( $additional_filters = [] ) {
+	protected function dump_docker_compose_yml( $additional_filters = [] ) {
 
 		$site_docker_yml = $this->site_data['site_fs_path'] . '/docker-compose.yml';
 
@@ -535,21 +530,7 @@ class WordPress extends EE_Site_Command {
 				$this->install_wp();
 			}
 
-			\EE\Site\Utils\add_site_redirects( $this->site_data['site_url'], false, 'inherit' === $this->site_data['site_ssl'] );
-			\EE\Site\Utils\reload_global_nginx_proxy();
-
-			if ( $this->site_data['site_ssl'] ) {
-				$wildcard = 'subdom' === $this->site_data['app_sub_type'] || $this->site_data['site_ssl_wildcard'];
-				\EE::debug( 'Wildcard in site wp command: ' . $this->site_data['site_ssl_wildcard'] );
-				$this->init_ssl( $this->site_data['site_url'], $this->site_data['site_fs_path'], $this->site_data['site_ssl'], $wildcard );
-
-				\EE\Site\Utils\add_site_redirects( $this->site_data['site_url'], true, 'inherit' === $this->site_data['site_ssl'] );
-
-				$this->dump_docker_compose_yml( [ 'nohttps' => false ] );
-				\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'], ['nginx'] );
-
-				\EE\Site\Utils\reload_global_nginx_proxy();
-			}
+			$this->www_ssl_wrapper( [ 'nginx' ] );
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
 		}
