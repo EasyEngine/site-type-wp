@@ -385,8 +385,8 @@ class WordPress extends EE_Site_Command {
 		\EE::log( 'Creating WordPress site ' . $this->site_data['site_url'] );
 		\EE::log( 'Copying configuration files.' );
 
-		$default_conf_content   = $this->generate_default_conf( $this->site_data['app_sub_type'], $this->cache_type, $server_name );
-		$local                  = ( 'db' === $this->site_data['db_host'] ) ? true : false;
+		$default_conf_content = $this->generate_default_conf( $this->site_data['app_sub_type'], $this->cache_type, $server_name );
+		$local                = ( 'db' === $this->site_data['db_host'] ) ? true : false;
 
 		$db_host  = $local ? $this->site_data['db_host'] : $this->site_data['db_host'] . ':' . $this->site_data['db_port'];
 		$env_data = [
@@ -435,11 +435,11 @@ class WordPress extends EE_Site_Command {
 
 		$site_docker_yml = $this->site_data['site_fs_path'] . '/docker-compose.yml';
 
-		$filter                 = [];
-		$filter[]               = $this->site_data['app_sub_type'];
-		$filter[]               = $this->site_data['cache_host'];
-		$filter[]               = $this->site_data['db_host'];
-		$site_docker            = new Site_WP_Docker();
+		$filter      = [];
+		$filter[]    = $this->site_data['app_sub_type'];
+		$filter[]    = $this->site_data['cache_host'];
+		$filter[]    = $this->site_data['db_host'];
+		$site_docker = new Site_WP_Docker();
 
 		foreach ( $additional_filters as $key => $addon_filter ) {
 			$filter[ $key ] = $addon_filter;
@@ -472,34 +472,44 @@ class WordPress extends EE_Site_Command {
 	}
 
 
+	/**
+	 * Verify if the passed database credentials are working or not.
+	 *
+	 * @throws \Exception
+	 */
 	private function maybe_verify_remote_db_connection() {
 
-		if ( in_array( $this->site_data['db_host'], [ 'db', GLOBAL_DB ] ) ) {
+		if ( in_array( $this->site_data['db_host'], [ 'db', GLOBAL_DB ], true ) ) {
 			return;
+		}
+		$db_host        = $this->site_data['db_host'];
+		$img_versions   = \EE\Utils\get_image_versions();
+		$container_name = \EE\Utils\random_password();
+		$network        = ( GLOBAL_DB === $this->site_data['db_host'] ) ? "--network='" . GLOBAL_FRONTEND_NETWORK . "'" : '';
+
+		if ( ! \EE::exec( sprintf( 'docker run --name %s %s -e MYSQL_ROOT_PASSWORD=%s -d --restart always easyengine/mariadb:%s', $container_name, $network, \EE\Utils\random_password(), $img_versions['easyengine/mariadb'] ) ) ) {
+			throw new \Exception( 'There was a problem creating container to test mysql connection. Please check the logs' );
 		}
 
 		// Docker needs special handling if we want to connect to host machine.
 		// The since we're inside the container and we want to access host machine,
 		// we would need to replace localhost with default gateway.
-		if ( '127.0.0.1' === $this->site_data['db_host'] || 'localhost' === $this->site_data['db_host'] ) {
-			$launch = \EE::launch( sprintf( "docker network inspect %s --format='{{ (index .IPAM.Config 0).Gateway }}'", $this->site_data['site_url'] ) );
+		if ( '127.0.0.1' === $db_host || 'localhost' === $db_host ) {
+			$launch = \EE::launch( sprintf( "docker exec %s bash -c \"ip route show default | cut -d' ' -f3\"", $container_name ) );
 
 			if ( ! $launch->return_code ) {
-				$this->site_data['db_host'] = trim( $launch->stdout, "\n" );
+				$db_host = trim( $launch->stdout, "\n" );
 			} else {
-				throw new \Exception( 'There was a problem inspecting network. Please check the logs' );
+				throw new \Exception( 'There was a problem connecting to connection test container. Please check the logs' );
 			}
 		}
 
 		\EE::log( 'Verifying connection to remote database' );
-		$img_versions = \EE\Utils\get_image_versions();
 
-		$network = ( GLOBAL_DB === $this->site_data['db_host'] ) ? "--network='" . GLOBAL_FRONTEND_NETWORK . "'" : '';
-
-		if ( ! \EE::exec( sprintf( "docker run -it --rm %s easyengine/mariadb:%s sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"", $network, $img_versions['easyengine/mariadb'], $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'] ) ) ) {
+		if ( ! \EE::exec( sprintf( "docker exec %s sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"", $container_name, $db_host, $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'] ) ) ) {
 			throw new \Exception( 'Unable to connect to remote db' );
 		}
-
+		\EE::exec( "docker rm -f $container_name" );
 		\EE::success( 'Connection to remote db verified' );
 	}
 
@@ -514,8 +524,8 @@ class WordPress extends EE_Site_Command {
 			\EE\Site\Utils\create_site_root( $this->site_data['site_fs_path'], $this->site_data['site_url'] );
 			$this->level = 2;
 			$this->maybe_verify_remote_db_connection();
-			$this->level = 3;
 			$this->configure_site_files();
+			$this->level = 3;
 
 			\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'], [ 'nginx', 'postfix' ] );
 			\EE\Site\Utils\configure_postfix( $this->site_data['site_url'], $this->site_data['site_fs_path'] );
