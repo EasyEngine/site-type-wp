@@ -704,6 +704,7 @@ class WordPress extends EE_Site_Command {
 			'cache_nginx_fullpage' => (int) $this->cache_type,
 			'cache_mysql_query'    => (int) $this->cache_type,
 			'cache_app_object'     => (int) $this->cache_type,
+			'cache_host'           => $this->site_data['cache_host'],
 			'site_fs_path'         => $this->site_data['site_fs_path'],
 			'db_name'              => $this->site_data['db_name'],
 			'db_user'              => $this->site_data['db_user'],
