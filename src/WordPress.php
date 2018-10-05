@@ -544,7 +544,7 @@ class WordPress extends EE_Site_Command {
 		$this->create_site_db_entry();
 
 		\EE::log( 'Creating cron entry' );
-		\EE::runcommand( 'cron create ' . $this->site_data['site_url'] . ' --user=www-data --command=\'wp cron event run --due-now\' --schedule=\'@every 5m\'' );
+		\EE::runcommand( 'cron create ' . $this->site_data['site_url'] . ' --user=www-data --command=\'wp cron event run --due-now\' --schedule=\'@every 1h\'' );
 
 		$this->info( [ $this->site_data['site_url'] ], [] );
 		\EE::log( 'Site entry created.' );
