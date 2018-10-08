@@ -248,6 +248,10 @@ class WordPress extends EE_Site_Command {
 		$this->skip_status_check            = \EE\Utils\get_flag_value( $assoc_args, 'skip-status-check' );
 		$this->force                        = \EE\Utils\get_flag_value( $assoc_args, 'force' );
 
+		if ( 'inherit' === $this->site_data['site_ssl'] && ( 'subdom' === $mu || $this->site_data['site_ssl_wildcard'] ) ) {
+			\EE::error( '--wildcard or --mu=subdom flag can not be passed together with --ssl=inherit flag.' );
+		}
+
 		\EE::log( 'Configuring project.' );
 
 		$this->create_site( $assoc_args );
@@ -584,15 +588,13 @@ class WordPress extends EE_Site_Command {
 			$this->enable_page_cache();
 		}
 
-		$this->info( [ $this->site_data['site_url'] ], [] );
 		$this->create_site_db_entry();
+		\EE::log( 'Site entry created.' );
 
 		\EE::log( 'Creating cron entry' );
-		\EE::runcommand( 'cron create ' . $this->site_data['site_url'] . ' --user=www-data --command=\'wp cron event run --due-now\' --schedule=\'@every 5m\'' );
-		\EE::exec( 'cd ' . $this->site_data['site_fs_path'] . ' && docker-compose exec php wp cron event run --due-now' );
+		\EE::runcommand( 'cron create ' . $this->site_data['site_url'] . ' --user=www-data --command=\'wp cron event run --due-now\' --schedule=\'@every 1h\'' );
 
 		$this->info( [ $this->site_data['site_url'] ], [] );
-		\EE::log( 'Site entry created.' );
 	}
 
 	/**
@@ -726,6 +728,7 @@ class WordPress extends EE_Site_Command {
 			'cache_nginx_fullpage' => (int) $this->cache_type,
 			'cache_mysql_query'    => (int) $this->cache_type,
 			'cache_app_object'     => (int) $this->cache_type,
+			'cache_host'           => $this->site_data['cache_host'],
 			'site_fs_path'         => $this->site_data['site_fs_path'],
 			'db_name'              => $this->site_data['db_name'],
 			'db_user'              => $this->site_data['db_user'],
