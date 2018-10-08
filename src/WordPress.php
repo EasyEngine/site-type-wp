@@ -125,7 +125,7 @@ class WordPress extends EE_Site_Command {
 	 * [--dbcharset=<dbcharset>]
 	 * : Set the database charset.
 	 * ---
-	 * default: utf8
+	 * default: utf8mb4
 	 * ---
 	 *
 	 * [--dbcollate=<dbcollate>]
