@@ -248,6 +248,10 @@ class WordPress extends EE_Site_Command {
 		$this->skip_status_check            = \EE\Utils\get_flag_value( $assoc_args, 'skip-status-check' );
 		$this->force                        = \EE\Utils\get_flag_value( $assoc_args, 'force' );
 
+		if ( 'inherit' === $this->site_data['site_ssl'] && ( 'subdom' === $mu || $this->site_data['site_ssl_wildcard'] ) ) {
+			\EE::error( '--wildcard or --mu=subdom flag can not be passed together with --ssl=inherit flag.' );
+		}
+
 		\EE::log( 'Configuring project.' );
 
 		$this->create_site( $assoc_args );
