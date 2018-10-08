@@ -502,7 +502,7 @@ class WordPress extends EE_Site_Command {
 				$db_host = trim( $launch->stdout, "\n" );
 			} else {
 				\EE::exec( "docker rm -f $container_name" );
-				throw new \Exception( 'There was a problem connecting to connection test container. Please check the logs' );
+				throw new \Exception( 'There was a problem in connecting to the database. Please check the logs' );
 			}
 		}
 
