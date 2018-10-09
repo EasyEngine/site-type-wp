@@ -229,7 +229,14 @@ class WordPress extends EE_Site_Command {
 
 		if ( GLOBAL_DB === $this->site_data['db_host'] ) {
 			\EE\Service\Utils\init_global_container( GLOBAL_DB );
-			$user_data                      = \EE\Site\Utils\create_user_in_db( GLOBAL_DB, $this->site_data['db_name'], $this->site_data['db_user'], $this->site_data['db_password'] );
+			try {
+				$user_data = \EE\Site\Utils\create_user_in_db( GLOBAL_DB, $this->site_data['db_name'], $this->site_data['db_user'], $this->site_data['db_password'] );
+				if ( ! $user_data ) {
+					throw new \Exception( sprintf( 'Could not create user %s. Please check logs.', $this->site_data['db_user'] ) );
+				}
+			} catch ( \Exception $e ) {
+				$this->catch_clean( $e );
+			}
 			$this->site_data['db_name']     = $user_data['db_name'];
 			$this->site_data['db_user']     = $user_data['db_user'];
 			$this->site_data['db_password'] = $user_data['db_pass'];
