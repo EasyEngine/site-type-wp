@@ -487,7 +487,15 @@ class WordPress extends EE_Site_Command {
 		$container_name = \EE\Utils\random_password();
 		$network        = ( GLOBAL_DB === $this->site_data['db_host'] ) ? "--network='" . GLOBAL_FRONTEND_NETWORK . "'" : '';
 
-		if ( ! \EE::exec( sprintf( 'docker run --name %s %s -e MYSQL_ROOT_PASSWORD=%s -d --restart always easyengine/mariadb:%s', $container_name, $network, \EE\Utils\random_password(), $img_versions['easyengine/mariadb'] ) ) ) {
+		if ( ! \EE::exec(
+			sprintf(
+				'docker run --name %s %s -e MYSQL_ROOT_PASSWORD=%s -d --restart always easyengine/mariadb:%s',
+				$container_name,
+				$network,
+				\EE\Utils\random_password(),
+				$img_versions['easyengine/mariadb']
+			)
+		) ) {
 			\EE::exec( "docker rm -f $container_name" );
 			throw new \Exception( 'There was a problem creating container to test mysql connection. Please check the logs' );
 		}
@@ -508,7 +516,16 @@ class WordPress extends EE_Site_Command {
 
 		\EE::log( 'Verifying connection to remote database' );
 
-		if ( ! \EE::exec( sprintf( "docker exec %s sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"", $container_name, $db_host, $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'] ) ) ) {
+		if ( ! \EE::exec(
+			sprintf(
+				"docker exec %s sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"",
+				$container_name,
+				$db_host,
+				$this->site_data['db_port'],
+				$this->site_data['db_user'],
+				$this->site_data['db_password']
+			)
+		) ) {
 			\EE::exec( "docker rm -f $container_name" );
 			throw new \Exception( 'Unable to connect to remote db' );
 		}
@@ -519,18 +536,60 @@ class WordPress extends EE_Site_Command {
 
 		if ( ! \EE::exec( $check_db_exists ) ) {
 			\EE::log( sprintf( 'Database `%s` does not exist. Attempting to create it.', $this->site_data['db_name'] ) );
-			$create_db_command = sprintf( "docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='CREATE DATABASE %s;'\"", $container_name, $db_host, $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_name'] );
+			$create_db_command = sprintf(
+				"docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='CREATE DATABASE %s;'\"",
+				$container_name,
+				$db_host,
+				$this->site_data['db_port'],
+				$this->site_data['db_user'],
+				$this->site_data['db_password'],
+				$this->site_data['db_name']
+			);
 
 			if ( ! \EE::exec( $create_db_command ) ) {
 				\EE::exec( "docker rm -f $container_name" );
-				throw new \Exception( sprintf( 'Could not create database `%s` on `%s:%s`. Please check if %s has rights to create database or manually create a database and pass with `--dbname` parameter.', $this->site_data['db_name'], $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'] ) );
+				throw new \Exception( sprintf(
+					'Could not create database `%s` on `%s:%s`. Please check if %s has rights to create database or manually create a database and pass with `--dbname` parameter.',
+					$this->site_data['db_name'],
+					$this->site_data['db_host'],
+					$this->site_data['db_port'],
+					$this->site_data['db_user']
+				) );
 			}
 		} else {
 			if ( $this->force ) {
-				\EE::exec( sprintf( "docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='DROP DATABASE %s;'\"", $container_name, $db_host, $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_name'] ) );
-				\EE::exec( sprintf( "docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='CREATE DATABASE %s;'\"", $container_name, $db_host, $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_name'] ) );
+				\EE::exec(
+					sprintf(
+						"docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='DROP DATABASE %s;'\"",
+						$container_name,
+						$db_host,
+						$this->site_data['db_port'],
+						$this->site_data['db_user'],
+						$this->site_data['db_password'],
+						$this->site_data['db_name']
+					)
+				);
+				\EE::exec(
+					sprintf(
+						"docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='CREATE DATABASE %s;'\"",
+						$container_name,
+						$db_host,
+						$this->site_data['db_port'],
+						$this->site_data['db_user'],
+						$this->site_data['db_password'],
+						$this->site_data['db_name']
+					)
+				);
 			}
-			$check_tables = sprintf( "docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='USE %s; show tables;'\"", $container_name, $db_host, $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_name'] );
+			$check_tables = sprintf(
+				"docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='USE %s; show tables;'\"",
+				$container_name,
+				$db_host,
+				$this->site_data['db_port'],
+				$this->site_data['db_user'],
+				$this->site_data['db_password'],
+				$this->site_data['db_name']
+			);
 
 			$launch = \EE::launch( $check_tables );
 			if ( ! $launch->return_code ) {
