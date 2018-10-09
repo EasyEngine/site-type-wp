@@ -491,15 +491,14 @@ class WordPress extends EE_Site_Command {
 		$container_name = \EE\Utils\random_password();
 		$network        = ( GLOBAL_DB === $this->site_data['db_host'] ) ? "--network='" . GLOBAL_FRONTEND_NETWORK . "'" : '';
 
-		if ( ! \EE::exec(
-			sprintf(
-				'docker run --name %s %s -e MYSQL_ROOT_PASSWORD=%s -d --restart always easyengine/mariadb:%s',
-				$container_name,
-				$network,
-				\EE\Utils\random_password(),
-				$img_versions['easyengine/mariadb']
-			)
-		) ) {
+		$run_temp_container = sprintf(
+			'docker run --name %s %s -e MYSQL_ROOT_PASSWORD=%s -d --restart always easyengine/mariadb:%s',
+			$container_name,
+			$network,
+			\EE\Utils\random_password(),
+			$img_versions['easyengine/mariadb']
+		);
+		if ( ! \EE::exec( $run_temp_container ) ) {
 			\EE::exec( "docker rm -f $container_name" );
 			throw new \Exception( 'There was a problem creating container to test mysql connection. Please check the logs' );
 		}
@@ -520,16 +519,15 @@ class WordPress extends EE_Site_Command {
 
 		\EE::log( 'Verifying connection to remote database' );
 
-		if ( ! \EE::exec(
-			sprintf(
-				"docker exec %s sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"",
-				$container_name,
-				$db_host,
-				$this->site_data['db_port'],
-				$this->site_data['db_user'],
-				$this->site_data['db_password']
-			)
-		) ) {
+		$check_db_connection = sprintf(
+			"docker exec %s sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"",
+			$container_name,
+			$db_host,
+			$this->site_data['db_port'],
+			$this->site_data['db_user'],
+			$this->site_data['db_password']
+		);
+		if ( ! \EE::exec( $check_db_connection ) ) {
 			\EE::exec( "docker rm -f $container_name" );
 			throw new \Exception( 'Unable to connect to remote db' );
 		}
