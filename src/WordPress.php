@@ -17,11 +17,6 @@ use function EE\Site\Utils\get_site_info;
 class WordPress extends EE_Site_Command {
 
 	/**
-	 * @var array $site_data Associative array containing essential site related information.
-	 */
-	private $site_data;
-
-	/**
 	 * @var string $cache_type Type of caching being used.
 	 */
 	private $cache_type;
@@ -130,7 +125,7 @@ class WordPress extends EE_Site_Command {
 	 * [--dbcharset=<dbcharset>]
 	 * : Set the database charset.
 	 * ---
-	 * default: utf8
+	 * default: utf8mb4
 	 * ---
 	 *
 	 * [--dbcollate=<dbcollate>]
@@ -253,6 +248,10 @@ class WordPress extends EE_Site_Command {
 		$this->skip_status_check            = \EE\Utils\get_flag_value( $assoc_args, 'skip-status-check' );
 		$this->force                        = \EE\Utils\get_flag_value( $assoc_args, 'force' );
 
+		if ( 'inherit' === $this->site_data['site_ssl'] && ( 'subdom' === $mu || $this->site_data['site_ssl_wildcard'] ) ) {
+			\EE::error( '--wildcard or --mu=subdom flag can not be passed together with --ssl=inherit flag.' );
+		}
+
 		\EE::log( 'Configuring project.' );
 
 		$this->create_site( $assoc_args );
@@ -333,6 +332,55 @@ class WordPress extends EE_Site_Command {
 
 		\EE::success( 'Updated site ' . $this->site_data['site_ssl'] );
 		\EE\Utils\delem_log( 'site reload end' );
+  }
+
+  /*
+   * Enable object cache.
+	 */
+	private function enable_object_cache() {
+		$redis_plugin_constant    = 'docker-compose exec --user=\'www-data\' php wp config set --type=variable redis_server "array(\'host\'=> \'ee-global-redis\',\'port\'=> 6379,)" --raw';
+		$activate_wp_redis_plugin = "docker-compose exec --user='www-data' php wp plugin install wp-redis --activate";
+		$enable_redis_cache       = "docker-compose exec --user='www-data' php wp redis enable";
+
+		$this->docker_compose_exec( $redis_plugin_constant, 'Unable to download or activate wp-redis plugin.' );
+		$this->docker_compose_exec( $activate_wp_redis_plugin, 'Unable to download or activate wp-redis plugin.' );
+		$this->docker_compose_exec( $enable_redis_cache, 'Unable to enable object cache' );
+	}
+
+	/**
+	 * Enable page cache.
+	 */
+	private function enable_page_cache() {
+		$activate_nginx_helper = 'docker-compose exec --user=\'www-data\' php wp plugin install nginx-helper --activate';
+		$nginx_helper_fail_msg = 'Unable to download or activate nginx-helper plugin';
+		$salt_value            = $this->site_data['site_url'] . ':';
+		$add_hostname_constant = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_HOSTNAME ee-global-redis --add=true --type=constant";
+		$add_port_constant     = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PORT 6379 --add=true --type=constant";
+		$add_prefix_constant   = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX nginx-cache: --add=true --type=constant";
+		$add_cache_key_salt    = "docker-compose exec --user='www-data' php wp config set WP_CACHE_KEY_SALT $salt_value --add=true --type=constant";
+		$add_redis_maxttl      = "docker-compose exec --user='www-data' php wp config set WP_REDIS_MAXTTL 14400 --add=true --type=constant";
+
+		$this->docker_compose_exec( $add_hostname_constant, $nginx_helper_fail_msg );
+		$this->docker_compose_exec( $add_port_constant, $nginx_helper_fail_msg );
+		$this->docker_compose_exec( $add_prefix_constant, $nginx_helper_fail_msg );
+		$this->docker_compose_exec( $add_cache_key_salt, $nginx_helper_fail_msg );
+		$this->docker_compose_exec( $activate_nginx_helper, $nginx_helper_fail_msg );
+		$this->docker_compose_exec( $add_redis_maxttl, $nginx_helper_fail_msg );
+	}
+
+	/**
+	 *  Execute command with fail msg.
+	 *
+	 * @param string $command  Command to execute.
+	 * @param string $fail_msg failure message.
+	 */
+	private function docker_compose_exec( $command, $fail_msg = '' ) {
+		if ( empty( $command ) ) {
+			return;
+		}
+		if ( ! \EE::exec( $command ) ) {
+			\EE::warning( $fail_msg );
+		}
 	}
 
 	/**
@@ -463,7 +511,7 @@ class WordPress extends EE_Site_Command {
 	 *
 	 * @param array $additional_filters Filters to alter docker-compose file.
 	 */
-	private function dump_docker_compose_yml( $additional_filters = [] ) {
+	protected function dump_docker_compose_yml( $additional_filters = [] ) {
 
 		$site_docker_yml = $this->site_data['site_fs_path'] . '/docker-compose.yml';
 
@@ -562,33 +610,23 @@ class WordPress extends EE_Site_Command {
 				$this->install_wp();
 			}
 
-			\EE\Site\Utils\add_site_redirects( $this->site_data['site_url'], false, 'inherit' === $this->site_data['site_ssl'] );
-			\EE\Site\Utils\reload_global_nginx_proxy();
-
-			if ( $this->site_data['site_ssl'] ) {
-				$wildcard = 'subdom' === $this->site_data['app_sub_type'] || $this->site_data['site_ssl_wildcard'];
-				\EE::debug( 'Wildcard in site wp command: ' . $this->site_data['site_ssl_wildcard'] );
-				$this->init_ssl( $this->site_data['site_url'], $this->site_data['site_fs_path'], $this->site_data['site_ssl'], $wildcard );
-
-				\EE\Site\Utils\add_site_redirects( $this->site_data['site_url'], true, 'inherit' === $this->site_data['site_ssl'] );
-
-				$this->dump_docker_compose_yml( [ 'nohttps' => false ] );
-				\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'], ['nginx'] );
-
-				\EE\Site\Utils\reload_global_nginx_proxy();
-			}
+			$this->www_ssl_wrapper( [ 'nginx' ] );
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
 		}
 
+		if ( ! empty( $this->cache_type ) ) {
+			$this->enable_object_cache();
+			$this->enable_page_cache();
+		}
+
 		$this->create_site_db_entry();
+		\EE::log( 'Site entry created.' );
 
 		\EE::log( 'Creating cron entry' );
-		\EE::runcommand( 'cron create ' . $this->site_data['site_url'] . ' --user=www-data --command=\'wp cron event run --due-now\' --schedule=\'@every 5m\'' );
-		\EE::exec( 'cd ' . $this->site_data['site_fs_path'] . ' && docker-compose exec php wp cron event run --due-now' );
+		\EE::runcommand( 'cron create ' . $this->site_data['site_url'] . ' --user=www-data --command=\'wp cron event run --due-now\' --schedule=\'@every 1h\'' );
 
 		$this->info( [ $this->site_data['site_url'] ], [] );
-		\EE::log( 'Site entry created.' );
 	}
 
 	/**
@@ -744,6 +782,7 @@ class WordPress extends EE_Site_Command {
 			'cache_nginx_fullpage' => (int) $this->cache_type,
 			'cache_mysql_query'    => (int) $this->cache_type,
 			'cache_app_object'     => (int) $this->cache_type,
+			'cache_host'           => $this->site_data['cache_host'],
 			'site_fs_path'         => $this->site_data['site_fs_path'],
 			'db_name'              => $this->site_data['db_name'],
 			'db_user'              => $this->site_data['db_user'],
