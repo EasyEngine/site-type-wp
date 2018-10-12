@@ -73,6 +73,7 @@ class Site_WP_Docker {
 				'vol' => [
 					[ 'name' => './app/src:/var/www/htdocs' ],
 					[ 'name' => './config/php-fpm/php.ini:/usr/local/etc/php/php.ini' ],
+					[ 'name' => './config/php-fpm/conf.d:/usr/local/etc/php/conf.d' ],
 				],
 			],
 		];
