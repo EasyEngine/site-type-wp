@@ -1,6 +1,7 @@
 <?php
 
 namespace EE\Site\Type;
+
 use function EE\Utils\mustache_render;
 
 class Site_WP_Docker {
@@ -37,7 +38,7 @@ class Site_WP_Docker {
 		$db['volumes']      = [
 			[
 				'vol' => [
-					'name' => './app/db:/var/lib/mysql',
+					'name' => './services/db:/var/lib/mysql',
 				],
 			],
 		];
@@ -71,7 +72,7 @@ class Site_WP_Docker {
 		$php['volumes']     = [
 			[
 				'vol' => [
-					[ 'name' => './app/src:/var/www/htdocs' ],
+					[ 'name' => './app:/var/www' ],
 					[ 'name' => './config/php-fpm/php.ini:/usr/local/etc/php/php.ini' ],
 				],
 			],
@@ -116,23 +117,23 @@ class Site_WP_Docker {
 		if ( ! empty( $filters['nohttps'] ) ) {
 			$nginx['environment']['env'][] = [ 'name' => 'HTTPS_METHOD=nohttps' ];
 		}
-		$nginx['volumes']     = [
+		$nginx['volumes']  = [
 			'vol' => [
-				[ 'name' => './app/src:/var/www/htdocs' ],
+				[ 'name' => './app:/var/www' ],
 				[ 'name' => './config/nginx/main.conf:/etc/nginx/conf.d/default.conf' ],
 				[ 'name' => './config/nginx/custom:/etc/nginx/custom' ],
 				[ 'name' => './logs/nginx:/var/log/nginx' ],
 			],
 		];
-		$nginx['labels']      = [
+		$nginx['labels']   = [
 			'label' => [
 				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
 			],
 		];
-		$nginx['networks']    = [
+		$nginx['networks'] = [
 			'net' => [
 				[
-					'name' => 'site-network',
+					'name'    => 'site-network',
 					'aliases' => [
 						'alias' => [
 							'name' => '${VIRTUAL_HOST}',
@@ -184,7 +185,7 @@ class Site_WP_Docker {
 			'vol' => [
 				[ 'name' => '/dev/log:/dev/log' ],
 				[ 'name' => './config/postfix/ssl:/etc/ssl/postfix' ],
-				[ 'name' => './app/postfix/spool:/var/spool/postfix' ],
+				[ 'name' => './services/postfix/spool:/var/spool/postfix' ],
 			],
 		];
 		$postfix['networks']     = $network_default;
