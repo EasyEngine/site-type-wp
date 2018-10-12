@@ -762,6 +762,9 @@ class WordPress extends EE_Site_Command {
 			if ( ! \EE::exec( $wp_config_create_command ) ) {
 				throw new \Exception( sprintf( 'Couldn\'t connect to %s:%s or there was issue in `wp config create`. Please check logs.', $this->site_data['db_host'], $this->site_data['db_port'] ) );
 			}
+			$old_wp_config_path = $this->site_data['site_fs_path'] . '/app/htdocs/wp-config.php';
+			$new_wp_config_path = $this->site_data['site_fs_path'] . '/app/wp-config.php';
+			$this->fs->rename( $old_wp_config_path, $new_wp_config_path );
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
 		}
