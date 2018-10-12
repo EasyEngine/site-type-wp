@@ -283,19 +283,53 @@ class WordPress extends EE_Site_Command {
 	 */
 	private function enable_page_cache() {
 		$activate_nginx_helper = 'docker-compose exec --user=\'www-data\' php wp plugin install nginx-helper --activate';
-		$nginx_helper_fail_msg = 'Unable to download or activate nginx-helper plugin';
+		$nginx_helper_fail_msg = 'Unable to download or activate nginx-helper plugin properly.';
 		$salt_value            = $this->site_data['site_url'] . ':';
+
+		$redis_host    = ( 'redis' === $this->site_data['cache_host'] ) ? $this->site_data['cache_host'] : 'ee-' . $this->site_data['cache_host'];
+		$wp_cli_params = ( 'wp' === $this->site_data['app_sub_type'] ) ? 'option update' : 'network meta update 1';
+
+		$plugin_data = sprintf( '{  
+				"log_level":"INFO",
+				"log_filesize":5,
+				"enable_purge":1,
+				"enable_map":0,
+				"enable_log":0,
+				"enable_stamp":0,
+				"purge_homepage_on_new":1,
+				"purge_homepage_on_edit":1,
+				"purge_homepage_on_del":1,
+				"purge_archive_on_new":1,
+				"purge_archive_on_edit":0,
+				"purge_archive_on_del":0,
+				"purge_archive_on_new_comment":0,
+				"purge_archive_on_deleted_comment":0,
+				"purge_page_on_mod":1,
+				"purge_page_on_new_comment":1,
+				"purge_page_on_deleted_comment":1,
+				"cache_method":"enable_redis",
+				"purge_method":"get_request",
+				"redis_hostname":"%s",
+				"redis_port":"6379",
+				"redis_prefix":"%s"
+			}',
+			$redis_host,
+			$salt_value
+		);
+
 		$add_hostname_constant = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_HOSTNAME ee-global-redis --add=true --type=constant";
 		$add_port_constant     = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PORT 6379 --add=true --type=constant";
 		$add_prefix_constant   = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX $salt_value --add=true --type=constant";
 		$add_cache_key_salt    = "docker-compose exec --user='www-data' php wp config set WP_CACHE_KEY_SALT $salt_value --add=true --type=constant";
 		$add_redis_maxttl      = "docker-compose exec --user='www-data' php wp config set WP_REDIS_MAXTTL 14400 --add=true --type=constant";
+		$add_plugin_data       = "docker-compose exec --user='www-data' php wp $wp_cli_params rt_wp_nginx_helper_options '$plugin_data' --format=json";
 
 		$this->docker_compose_exec( $add_hostname_constant, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $add_port_constant, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $add_prefix_constant, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $add_cache_key_salt, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $activate_nginx_helper, $nginx_helper_fail_msg );
+		$this->docker_compose_exec( $add_plugin_data, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $add_redis_maxttl, $nginx_helper_fail_msg );
 	}
 
