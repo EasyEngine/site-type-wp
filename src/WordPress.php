@@ -462,6 +462,7 @@ class WordPress extends EE_Site_Command {
 			$this->fs->dumpFile( $site_nginx_default_conf, $default_conf_content );
 			$this->fs->copy( $custom_conf_source, $custom_conf_dest );
 			$this->fs->dumpFile( $site_php_ini, $php_ini_content );
+			$this->generate_php_confd_config_files();
 
 			\EE\Site\Utils\set_postfix_files( $this->site_data['site_url'], $site_conf_dir );
 
@@ -494,6 +495,38 @@ class WordPress extends EE_Site_Command {
 		$this->fs->dumpFile( $site_docker_yml, $docker_compose_content );
 	}
 
+	/**
+	 * Generate php conf.d config files.
+	 */
+	protected function generate_php_confd_config_files() {
+		$confd_template_path = SITE_WP_TEMPLATE_ROOT . '/config/php-fpm/conf.d';
+		$confd_config_path = $this->site_data['site_fs_path'] . '/config/php-fpm/conf.d/';
+
+		$ext_gd              = \EE\Utils\mustache_render( $confd_template_path . '/docker-php-ext-gd.ini.mustache' );
+		$ext_imagick         = \EE\Utils\mustache_render( $confd_template_path . '/docker-php-ext-imagick.ini.mustache' );
+		$ext_mcrypt          = \EE\Utils\mustache_render( $confd_template_path . '/docker-php-ext-mcrypt.ini.mustache' );
+		$ext_memcache        = \EE\Utils\mustache_render( $confd_template_path . '/docker-php-ext-memcache.ini.mustache' );
+		$ext_mysql           = \EE\Utils\mustache_render( $confd_template_path . '/docker-php-ext-mysqli.ini.mustache' );
+		$ext_opcache         = \EE\Utils\mustache_render( $confd_template_path . '/docker-php-ext-opcache.ini.mustache' );
+		$ext_redis           = \EE\Utils\mustache_render( $confd_template_path . '/docker-php-ext-redis.ini.mustache' );
+		$ext_sodium          = \EE\Utils\mustache_render( $confd_template_path . '/docker-php-ext-sodium.ini.mustache' );
+		$ext_zip             = \EE\Utils\mustache_render( $confd_template_path . '/docker-php-ext-zip.ini.mustache' );
+		$memcache            = \EE\Utils\mustache_render( $confd_template_path . '/memcached.ini.mustache' );
+		$opcache_recommended = \EE\Utils\mustache_render( $confd_template_path . '/opcache-recommended.ini.mustache' );
+
+		$this->fs->dumpFile( $confd_config_path . '/docker-php-ext-gd.ini', $ext_gd );
+		$this->fs->dumpFile( $confd_config_path . '/docker-php-ext-imagick.ini', $ext_imagick );
+		$this->fs->dumpFile( $confd_config_path . '/docker-php-ext-mcrypt.ini', $ext_mcrypt );
+		$this->fs->dumpFile( $confd_config_path . '/docker-php-ext-memcache.ini', $ext_memcache );
+		$this->fs->dumpFile( $confd_config_path . '/docker-php-ext-mysqli.ini', $ext_mysql );
+		$this->fs->dumpFile( $confd_config_path . '/docker-php-ext-opcache.ini', $ext_opcache );
+		$this->fs->dumpFile( $confd_config_path . '/docker-php-ext-redis.ini', $ext_redis );
+		$this->fs->dumpFile( $confd_config_path . '/docker-php-ext-sodium.ini', $ext_sodium );
+		$this->fs->dumpFile( $confd_config_path . '/docker-php-ext-zip.ini', $ext_zip );
+		$this->fs->dumpFile( $confd_config_path . '/memcached.ini', $memcache );
+		$this->fs->dumpFile( $confd_config_path . '/opcache-recommended.ini', $opcache_recommended );
+
+	}
 
 	/**
 	 * Function to generate main.conf from mustache templates.
