@@ -125,7 +125,7 @@ class WordPress extends EE_Site_Command {
 	 * [--dbcharset=<dbcharset>]
 	 * : Set the database charset.
 	 * ---
-	 * default: utf8
+	 * default: utf8mb4
 	 * ---
 	 *
 	 * [--dbcollate=<dbcollate>]
@@ -230,7 +230,14 @@ class WordPress extends EE_Site_Command {
 
 		if ( GLOBAL_DB === $this->site_data['db_host'] ) {
 			\EE\Service\Utils\init_global_container( GLOBAL_DB );
-			$user_data                      = \EE\Site\Utils\create_user_in_db( GLOBAL_DB, $this->site_data['db_name'], $this->site_data['db_user'], $this->site_data['db_password'] );
+			try {
+				$user_data = \EE\Site\Utils\create_user_in_db( GLOBAL_DB, $this->site_data['db_name'], $this->site_data['db_user'], $this->site_data['db_password'] );
+				if ( ! $user_data ) {
+					throw new \Exception( sprintf( 'Could not create user %s. Please check logs.', $this->site_data['db_user'] ) );
+				}
+			} catch ( \Exception $e ) {
+				$this->catch_clean( $e );
+			}
 			$this->site_data['db_name']     = $user_data['db_name'];
 			$this->site_data['db_user']     = $user_data['db_user'];
 			$this->site_data['db_password'] = $user_data['db_pass'];
@@ -277,19 +284,53 @@ class WordPress extends EE_Site_Command {
 	 */
 	private function enable_page_cache() {
 		$activate_nginx_helper = 'docker-compose exec --user=\'www-data\' php wp plugin install nginx-helper --activate';
-		$nginx_helper_fail_msg = 'Unable to download or activate nginx-helper plugin';
+		$nginx_helper_fail_msg = 'Unable to download or activate nginx-helper plugin properly.';
 		$salt_value            = $this->site_data['site_url'] . ':';
+
+		$redis_host    = ( 'redis' === $this->site_data['cache_host'] ) ? $this->site_data['cache_host'] : 'ee-' . $this->site_data['cache_host'];
+		$wp_cli_params = ( 'wp' === $this->site_data['app_sub_type'] ) ? 'option update' : 'network meta update 1';
+
+		$plugin_data = sprintf( '{  
+				"log_level":"INFO",
+				"log_filesize":5,
+				"enable_purge":1,
+				"enable_map":0,
+				"enable_log":0,
+				"enable_stamp":0,
+				"purge_homepage_on_new":1,
+				"purge_homepage_on_edit":1,
+				"purge_homepage_on_del":1,
+				"purge_archive_on_new":1,
+				"purge_archive_on_edit":0,
+				"purge_archive_on_del":0,
+				"purge_archive_on_new_comment":0,
+				"purge_archive_on_deleted_comment":0,
+				"purge_page_on_mod":1,
+				"purge_page_on_new_comment":1,
+				"purge_page_on_deleted_comment":1,
+				"cache_method":"enable_redis",
+				"purge_method":"get_request",
+				"redis_hostname":"%s",
+				"redis_port":"6379",
+				"redis_prefix":"%s"
+			}',
+			$redis_host,
+			$salt_value
+		);
+
 		$add_hostname_constant = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_HOSTNAME ee-global-redis --add=true --type=constant";
 		$add_port_constant     = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PORT 6379 --add=true --type=constant";
-		$add_prefix_constant   = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX nginx-cache: --add=true --type=constant";
+		$add_prefix_constant   = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX $salt_value --add=true --type=constant";
 		$add_cache_key_salt    = "docker-compose exec --user='www-data' php wp config set WP_CACHE_KEY_SALT $salt_value --add=true --type=constant";
 		$add_redis_maxttl      = "docker-compose exec --user='www-data' php wp config set WP_REDIS_MAXTTL 14400 --add=true --type=constant";
+		$add_plugin_data       = "docker-compose exec --user='www-data' php wp $wp_cli_params rt_wp_nginx_helper_options '$plugin_data' --format=json";
 
 		$this->docker_compose_exec( $add_hostname_constant, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $add_port_constant, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $add_prefix_constant, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $add_cache_key_salt, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $activate_nginx_helper, $nginx_helper_fail_msg );
+		$this->docker_compose_exec( $add_plugin_data, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $add_redis_maxttl, $nginx_helper_fail_msg );
 	}
 
@@ -390,8 +431,8 @@ class WordPress extends EE_Site_Command {
 		\EE::log( 'Creating WordPress site ' . $this->site_data['site_url'] );
 		\EE::log( 'Copying configuration files.' );
 
-		$default_conf_content   = $this->generate_default_conf( $this->site_data['app_sub_type'], $this->cache_type, $server_name );
-		$local                  = ( 'db' === $this->site_data['db_host'] ) ? true : false;
+		$default_conf_content = $this->generate_default_conf( $this->site_data['app_sub_type'], $this->cache_type, $server_name );
+		$local                = ( 'db' === $this->site_data['db_host'] ) ? true : false;
 
 		$db_host  = $local ? $this->site_data['db_host'] : $this->site_data['db_host'] . ':' . $this->site_data['db_port'];
 		$env_data = [
@@ -440,11 +481,11 @@ class WordPress extends EE_Site_Command {
 
 		$site_docker_yml = $this->site_data['site_fs_path'] . '/docker-compose.yml';
 
-		$filter                 = [];
-		$filter[]               = $this->site_data['app_sub_type'];
-		$filter[]               = $this->site_data['cache_host'];
-		$filter[]               = $this->site_data['db_host'];
-		$site_docker            = new Site_WP_Docker();
+		$filter      = [];
+		$filter[]    = $this->site_data['app_sub_type'];
+		$filter[]    = $this->site_data['cache_host'];
+		$filter[]    = $this->site_data['db_host'];
+		$site_docker = new Site_WP_Docker();
 
 		foreach ( $additional_filters as $key => $addon_filter ) {
 			$filter[ $key ] = $addon_filter;
@@ -467,6 +508,7 @@ class WordPress extends EE_Site_Command {
 	private function generate_default_conf( $site_type, $cache_type, $server_name ) {
 
 		$default_conf_data['site_type']             = $site_type;
+		$default_conf_data['site_url']              = $this->site_data['site_url'];
 		$default_conf_data['server_name']           = $server_name;
 		$default_conf_data['include_php_conf']      = ! $cache_type;
 		$default_conf_data['include_wpsubdir_conf'] = $site_type === 'subdir';
@@ -477,35 +519,136 @@ class WordPress extends EE_Site_Command {
 	}
 
 
+	/**
+	 * Verify if the passed database credentials are working or not.
+	 *
+	 * @throws \Exception
+	 */
 	private function maybe_verify_remote_db_connection() {
 
-		if ( in_array( $this->site_data['db_host'], [ 'db', GLOBAL_DB ] ) ) {
+		if ( in_array( $this->site_data['db_host'], [ 'db', GLOBAL_DB ], true ) ) {
 			return;
+		}
+		$db_host        = $this->site_data['db_host'];
+		$img_versions   = \EE\Utils\get_image_versions();
+		$container_name = \EE\Utils\random_password();
+		$network        = ( GLOBAL_DB === $this->site_data['db_host'] ) ? "--network='" . GLOBAL_FRONTEND_NETWORK . "'" : '';
+
+		$run_temp_container = sprintf(
+			'docker run --name %s %s -e MYSQL_ROOT_PASSWORD=%s -d --restart always easyengine/mariadb:%s',
+			$container_name,
+			$network,
+			\EE\Utils\random_password(),
+			$img_versions['easyengine/mariadb']
+		);
+		if ( ! \EE::exec( $run_temp_container ) ) {
+			\EE::exec( "docker rm -f $container_name" );
+			throw new \Exception( 'There was a problem creating container to test mysql connection. Please check the logs' );
 		}
 
 		// Docker needs special handling if we want to connect to host machine.
 		// The since we're inside the container and we want to access host machine,
 		// we would need to replace localhost with default gateway.
-		if ( '127.0.0.1' === $this->site_data['db_host'] || 'localhost' === $this->site_data['db_host'] ) {
-			$launch = \EE::launch( sprintf( "docker network inspect %s --format='{{ (index .IPAM.Config 0).Gateway }}'", $this->site_data['site_url'] ) );
+		if ( '127.0.0.1' === $db_host || 'localhost' === $db_host ) {
+			$launch = \EE::launch( sprintf( "docker exec %s bash -c \"ip route show default | cut -d' ' -f3\"", $container_name ) );
 
 			if ( ! $launch->return_code ) {
-				$this->site_data['db_host'] = trim( $launch->stdout, "\n" );
+				$db_host = trim( $launch->stdout, "\n" );
 			} else {
-				throw new \Exception( 'There was a problem inspecting network. Please check the logs' );
+				\EE::exec( "docker rm -f $container_name" );
+				throw new \Exception( 'There was a problem in connecting to the database. Please check the logs' );
 			}
 		}
 
 		\EE::log( 'Verifying connection to remote database' );
-		$img_versions = \EE\Utils\get_image_versions();
 
-		$network = ( GLOBAL_DB === $this->site_data['db_host'] ) ? "--network='" . GLOBAL_FRONTEND_NETWORK . "'" : '';
-
-		if ( ! \EE::exec( sprintf( "docker run -it --rm %s easyengine/mariadb:%s sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"", $network, $img_versions['easyengine/mariadb'], $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'] ) ) ) {
+		$check_db_connection = sprintf(
+			"docker exec %s sh -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='EXIT'\"",
+			$container_name,
+			$db_host,
+			$this->site_data['db_port'],
+			$this->site_data['db_user'],
+			$this->site_data['db_password']
+		);
+		if ( ! \EE::exec( $check_db_connection ) ) {
+			\EE::exec( "docker rm -f $container_name" );
 			throw new \Exception( 'Unable to connect to remote db' );
 		}
-
 		\EE::success( 'Connection to remote db verified' );
+
+		$name            = str_replace( '_', '\_', $this->site_data['db_name'] );
+		$check_db_exists = sprintf( "docker exec %s bash -c \"mysqlshow --user='%s' --password='%s' --host='%s' --port='%s' '%s'\"", $container_name, $this->site_data['db_user'], $this->site_data['db_password'], $db_host, $this->site_data['db_port'], $name );
+
+		if ( ! \EE::exec( $check_db_exists ) ) {
+			\EE::log( sprintf( 'Database `%s` does not exist. Attempting to create it.', $this->site_data['db_name'] ) );
+			$create_db_command = sprintf(
+				"docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='CREATE DATABASE %s;'\"",
+				$container_name,
+				$db_host,
+				$this->site_data['db_port'],
+				$this->site_data['db_user'],
+				$this->site_data['db_password'],
+				$this->site_data['db_name']
+			);
+
+			if ( ! \EE::exec( $create_db_command ) ) {
+				\EE::exec( "docker rm -f $container_name" );
+				throw new \Exception( sprintf(
+					'Could not create database `%s` on `%s:%s`. Please check if %s has rights to create database or manually create a database and pass with `--dbname` parameter.',
+					$this->site_data['db_name'],
+					$this->site_data['db_host'],
+					$this->site_data['db_port'],
+					$this->site_data['db_user']
+				) );
+			}
+		} else {
+			if ( $this->force ) {
+				\EE::exec(
+					sprintf(
+						"docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='DROP DATABASE %s;'\"",
+						$container_name,
+						$db_host,
+						$this->site_data['db_port'],
+						$this->site_data['db_user'],
+						$this->site_data['db_password'],
+						$this->site_data['db_name']
+					)
+				);
+				\EE::exec(
+					sprintf(
+						"docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='CREATE DATABASE %s;'\"",
+						$container_name,
+						$db_host,
+						$this->site_data['db_port'],
+						$this->site_data['db_user'],
+						$this->site_data['db_password'],
+						$this->site_data['db_name']
+					)
+				);
+			}
+			$check_tables = sprintf(
+				"docker exec %s bash -c \"mysql --host='%s' --port='%s' --user='%s' --password='%s' --execute='USE %s; show tables;'\"",
+				$container_name,
+				$db_host,
+				$this->site_data['db_port'],
+				$this->site_data['db_user'],
+				$this->site_data['db_password'],
+				$this->site_data['db_name']
+			);
+
+			$launch = \EE::launch( $check_tables );
+			if ( ! $launch->return_code ) {
+				$tables = trim( $launch->stdout, "\n" );
+				if ( ! empty( $tables ) ) {
+					\EE::exec( "docker rm -f $container_name" );
+					throw new \Exception( sprintf( 'Some database tables seem to exist in database %s. Please backup and reset the database or use `--force` in the site create command to reset it.', $this->site_data['db_name'] ) );
+				}
+			} else {
+				\EE::exec( "docker rm -f $container_name" );
+				throw new \Exception( 'There was a problem in connecting to the database. Please check the logs' );
+			}
+		}
+		\EE::exec( "docker rm -f $container_name" );
 	}
 
 	/**
@@ -519,8 +662,8 @@ class WordPress extends EE_Site_Command {
 			\EE\Site\Utils\create_site_root( $this->site_data['site_fs_path'], $this->site_data['site_url'] );
 			$this->level = 2;
 			$this->maybe_verify_remote_db_connection();
-			$this->level = 3;
 			$this->configure_site_files();
+			$this->level = 3;
 
 			\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'], [ 'nginx', 'postfix' ] );
 			\EE\Site\Utils\configure_postfix( $this->site_data['site_url'], $this->site_data['site_fs_path'] );
@@ -620,28 +763,6 @@ class WordPress extends EE_Site_Command {
 		try {
 			if ( ! \EE::exec( $wp_config_create_command ) ) {
 				throw new \Exception( sprintf( 'Couldn\'t connect to %s:%s or there was issue in `wp config create`. Please check logs.', $this->site_data['db_host'], $this->site_data['db_port'] ) );
-			}
-			if ( 'db' !== $this->site_data['db_host'] ) {
-				$name            = $this->site_data['db_name'];
-				$check_db_exists = sprintf( "docker-compose exec php bash -c \"mysqlshow --user='%s' --password='%s' --host='%s' --port='%s' '%s'\"", $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_host'], $this->site_data['db_port'], $name );
-
-				if ( ! \EE::exec( $check_db_exists ) ) {
-					\EE::log( sprintf( 'Database `%s` does not exist. Attempting to create it.', $this->site_data['db_name'] ) );
-					$create_db_command = sprintf( 'docker-compose exec php bash -c "mysql --host=%s --port=%s --user=%s --password=%s --execute="CREATE DATABASE %s;""', $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'], $this->site_data['db_password'], $this->site_data['db_name'] );
-
-					if ( ! \EE::exec( $create_db_command ) ) {
-						throw new \Exception( sprintf( 'Could not create database `%s` on `%s:%s`. Please check if %s has rights to create database or manually create a database and pass with `--dbname` parameter.', $this->site_data['db_name'], $this->site_data['db_host'], $this->site_data['db_port'], $this->site_data['db_user'] ) );
-					}
-					$this->level = 4;
-				} else {
-					if ( $this->force ) {
-						\EE::exec( 'docker-compose exec --user=\'www-data\' php wp db reset --yes' );
-					}
-					$check_tables = 'docker-compose exec --user=\'www-data\' php wp db tables';
-					if ( \EE::exec( $check_tables, false, false ) ) {
-						throw new \Exception( 'WordPress tables already seem to exist. Please backup and reset the database or use `--force` in the site create command to reset it.' );
-					}
-				}
 			}
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );

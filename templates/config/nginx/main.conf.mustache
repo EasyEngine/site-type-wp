@@ -49,7 +49,7 @@ server {
 
 	location ~ \.php$ {
 		#  add_header Cache-Control "max-age=0, no-cache, no-store, must-revalidate";
-		set $key "nginx-cache:$scheme$request_method$host$request_uri";
+		set $key "{{site_url}}:$scheme$request_method$host$request_uri";
 		try_files $uri =404;
 
 		srcache_fetch_skip $skip;
@@ -66,7 +66,7 @@ server {
 		more_set_headers 'X-SRCache-Store-Status $srcache_store_status';
 
 		include fastcgi_params;
-		fastcgi_pass php:9000;
+		fastcgi_pass {{site_url}}_php:9000;
 	}
 
 	{{/include_redis_conf}}
@@ -95,7 +95,7 @@ server {
 		try_files $uri =404;
 		fastcgi_param  SCRIPT_FILENAME  $document_root$fastcgi_script_name;
 		include fastcgi_params;
-		fastcgi_pass php:9000;
+		fastcgi_pass {{site_url}}_php:9000;
 	}
 	{{/include_php_conf}}
 
@@ -105,7 +105,7 @@ server {
 	location = /wp-login.php {
 		limit_req zone=one burst=1 nodelay;
 		include fastcgi_params;
-		fastcgi_pass php:9000;
+		fastcgi_pass {{site_url}}_php:9000;
 	}
 	# Disable wp-config.txt
 	location = /wp-config.txt {
@@ -177,7 +177,7 @@ server {
 	}
 	location ~ ^/(status|ping) {
 		include fastcgi_params;
-		fastcgi_pass php:9000;
+		fastcgi_pass {{site_url}}_php:9000;
 	}
 	location ~*  \.(css|js)$ {
 		expires 1d;
