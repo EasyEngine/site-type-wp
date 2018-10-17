@@ -202,7 +202,7 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['site_ssl']           = \EE\Utils\get_flag_value( $assoc_args, 'ssl' );
 		$this->site_data['site_ssl_wildcard']  = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
 		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
-		$this->site_data['app_admin_username'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', 'admin' );
+		$this->site_data['app_admin_username'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', $this->site_data['site_url'] . '-' . \EE\Utils\random_password( 5 ) );
 		$this->site_data['app_admin_password'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', \EE\Utils\random_password() );
 		$this->site_data['db_name']            = \EE\Utils\get_flag_value( $assoc_args, 'dbname', str_replace( [ '.', '-' ], '_', $this->site_data['site_url'] ) );
 		$this->site_data['db_host']            = \EE\Utils\get_flag_value( $assoc_args, 'dbhost', GLOBAL_DB );
@@ -319,7 +319,7 @@ class WordPress extends EE_Site_Command {
 
 		$add_hostname_constant = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_HOSTNAME ee-global-redis --add=true --type=constant";
 		$add_port_constant     = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PORT 6379 --add=true --type=constant";
-		$add_prefix_constant   = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX nginx-cache: --add=true --type=constant";
+		$add_prefix_constant   = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX $salt_value --add=true --type=constant";
 		$add_cache_key_salt    = "docker-compose exec --user='www-data' php wp config set WP_CACHE_KEY_SALT $salt_value --add=true --type=constant";
 		$add_redis_maxttl      = "docker-compose exec --user='www-data' php wp config set WP_REDIS_MAXTTL 14400 --add=true --type=constant";
 		$add_plugin_data       = "docker-compose exec --user='www-data' php wp $wp_cli_params rt_wp_nginx_helper_options '$plugin_data' --format=json";
@@ -507,6 +507,7 @@ class WordPress extends EE_Site_Command {
 	private function generate_default_conf( $site_type, $cache_type, $server_name ) {
 
 		$default_conf_data['site_type']             = $site_type;
+		$default_conf_data['site_url']              = $this->site_data['site_url'];
 		$default_conf_data['server_name']           = $server_name;
 		$default_conf_data['include_php_conf']      = ! $cache_type;
 		$default_conf_data['include_wpsubdir_conf'] = $site_type === 'subdir';
