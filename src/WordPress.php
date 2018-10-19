@@ -181,6 +181,7 @@ class WordPress extends EE_Site_Command {
 	 */
 	public function create( $args, $assoc_args ) {
 
+		$this->check_site_count();
 		\EE\Utils\delem_log( 'site create start' );
 		\EE::warning( 'This is a beta version. Please don\'t use it in production.' );
 		$this->logger->debug( 'args:', $args );
@@ -202,7 +203,7 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['site_ssl']           = \EE\Utils\get_flag_value( $assoc_args, 'ssl' );
 		$this->site_data['site_ssl_wildcard']  = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
 		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
-		$this->site_data['app_admin_username'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', 'admin' );
+		$this->site_data['app_admin_username'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', $this->site_data['site_url'] . '-' . \EE\Utils\random_password( 5 ) );
 		$this->site_data['app_admin_password'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', \EE\Utils\random_password() );
 		$this->site_data['db_name']            = \EE\Utils\get_flag_value( $assoc_args, 'dbname', str_replace( [ '.', '-' ], '_', $this->site_data['site_url'] ) );
 		$this->site_data['db_host']            = \EE\Utils\get_flag_value( $assoc_args, 'dbhost', GLOBAL_DB );
@@ -796,6 +797,9 @@ class WordPress extends EE_Site_Command {
 			if ( ! \EE::exec( $wp_config_create_command ) ) {
 				throw new \Exception( sprintf( 'Couldn\'t connect to %s:%s or there was issue in `wp config create`. Please check logs.', $this->site_data['db_host'], $this->site_data['db_port'] ) );
 			}
+			$default_wp_config_path = $this->site_data['site_fs_path'] . '/app/htdocs/wp-config.php';
+			$new_wp_config_path     = $this->site_data['site_fs_path'] . '/app/wp-config.php';
+			$this->fs->rename( $default_wp_config_path, $new_wp_config_path );
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
 		}

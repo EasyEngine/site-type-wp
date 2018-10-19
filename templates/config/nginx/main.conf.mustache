@@ -49,7 +49,10 @@ server {
 
 	location ~ \.php$ {
 		#  add_header Cache-Control "max-age=0, no-cache, no-store, must-revalidate";
-		set $key "{{site_url}}:$scheme$request_method$host$request_uri";
+		set $key "{{site_url}}:http$request_method$host$request_uri";
+		if ($HTTP_X_FORWARDED_PROTO = "https") {
+			set $key "{{site_url}}:https$request_method$host$request_uri";
+		}
 		try_files $uri =404;
 
 		srcache_fetch_skip $skip;
@@ -188,5 +191,5 @@ server {
 
 	client_max_body_size 100m;
 
-	include custom/*.conf;
+	include /etc/nginx/custom/*.conf;
 }
