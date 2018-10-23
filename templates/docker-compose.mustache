@@ -70,7 +70,9 @@ networks:
   global-frontend-network:
     external:
       name: ee-global-frontend-network
+  {{#enable_backend_network}}
   global-backend-network:
     external:
       name: ee-global-backend-network
+  {{/enable_backend_network}}
 {{/network}}
