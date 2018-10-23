@@ -22,8 +22,8 @@ class Site_WP_Docker {
 		$restart_default = [ 'name' => 'always' ];
 		$network_default = [
 			'net' => [
-				[ 'name' => 'site-network' ]
-			]
+				[ 'name' => 'site-network' ],
+			],
 		];
 
 		// db configuration.
@@ -148,7 +148,7 @@ class Site_WP_Docker {
 					],
 				],
 				[ 'name' => 'global-frontend-network' ],
-			]
+			],
 		];
 		if ( in_array( GLOBAL_REDIS, $filters, true ) ) {
 			$nginx['networks']['net'][] = [ 'name' => 'global-backend-network' ];
@@ -175,7 +175,7 @@ class Site_WP_Docker {
 			'net' => [
 				[ 'name' => 'site-network' ],
 				[ 'name' => 'global-frontend-network' ],
-			]
+			],
 		];
 
 		// postfix configuration.
