@@ -428,8 +428,28 @@ class WordPress extends EE_Site_Command {
 		$custom_conf_source      = SITE_WP_TEMPLATE_ROOT . '/config/nginx/user.conf.mustache';
 		$process_user            = posix_getpwuid( posix_geteuid() );
 
+		$volumes = [
+			[ 'name' => 'htdocs', 'path_to_symlink' => $this->site_data['site_fs_path'] . '/app' ],
+			[ 'name' => 'config_nginx', 'path_to_symlink' => dirname( $site_nginx_default_conf ) ],
+			[ 'name' => 'config_php', 'path_to_symlink' => dirname( $site_php_ini ) ],
+			[ 'name' => 'log_nginx', 'path_to_symlink' => $this->site_data['site_fs_path'] . '/logs/nginx' ],
+			[
+				'name'            => 'data_postfix',
+				'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/postfix/spool'
+			],
+		];
+
+		if ( 'db' === $this->site_data['db_host'] ) {
+			$volumes[] = [
+				'name'            => 'data_db',
+				'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/db'
+			];
+		}
+
 		\EE::log( 'Creating WordPress site ' . $this->site_data['site_url'] );
 		\EE::log( 'Copying configuration files.' );
+
+		$this->docker->create_volumes( $this->site_data['site_url'], $volumes );
 
 		$default_conf_content = $this->generate_default_conf( $this->site_data['app_sub_type'], $this->cache_type, $server_name );
 		$local                = ( 'db' === $this->site_data['db_host'] ) ? true : false;
@@ -460,13 +480,14 @@ class WordPress extends EE_Site_Command {
 		try {
 			$this->dump_docker_compose_yml( [ 'nohttps' => true ] );
 			$this->fs->dumpFile( $site_conf_env, $env_content );
+			\EE\Site\Utils\set_postfix_files( $this->site_data['site_url'], $site_conf_dir );
+			\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'], [ 'nginx', 'postfix' ] );
 			$this->fs->dumpFile( $site_nginx_default_conf, $default_conf_content );
 			$this->fs->copy( $custom_conf_source, $custom_conf_dest );
+			$this->fs->remove( $this->site_data['site_fs_path'] . '/app/html' );
+			$this->fs->remove( $this->site_data['site_fs_path'] . '/config/nginx/conf.d' );
 			$this->fs->dumpFile( $site_php_ini, $php_ini_content );
-
-			\EE\Site\Utils\set_postfix_files( $this->site_data['site_url'], $site_conf_dir );
-
-			\EE::success( 'Configuration files copied.' );
+			\EE::exec( 'docker-compose restart nginx php' );
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
 		}
@@ -481,11 +502,12 @@ class WordPress extends EE_Site_Command {
 
 		$site_docker_yml = $this->site_data['site_fs_path'] . '/docker-compose.yml';
 
-		$filter      = [];
-		$filter[]    = $this->site_data['app_sub_type'];
-		$filter[]    = $this->site_data['cache_host'];
-		$filter[]    = $this->site_data['db_host'];
-		$site_docker = new Site_WP_Docker();
+		$filter                = [];
+		$filter[]              = $this->site_data['app_sub_type'];
+		$filter[]              = $this->site_data['cache_host'];
+		$filter[]              = $this->site_data['db_host'];
+		$filter['site_prefix'] = $this->docker->get_docker_style_prefix( $this->site_data['site_url'] );
+		$site_docker           = new Site_WP_Docker();
 
 		foreach ( $additional_filters as $key => $addon_filter ) {
 			$filter[ $key ] = $addon_filter;
@@ -665,7 +687,6 @@ class WordPress extends EE_Site_Command {
 			$this->configure_site_files();
 			$this->level = 3;
 
-			\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'], [ 'nginx', 'postfix' ] );
 			\EE\Site\Utils\configure_postfix( $this->site_data['site_url'], $this->site_data['site_fs_path'] );
 			$this->wp_download_and_config( $assoc_args );
 

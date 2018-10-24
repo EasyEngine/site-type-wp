@@ -22,8 +22,8 @@ class Site_WP_Docker {
 		$restart_default = [ 'name' => 'always' ];
 		$network_default = [
 			'net' => [
-				[ 'name' => 'site-network' ]
-			]
+				[ 'name' => 'site-network' ],
+			],
 		];
 
 		// db configuration.
@@ -38,7 +38,7 @@ class Site_WP_Docker {
 		$db['volumes']      = [
 			[
 				'vol' => [
-					'name' => './services/db:/var/lib/mysql',
+					'name' => 'data_db:/var/lib/mysql',
 				],
 			],
 		];
@@ -72,8 +72,8 @@ class Site_WP_Docker {
 		$php['volumes']     = [
 			[
 				'vol' => [
-					[ 'name' => './app:/var/www' ],
-					[ 'name' => './config/php-fpm/php.ini:/usr/local/etc/php/php.ini' ],
+					[ 'name' => 'htdocs:/var/www' ],
+					[ 'name' => 'config_php:/usr/local/etc/php' ],
 				],
 			],
 		];
@@ -88,22 +88,22 @@ class Site_WP_Docker {
 				[ 'name' => 'VIRTUAL_HOST' ],
 			],
 		];
-		if ( in_array( GLOBAL_DB, $filters, true ) ) {
-			$php['networks'] = [
-				'net' => [
-					[
-						'name' => 'site-network',
-						'aliases' => [
-							'alias' => [
-								'name' => '${VIRTUAL_HOST}_php',
-							],
+
+		$php['networks'] = [
+			'net' => [
+				[
+					'name'    => 'site-network',
+					'aliases' => [
+						'alias' => [
+							'name' => '${VIRTUAL_HOST}_php',
 						],
 					],
-					[ 'name' => 'global-backend-network' ],
 				],
-			];
-		} else {
-			$php['networks'] = $network_default;
+			],
+		];
+
+		if ( in_array( GLOBAL_DB, $filters, true ) ) {
+			$php['networks']['net'][] = [ 'name' => 'global-backend-network' ];
 		}
 
 		// nginx configuration.
@@ -126,10 +126,9 @@ class Site_WP_Docker {
 		}
 		$nginx['volumes']  = [
 			'vol' => [
-				[ 'name' => './app:/var/www' ],
-				[ 'name' => './config/nginx/main.conf:/etc/nginx/conf.d/default.conf' ],
-				[ 'name' => './config/nginx/custom:/etc/nginx/custom' ],
-				[ 'name' => './logs/nginx:/var/log/nginx' ],
+				[ 'name' => 'htdocs:/var/www' ],
+				[ 'name' => 'config_nginx:/etc/nginx' ],
+				[ 'name' => 'log_nginx:/var/log/nginx' ],
 			],
 		];
 		$nginx['labels']   = [
@@ -148,7 +147,7 @@ class Site_WP_Docker {
 					],
 				],
 				[ 'name' => 'global-frontend-network' ],
-			]
+			],
 		];
 		if ( in_array( GLOBAL_REDIS, $filters, true ) ) {
 			$nginx['networks']['net'][] = [ 'name' => 'global-backend-network' ];
@@ -175,7 +174,7 @@ class Site_WP_Docker {
 			'net' => [
 				[ 'name' => 'site-network' ],
 				[ 'name' => 'global-frontend-network' ],
-			]
+			],
 		];
 
 		// postfix configuration.
@@ -191,8 +190,7 @@ class Site_WP_Docker {
 		$postfix['volumes']      = [
 			'vol' => [
 				[ 'name' => '/dev/log:/dev/log' ],
-				[ 'name' => './config/postfix/ssl:/etc/ssl/postfix' ],
-				[ 'name' => './services/postfix/spool:/var/spool/postfix' ],
+				[ 'name' => 'data_postfix:/etc/ssl/postfix' ],
 			],
 		];
 		$postfix['networks']     = $network_default;
@@ -207,10 +205,6 @@ class Site_WP_Docker {
 		];
 		$redis['networks']     = $network_default;
 
-		if ( in_array( 'db', $filters, true ) ) {
-			$base[] = $db;
-		}
-
 		$base[] = $php;
 		$base[] = $nginx;
 		$base[] = $mailhog;
@@ -220,16 +214,36 @@ class Site_WP_Docker {
 			$base[] = $redis;
 		}
 
-		$binding = [
-			'services' => $base,
-			'network'  => [
-				'networks_labels' => [
-					'label' => [
-						[ 'name' => 'org.label-schema.vendor=EasyEngine' ],
-						[ 'name' => 'io.easyengine.site=${VIRTUAL_HOST}' ],
-					],
+		$volumes = [
+			'external_vols' => [
+				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'htdocs' ],
+				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'config_nginx' ],
+				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'config_php' ],
+				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'log_nginx' ],
+				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'data_postfix' ],
+			],
+		];
+
+		$network = [
+			'networks_labels' => [
+				'label' => [
+					[ 'name' => 'org.label-schema.vendor=EasyEngine' ],
+					[ 'name' => 'io.easyengine.site=${VIRTUAL_HOST}' ],
 				],
 			],
+		];
+
+		if ( in_array( 'db', $filters, true ) ) {
+			$base[]                     = $db;
+			$volumes['external_vols'][] = [ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'data_db' ];
+		} else {
+			$network['enable_backend_network'] = true;
+		}
+
+		$binding = [
+			'services'        => $base,
+			'network'         => $network,
+			'created_volumes' => $volumes,
 		];
 
 		$docker_compose_yml = mustache_render( SITE_WP_TEMPLATE_ROOT . '/docker-compose.mustache', $binding );
