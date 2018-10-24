@@ -449,7 +449,7 @@ class WordPress extends EE_Site_Command {
 		\EE::log( 'Creating WordPress site ' . $this->site_data['site_url'] );
 		\EE::log( 'Copying configuration files.' );
 
-		\EE\Site\Utils\create_volumes( $this->site_data['site_url'], $volumes );
+		$this->docker->create_volumes( $this->site_data['site_url'], $volumes );
 
 		$default_conf_content = $this->generate_default_conf( $this->site_data['app_sub_type'], $this->cache_type, $server_name );
 		$local                = ( 'db' === $this->site_data['db_host'] ) ? true : false;
@@ -506,7 +506,7 @@ class WordPress extends EE_Site_Command {
 		$filter[]              = $this->site_data['app_sub_type'];
 		$filter[]              = $this->site_data['cache_host'];
 		$filter[]              = $this->site_data['db_host'];
-		$filter['site_prefix'] = \EE\Site\Utils\get_site_prefix( $this->site_data['site_url'] );
+		$filter['site_prefix'] = $this->docker->get_docker_style_prefix( $this->site_data['site_url'] );
 		$site_docker           = new Site_WP_Docker();
 
 		foreach ( $additional_filters as $key => $addon_filter ) {
