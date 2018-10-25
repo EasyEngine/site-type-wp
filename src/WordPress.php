@@ -506,6 +506,7 @@ class WordPress extends EE_Site_Command {
 		$filter[]              = $this->site_data['app_sub_type'];
 		$filter[]              = $this->site_data['cache_host'];
 		$filter[]              = $this->site_data['db_host'];
+		$filter['is_ssl']      = $this->site_data['site_ssl'];
 		$filter['site_prefix'] = $this->docker->get_docker_style_prefix( $this->site_data['site_url'] );
 		$site_docker           = new Site_WP_Docker();
 
@@ -691,7 +692,9 @@ class WordPress extends EE_Site_Command {
 			$this->wp_download_and_config( $assoc_args );
 
 			if ( ! $this->skip_install ) {
-				\EE\Site\Utils\create_etc_hosts_entry( $this->site_data['site_url'] );
+				if ( ! $this->site_data['site_ssl'] ) {
+					\EE\Site\Utils\create_etc_hosts_entry( $this->site_data['site_url'] );
+				}
 				if ( ! $this->skip_status_check ) {
 					$this->level = 4;
 					\EE\Site\Utils\site_status_check( $this->site_data['site_url'] );
