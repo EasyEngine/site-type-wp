@@ -487,7 +487,7 @@ class WordPress extends EE_Site_Command {
 			$this->fs->remove( $this->site_data['site_fs_path'] . '/app/html' );
 			$this->fs->remove( $this->site_data['site_fs_path'] . '/config/nginx/conf.d' );
 			$this->fs->dumpFile( $site_php_ini, $php_ini_content );
-			\EE::exec( 'docker-compose restart nginx php' );
+			\EE\Site\Utils\restart_site_containers( $this->site_data['site_fs_path'], [ 'nginx', 'php' ] );
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
 		}
