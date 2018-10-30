@@ -127,7 +127,7 @@ class Site_WP_Docker {
 		$nginx['volumes']  = [
 			'vol' => [
 				[ 'name' => 'htdocs:/var/www' ],
-				[ 'name' => 'config_nginx:/etc/nginx' ],
+				[ 'name' => 'config_nginx:/usr/local/openresty/nginx/conf' ],
 				[ 'name' => 'log_nginx:/var/log/nginx' ],
 			],
 		];
