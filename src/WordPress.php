@@ -421,7 +421,7 @@ class WordPress extends EE_Site_Command {
 
 		$site_conf_dir           = $this->site_data['site_fs_path'] . '/config';
 		$site_conf_env           = $this->site_data['site_fs_path'] . '/.env';
-		$site_nginx_default_conf = $site_conf_dir . '/nginx/main.conf';
+		$site_nginx_default_conf = $site_conf_dir . '/nginx/conf.d/main.conf';
 		$site_php_ini            = $site_conf_dir . '/php-fpm/php.ini';
 		$server_name             = ( 'subdom' === $this->site_data['app_sub_type'] ) ? $this->site_data['site_url'] . ' *.' . $this->site_data['site_url'] : $this->site_data['site_url'];
 		$custom_conf_dest        = $site_conf_dir . '/nginx/custom/user.conf';
@@ -430,7 +430,7 @@ class WordPress extends EE_Site_Command {
 
 		$volumes = [
 			[ 'name' => 'htdocs', 'path_to_symlink' => $this->site_data['site_fs_path'] . '/app' ],
-			[ 'name' => 'config_nginx', 'path_to_symlink' => dirname( $site_nginx_default_conf ) ],
+			[ 'name' => 'config_nginx', 'path_to_symlink' => dirname( dirname( $site_nginx_default_conf ) ) ],
 			[ 'name' => 'config_php', 'path_to_symlink' => dirname( $site_php_ini ) ],
 			[ 'name' => 'log_nginx', 'path_to_symlink' => $this->site_data['site_fs_path'] . '/logs/nginx' ],
 			[
@@ -485,7 +485,6 @@ class WordPress extends EE_Site_Command {
 			$this->fs->dumpFile( $site_nginx_default_conf, $default_conf_content );
 			$this->fs->copy( $custom_conf_source, $custom_conf_dest );
 			$this->fs->remove( $this->site_data['site_fs_path'] . '/app/html' );
-			$this->fs->remove( $this->site_data['site_fs_path'] . '/config/nginx/conf.d' );
 			$this->fs->dumpFile( $site_php_ini, $php_ini_content );
 			\EE\Site\Utils\restart_site_containers( $this->site_data['site_fs_path'], [ 'nginx', 'php' ] );
 		} catch ( \Exception $e ) {
