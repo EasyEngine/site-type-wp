@@ -285,7 +285,8 @@ class WordPress extends EE_Site_Command {
 	private function enable_page_cache() {
 		$activate_nginx_helper = 'docker-compose exec --user=\'www-data\' php wp plugin install nginx-helper --activate';
 		$nginx_helper_fail_msg = 'Unable to download or activate nginx-helper plugin properly.';
-		$salt_value            = $this->site_data['site_url'] . ':';
+		$page_cache_key_prefix = $this->site_data['site_url'] . '_page:';
+		$obj_cache_key_prefix  = $this->site_data['site_url'] . '_obj:';
 
 		$redis_host    = ( 'redis' === $this->site_data['cache_host'] ) ? $this->site_data['cache_host'] : 'ee-' . $this->site_data['cache_host'];
 		$wp_cli_params = ( 'wp' === $this->site_data['app_sub_type'] ) ? 'option update' : 'network meta update 1';
@@ -315,13 +316,13 @@ class WordPress extends EE_Site_Command {
 				"redis_prefix":"%s"
 			}',
 			$redis_host,
-			$salt_value
+			$page_cache_key_prefix
 		);
 
 		$add_hostname_constant = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_HOSTNAME ee-global-redis --add=true --type=constant";
 		$add_port_constant     = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PORT 6379 --add=true --type=constant";
-		$add_prefix_constant   = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX $salt_value --add=true --type=constant";
-		$add_cache_key_salt    = "docker-compose exec --user='www-data' php wp config set WP_CACHE_KEY_SALT $salt_value --add=true --type=constant";
+		$add_prefix_constant   = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX $page_cache_key_prefix --add=true --type=constant";
+		$add_cache_key_salt    = "docker-compose exec --user='www-data' php wp config set WP_CACHE_KEY_SALT $obj_cache_key_prefix --add=true --type=constant";
 		$add_redis_maxttl      = "docker-compose exec --user='www-data' php wp config set WP_REDIS_MAXTTL 14400 --add=true --type=constant";
 		$add_plugin_data       = "docker-compose exec --user='www-data' php wp $wp_cli_params rt_wp_nginx_helper_options '$plugin_data' --format=json";
 
