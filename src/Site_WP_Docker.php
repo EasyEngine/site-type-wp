@@ -74,6 +74,7 @@ class Site_WP_Docker {
 				'vol' => [
 					[ 'name' => 'htdocs:/var/www' ],
 					[ 'name' => 'config_php:/usr/local/etc/php' ],
+					[ 'name' => 'log_php:/var/log/php' ],
 				],
 			],
 		];
@@ -225,6 +226,7 @@ class Site_WP_Docker {
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'htdocs' ],
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'config_nginx' ],
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'config_php' ],
+				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'log_php' ],
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'log_nginx' ],
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'data_postfix' ],
 			],
