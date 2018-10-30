@@ -433,6 +433,7 @@ class WordPress extends EE_Site_Command {
 			[ 'name' => 'htdocs', 'path_to_symlink' => $this->site_data['site_fs_path'] . '/app' ],
 			[ 'name' => 'config_nginx', 'path_to_symlink' => dirname( dirname( $site_nginx_default_conf ) ) ],
 			[ 'name' => 'config_php', 'path_to_symlink' => dirname( $site_php_ini ) ],
+			[ 'name' => 'log_php', 'path_to_symlink' => $this->site_data['site_fs_path'] . '/logs/php-fpm' ],
 			[ 'name' => 'log_nginx', 'path_to_symlink' => $this->site_data['site_fs_path'] . '/logs/nginx' ],
 			[
 				'name'            => 'data_postfix',
