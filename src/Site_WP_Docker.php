@@ -198,6 +198,7 @@ class Site_WP_Docker {
 			'vol' => [
 				[ 'name' => '/dev/log:/dev/log' ],
 				[ 'name' => 'data_postfix:/etc/ssl/postfix' ],
+				[ 'name' => 'config_postfix:/etc/postfix' ],
 			],
 		];
 		$postfix['networks']     = $network_default;
@@ -229,6 +230,7 @@ class Site_WP_Docker {
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'log_php' ],
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'log_nginx' ],
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'data_postfix' ],
+				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'config_postfix' ],
 			],
 		];
 
