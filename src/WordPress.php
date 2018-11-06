@@ -498,8 +498,9 @@ class WordPress extends EE_Site_Command {
 	 * Generate and place docker-compose.yml file.
 	 *
 	 * @param array $additional_filters Filters to alter docker-compose file.
+	 * @ignorecommand
 	 */
-	protected function dump_docker_compose_yml( $additional_filters = [] ) {
+	public function dump_docker_compose_yml( $additional_filters = [] ) {
 
 		$site_docker_yml = $this->site_data['site_fs_path'] . '/docker-compose.yml';
 
