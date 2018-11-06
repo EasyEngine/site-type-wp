@@ -73,7 +73,7 @@ class Site_WP_Docker {
 			[
 				'vol' => [
 					[ 'name' => 'htdocs:/var/www' ],
-					[ 'name' => 'config_php:/usr/local/etc/php' ],
+					[ 'name' => 'config_php:/usr/local/etc' ],
 					[ 'name' => 'log_php:/var/log/php' ],
 				],
 			],
