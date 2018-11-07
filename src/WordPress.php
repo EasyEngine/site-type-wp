@@ -440,6 +440,10 @@ class WordPress extends EE_Site_Command {
 				'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/postfix/spool'
 			],
 			[
+				'name'            => 'ssl_postfix',
+				'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/postfix/ssl'
+			],
+			[
 				'name'            => 'config_postfix',
 				'path_to_symlink' => $this->site_data['site_fs_path'] . '/config/postfix'
 			],
