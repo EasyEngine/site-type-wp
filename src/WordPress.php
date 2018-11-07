@@ -490,7 +490,7 @@ class WordPress extends EE_Site_Command {
 		try {
 			$this->dump_docker_compose_yml( [ 'nohttps' => true ] );
 			$this->fs->dumpFile( $site_conf_env, $env_content );
-			\EE\Site\Utils\set_postfix_files( $this->site_data['site_url'], $site_conf_dir );
+			\EE\Site\Utils\set_postfix_files( $this->site_data['site_url'], $this->site_data['site_fs_path'] . '/services' );
 			\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'], [ 'nginx', 'postfix' ] );
 			$this->fs->dumpFile( $site_nginx_default_conf, $default_conf_content );
 			$this->fs->copy( $custom_conf_source, $custom_conf_dest );
