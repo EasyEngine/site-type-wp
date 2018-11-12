@@ -1,11 +1,9 @@
 # Add your custom config in custom/user.conf
 # ALL CHANGES IN THIS FILE WILL BE LOST AFTER EasyEngine Update
 
-{{#include_php_conf}}
 upstream php {
 	server {{site_url}}_php:9000;
 }
-{{/include_php_conf}}
 
 {{#include_redis_conf}}
 upstream redis {
