@@ -423,7 +423,7 @@ class WordPress extends EE_Site_Command {
 		$site_conf_dir           = $this->site_data['site_fs_path'] . '/config';
 		$site_conf_env           = $this->site_data['site_fs_path'] . '/.env';
 		$site_nginx_default_conf = $site_conf_dir . '/nginx/conf.d/main.conf';
-		$site_php_ini            = $site_conf_dir . '/php-fpm/php.ini';
+		$site_php_ini            = $site_conf_dir . '/php/php/php.ini';
 		$server_name             = ( 'subdom' === $this->site_data['app_sub_type'] ) ? $this->site_data['site_url'] . ' *.' . $this->site_data['site_url'] : $this->site_data['site_url'];
 		$custom_conf_dest        = $site_conf_dir . '/nginx/custom/user.conf';
 		$custom_conf_source      = SITE_WP_TEMPLATE_ROOT . '/config/nginx/user.conf.mustache';
@@ -432,12 +432,20 @@ class WordPress extends EE_Site_Command {
 		$volumes = [
 			[ 'name' => 'htdocs', 'path_to_symlink' => $this->site_data['site_fs_path'] . '/app' ],
 			[ 'name' => 'config_nginx', 'path_to_symlink' => dirname( dirname( $site_nginx_default_conf ) ) ],
-			[ 'name' => 'config_php', 'path_to_symlink' => dirname( $site_php_ini ) ],
-			[ 'name' => 'log_php', 'path_to_symlink' => $this->site_data['site_fs_path'] . '/logs/php-fpm' ],
+			[ 'name' => 'config_php', 'path_to_symlink' => dirname( dirname( $site_php_ini ) ) ],
+			[ 'name' => 'log_php', 'path_to_symlink' => $this->site_data['site_fs_path'] . '/logs/php' ],
 			[ 'name' => 'log_nginx', 'path_to_symlink' => $this->site_data['site_fs_path'] . '/logs/nginx' ],
 			[
 				'name'            => 'data_postfix',
 				'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/postfix/spool'
+			],
+			[
+				'name'            => 'ssl_postfix',
+				'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/postfix/ssl'
+			],
+			[
+				'name'            => 'config_postfix',
+				'path_to_symlink' => $this->site_data['site_fs_path'] . '/config/postfix'
 			],
 		];
 
@@ -482,8 +490,8 @@ class WordPress extends EE_Site_Command {
 		try {
 			$this->dump_docker_compose_yml( [ 'nohttps' => true ] );
 			$this->fs->dumpFile( $site_conf_env, $env_content );
-			\EE\Site\Utils\set_postfix_files( $this->site_data['site_url'], $site_conf_dir );
 			\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'], [ 'nginx', 'postfix' ] );
+			\EE\Site\Utils\set_postfix_files( $this->site_data['site_url'], $this->site_data['site_fs_path'] . '/services' );
 			$this->fs->dumpFile( $site_nginx_default_conf, $default_conf_content );
 			$this->fs->copy( $custom_conf_source, $custom_conf_dest );
 			$this->fs->remove( $this->site_data['site_fs_path'] . '/app/html' );
@@ -498,8 +506,9 @@ class WordPress extends EE_Site_Command {
 	 * Generate and place docker-compose.yml file.
 	 *
 	 * @param array $additional_filters Filters to alter docker-compose file.
+	 * @ignorecommand
 	 */
-	protected function dump_docker_compose_yml( $additional_filters = [] ) {
+	public function dump_docker_compose_yml( $additional_filters = [] ) {
 
 		$site_docker_yml = $this->site_data['site_fs_path'] . '/docker-compose.yml';
 
