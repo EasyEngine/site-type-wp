@@ -12,10 +12,11 @@ class Site_WP_Docker {
 	 * @param array $filters Array of flags to determine the docker-compose.yml generation.
 	 *                       Empty/Default -> Generates default WordPress docker-compose.yml
 	 *                       ['le']        -> Enables letsencrypt in the generation.
+	 * @param array $volumes Array containing volume info passable to \EE_DOCKER::get_mounting_volume_array().
 	 *
 	 * @return String docker-compose.yml content string.
 	 */
-	public function generate_docker_compose_yml( array $filters = [] ) {
+	public function generate_docker_compose_yml( array $filters = [], $volumes ) {
 		$img_versions = \EE\Utils\get_image_versions();
 		$base         = [];
 
@@ -26,31 +27,31 @@ class Site_WP_Docker {
 			],
 		];
 
-		// db configuration.
-		$db['service_name'] = [ 'name' => 'db' ];
-		$db['image']        = [ 'name' => 'easyengine/mariadb:' . $img_versions['easyengine/mariadb'] ];
-		$db['restart']      = $restart_default;
-		$db['labels']       = [
-			'label' => [
-				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
-			],
-		];
-		$db['volumes']      = [
-			[
-				'vol' => [
-					'name' => 'data_db:/var/lib/mysql',
+		if ( in_array( 'db', $filters, true ) ) {
+			// db configuration.
+			$db['service_name'] = [ 'name' => 'db' ];
+			$db['image']        = [ 'name' => 'easyengine/mariadb:' . $img_versions['easyengine/mariadb'] ];
+			$db['restart']      = $restart_default;
+			$db['labels']       = [
+				'label' => [
+					'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
 				],
-			],
-		];
-		$db['environment']  = [
-			'env' => [
-				[ 'name' => 'MYSQL_ROOT_PASSWORD' ],
-				[ 'name' => 'MYSQL_DATABASE' ],
-				[ 'name' => 'MYSQL_USER' ],
-				[ 'name' => 'MYSQL_PASSWORD' ],
-			],
-		];
-		$db['networks']     = $network_default;
+			];
+			$db['volumes']      = [
+				[
+					'vol' => \EE_DOCKER::get_mounting_volume_array( $volumes['db'] ),
+				],
+			];
+			$db['environment']  = [
+				'env' => [
+					[ 'name' => 'MYSQL_ROOT_PASSWORD' ],
+					[ 'name' => 'MYSQL_DATABASE' ],
+					[ 'name' => 'MYSQL_USER' ],
+					[ 'name' => 'MYSQL_PASSWORD' ],
+				],
+			];
+			$db['networks']     = $network_default;
+		}
 		// PHP configuration.
 		$php['service_name'] = [ 'name' => 'php' ];
 		$php['image']        = [ 'name' => 'easyengine/php:' . $img_versions['easyengine/php'] ];
@@ -71,11 +72,7 @@ class Site_WP_Docker {
 		];
 		$php['volumes']     = [
 			[
-				'vol' => [
-					[ 'name' => 'htdocs:/var/www' ],
-					[ 'name' => 'config_php:/usr/local/etc' ],
-					[ 'name' => 'log_php:/var/log/php' ],
-				],
+				'vol' => \EE_DOCKER::get_mounting_volume_array( $volumes['php'] ),
 			],
 		];
 		$php['environment'] = [
@@ -126,11 +123,7 @@ class Site_WP_Docker {
 			$nginx['environment']['env'][] = [ 'name' => 'HTTPS_METHOD=nohttps' ];
 		}
 		$nginx['volumes']  = [
-			'vol' => [
-				[ 'name' => 'htdocs:/var/www' ],
-				[ 'name' => 'config_nginx:/usr/local/openresty/nginx/conf' ],
-				[ 'name' => 'log_nginx:/var/log/nginx' ],
-			],
+			'vol' => \EE_DOCKER::get_mounting_volume_array( $volumes['nginx'] ),
 		];
 		$nginx['labels']   = [
 			'label' => [
@@ -195,12 +188,7 @@ class Site_WP_Docker {
 			],
 		];
 		$postfix['volumes']      = [
-			'vol' => [
-				[ 'name' => '/dev/log:/dev/log' ],
-				[ 'name' => 'data_postfix:/var/spool/postfix' ],
-				[ 'name' => 'ssl_postfix:/etc/ssl/postfix' ],
-				[ 'name' => 'config_postfix:/etc/postfix' ],
-			],
+			'vol' => \EE_DOCKER::get_mounting_volume_array( $volumes['postfix'] ),
 		];
 		$postfix['networks']     = $network_default;
 
@@ -223,7 +211,7 @@ class Site_WP_Docker {
 			$base[] = $redis;
 		}
 
-		$volumes = [
+		$external_volumes = [
 			'external_vols' => [
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'htdocs' ],
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'config_nginx' ],
@@ -246,17 +234,24 @@ class Site_WP_Docker {
 		];
 
 		if ( in_array( 'db', $filters, true ) ) {
-			$base[]                     = $db;
-			$volumes['external_vols'][] = [ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'data_db' ];
+			$base[]                            = $db;
+			$external_volumes['external_vols'] = [
+				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'db_data' ],
+				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'db_conf' ],
+				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'db_logs' ],
+			];
 		} else {
 			$network['enable_backend_network'] = true;
 		}
 
 		$binding = [
-			'services'        => $base,
-			'network'         => $network,
-			'created_volumes' => $volumes,
+			'services' => $base,
+			'network'  => $network,
 		];
+
+		if ( ! IS_DARWIN ) {
+			$binding['created_volumes'] = $external_volumes;
+		}
 
 		$docker_compose_yml = mustache_render( SITE_WP_TEMPLATE_ROOT . '/docker-compose.mustache', $binding );
 
