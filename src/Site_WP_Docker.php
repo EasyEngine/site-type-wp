@@ -235,11 +235,11 @@ class Site_WP_Docker {
 
 		if ( in_array( 'db', $filters, true ) ) {
 			$base[]                            = $db;
-			$external_volumes['external_vols'] = [
+			$external_volumes['external_vols'] = array_merge( $external_volumes['external_vols'], [
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'db_data' ],
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'db_conf' ],
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'db_logs' ],
-			];
+			] );
 		} else {
 			$network['enable_backend_network'] = true;
 		}

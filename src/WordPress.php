@@ -469,6 +469,10 @@ class WordPress extends EE_Site_Command {
 			$this->fs->remove( $this->site_data['site_fs_path'] . '/app/html' );
 			$this->fs->dumpFile( $site_php_ini, $php_ini_content );
 			if ( IS_DARWIN ) {
+				if ( 'db' === $this->site_data['db_host'] ) {
+					$db_conf_file = $this->site_data['site_fs_path'] . '/services/mariadb/conf/my.cnf';
+					$this->fs->copy( SITE_WP_TEMPLATE_ROOT . '/my.cnf.mustache', $db_conf_file );
+				}
 				\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'], [ 'nginx', 'php', 'postfix' ] );
 			} else {
 				\EE\Site\Utils\restart_site_containers( $this->site_data['site_fs_path'], [ 'nginx', 'php' ] );
@@ -583,14 +587,13 @@ class WordPress extends EE_Site_Command {
 					'container_path'  => '/etc/mysql',
 					'skip_darwin'     => true,
 				],
-				// [
-				// 	// TODO: Generate Template.
-				// 	'name'            => '',
-				// 	'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/mariadb/conf/my.cnf',
-				// 	'container_path'  => '/etc/mysql/my.cnf',
-				// 	'skip_linux'      => true,
-				// 	'skip_volume'     => true,
-				// ],
+				[
+					'name'            => 'db_conf',
+					'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/mariadb/conf/my.cnf',
+					'container_path'  => '/etc/mysql/my.cnf',
+					'skip_linux'      => true,
+					'skip_volume'     => true,
+				],
 				[
 					'name'            => 'db_logs',
 					'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/mariadb/logs',
