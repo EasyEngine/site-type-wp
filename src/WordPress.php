@@ -389,6 +389,7 @@ class WordPress extends EE_Site_Command {
 		if ( ! empty( $this->site_data['admin_tools'] ) ) {
 			$info[] = [ 'Access admin-tools', $prefix . $this->site_data['site_url'] . '/ee-admin/' ];
 		}
+		$info[] = [ 'Site Root', $this->site_data['site_fs_path'] ];
 		$info[] = [ 'Site Title', $this->site_data['app_admin_url'] ];
 		if ( ! empty( $this->site_data['app_admin_username'] ) && ! $this->skip_install ) {
 			$info[] = [ 'WordPress Username', $this->site_data['app_admin_username'] ];
