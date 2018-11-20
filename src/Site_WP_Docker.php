@@ -133,22 +133,9 @@ class Site_WP_Docker {
 		$nginx['networks'] = [
 			'net' => [
 				[ 'name' => 'global-frontend-network' ],
+				[ 'name' => 'site-network' ],
 			],
 		];
-		if ( $filters['is_ssl'] ) {
-			$nginx['networks']['net'][] = [
-				'name'    => 'site-network',
-				'aliases' => [
-					'alias' => [
-						'name' => '${VIRTUAL_HOST}',
-					],
-				],
-			];
-		} else {
-			$nginx['networks']['net'][] = [
-				'name' => 'site-network',
-			];
-		}
 		if ( in_array( GLOBAL_REDIS, $filters, true ) ) {
 			$nginx['networks']['net'][] = [ 'name' => 'global-backend-network' ];
 		}
