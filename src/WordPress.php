@@ -183,7 +183,6 @@ class WordPress extends EE_Site_Command {
 
 		$this->check_site_count();
 		\EE\Utils\delem_log( 'site create start' );
-		\EE::warning( 'This is a beta version. Please don\'t use it in production.' );
 		$this->logger->debug( 'args:', $args );
 		$this->logger->debug( 'assoc_args:', empty( $assoc_args ) ? array( 'NULL' ) : $assoc_args );
 		$this->site_data['site_url'] = strtolower( \EE\Utils\remove_trailing_slash( $args[0] ) );
@@ -390,6 +389,7 @@ class WordPress extends EE_Site_Command {
 		if ( ! empty( $this->site_data['admin_tools'] ) ) {
 			$info[] = [ 'Access admin-tools', $prefix . $this->site_data['site_url'] . '/ee-admin/' ];
 		}
+		$info[] = [ 'Site Root', $this->site_data['site_fs_path'] ];
 		$info[] = [ 'Site Title', $this->site_data['app_admin_url'] ];
 		if ( ! empty( $this->site_data['app_admin_username'] ) && ! $this->skip_install ) {
 			$info[] = [ 'WordPress Username', $this->site_data['app_admin_username'] ];
@@ -423,43 +423,14 @@ class WordPress extends EE_Site_Command {
 		$site_conf_dir           = $this->site_data['site_fs_path'] . '/config';
 		$site_conf_env           = $this->site_data['site_fs_path'] . '/.env';
 		$site_nginx_default_conf = $site_conf_dir . '/nginx/conf.d/main.conf';
-		$site_php_ini            = $site_conf_dir . '/php/php/php.ini';
+		$site_php_ini            = $site_conf_dir . '/php/php/conf.d/custom.ini';
 		$server_name             = ( 'subdom' === $this->site_data['app_sub_type'] ) ? $this->site_data['site_url'] . ' *.' . $this->site_data['site_url'] : $this->site_data['site_url'];
 		$custom_conf_dest        = $site_conf_dir . '/nginx/custom/user.conf';
 		$custom_conf_source      = SITE_WP_TEMPLATE_ROOT . '/config/nginx/user.conf.mustache';
 		$process_user            = posix_getpwuid( posix_geteuid() );
 
-		$volumes = [
-			[ 'name' => 'htdocs', 'path_to_symlink' => $this->site_data['site_fs_path'] . '/app' ],
-			[ 'name' => 'config_nginx', 'path_to_symlink' => dirname( dirname( $site_nginx_default_conf ) ) ],
-			[ 'name' => 'config_php', 'path_to_symlink' => dirname( dirname( $site_php_ini ) ) ],
-			[ 'name' => 'log_php', 'path_to_symlink' => $this->site_data['site_fs_path'] . '/logs/php' ],
-			[ 'name' => 'log_nginx', 'path_to_symlink' => $this->site_data['site_fs_path'] . '/logs/nginx' ],
-			[
-				'name'            => 'data_postfix',
-				'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/postfix/spool'
-			],
-			[
-				'name'            => 'ssl_postfix',
-				'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/postfix/ssl'
-			],
-			[
-				'name'            => 'config_postfix',
-				'path_to_symlink' => $this->site_data['site_fs_path'] . '/config/postfix'
-			],
-		];
-
-		if ( 'db' === $this->site_data['db_host'] ) {
-			$volumes[] = [
-				'name'            => 'data_db',
-				'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/db'
-			];
-		}
-
 		\EE::log( 'Creating WordPress site ' . $this->site_data['site_url'] );
 		\EE::log( 'Copying configuration files.' );
-
-		$this->docker->create_volumes( $this->site_data['site_url'], $volumes );
 
 		$default_conf_content = $this->generate_default_conf( $this->site_data['app_sub_type'], $this->cache_type, $server_name );
 		$local                = ( 'db' === $this->site_data['db_host'] ) ? true : false;
@@ -490,13 +461,23 @@ class WordPress extends EE_Site_Command {
 		try {
 			$this->dump_docker_compose_yml( [ 'nohttps' => true ] );
 			$this->fs->dumpFile( $site_conf_env, $env_content );
-			\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'], [ 'nginx', 'postfix' ] );
+			if ( ! IS_DARWIN ) {
+				\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'], [ 'nginx', 'postfix' ] );
+			}
 			\EE\Site\Utils\set_postfix_files( $this->site_data['site_url'], $this->site_data['site_fs_path'] . '/services' );
 			$this->fs->dumpFile( $site_nginx_default_conf, $default_conf_content );
 			$this->fs->copy( $custom_conf_source, $custom_conf_dest );
 			$this->fs->remove( $this->site_data['site_fs_path'] . '/app/html' );
 			$this->fs->dumpFile( $site_php_ini, $php_ini_content );
-			\EE\Site\Utils\restart_site_containers( $this->site_data['site_fs_path'], [ 'nginx', 'php' ] );
+			if ( IS_DARWIN ) {
+				if ( 'db' === $this->site_data['db_host'] ) {
+					$db_conf_file = $this->site_data['site_fs_path'] . '/services/mariadb/conf/my.cnf';
+					$this->fs->copy( SITE_WP_TEMPLATE_ROOT . '/my.cnf.mustache', $db_conf_file );
+				}
+				\EE\Site\Utils\start_site_containers( $this->site_data['site_fs_path'], [ 'nginx', 'php', 'postfix' ] );
+			} else {
+				\EE\Site\Utils\restart_site_containers( $this->site_data['site_fs_path'], [ 'nginx', 'php' ] );
+			}
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
 		}
@@ -506,9 +487,127 @@ class WordPress extends EE_Site_Command {
 	 * Generate and place docker-compose.yml file.
 	 *
 	 * @param array $additional_filters Filters to alter docker-compose file.
+	 *
 	 * @ignorecommand
 	 */
 	public function dump_docker_compose_yml( $additional_filters = [] ) {
+
+		$site_conf_dir           = $this->site_data['site_fs_path'] . '/config';
+		$site_nginx_default_conf = $site_conf_dir . '/nginx/conf.d/main.conf';
+		$site_php_ini            = $site_conf_dir . '/php/php/conf.d/custom.ini';
+
+		$volumes = [
+			'nginx'   => [
+				[
+					'name'            => 'htdocs',
+					'path_to_symlink' => $this->site_data['site_fs_path'] . '/app',
+					'container_path'  => '/var/www',
+				],
+				[
+					'name'            => 'config_nginx',
+					'path_to_symlink' => dirname( dirname( $site_nginx_default_conf ) ),
+					'container_path'  => '/usr/local/openresty/nginx/conf',
+					'skip_darwin'     => true,
+				],
+				[
+					'name'            => 'config_nginx',
+					'path_to_symlink' => $site_nginx_default_conf,
+					'container_path'  => '/usr/local/openresty/nginx/conf/conf.d/main.conf',
+					'skip_linux'      => true,
+					'skip_volume'     => true,
+				],
+				[
+					'name'            => 'log_nginx',
+					'path_to_symlink' => $this->site_data['site_fs_path'] . '/logs/nginx',
+					'container_path'  => '/var/log/nginx',
+				],
+			],
+			'php'     => [
+				[
+					'name'            => 'htdocs',
+					'path_to_symlink' => $this->site_data['site_fs_path'] . '/app',
+					'container_path'  => '/var/www',
+				],
+				[
+					'name'            => 'config_php',
+					'path_to_symlink' => $site_conf_dir . '/php',
+					'container_path'  => '/usr/local/etc',
+					'skip_darwin'     => true,
+				],
+				[
+					'name'            => 'config_php',
+					'path_to_symlink' => $site_php_ini,
+					'container_path'  => '/usr/local/etc/php/php/conf.d/custom.ini',
+					'skip_linux'      => true,
+					'skip_volume'     => true,
+				],
+				[
+					'name'            => 'log_php',
+					'path_to_symlink' => $this->site_data['site_fs_path'] . '/logs/php',
+					'container_path'  => '/var/log/php',
+				],
+
+			],
+			'postfix' => [
+				[
+					'name'            => '/dev/log',
+					'path_to_symlink' => '/dev/log',
+					'container_path'  => '/dev/log',
+					'skip_volume'     => true,
+					'skip_darwin'     => true,
+				],
+				[
+					'name'            => 'data_postfix',
+					'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/postfix/spool',
+					'container_path'  => '/var/spool/postfix',
+				],
+				[
+					'name'            => 'ssl_postfix',
+					'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/postfix/ssl',
+					'container_path'  => '/etc/ssl/postfix',
+				],
+				[
+					'name'            => 'config_postfix',
+					'path_to_symlink' => $this->site_data['site_fs_path'] . '/config/postfix',
+					'container_path'  => '/etc/postfix',
+					'skip_darwin'     => true,
+				],
+			],
+		];
+
+		if ( 'db' === $this->site_data['db_host'] ) {
+			$volumes['db'] = [
+				[
+					'name'            => 'db_data',
+					'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/mariadb/data',
+					'container_path'  => '/var/lib/mysql',
+				],
+				[
+					'name'            => 'db_conf',
+					'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/mariadb/conf',
+					'container_path'  => '/etc/mysql',
+					'skip_darwin'     => true,
+				],
+				[
+					'name'            => 'db_conf',
+					'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/mariadb/conf/my.cnf',
+					'container_path'  => '/etc/mysql/my.cnf',
+					'skip_linux'      => true,
+					'skip_volume'     => true,
+				],
+				[
+					'name'            => 'db_logs',
+					'path_to_symlink' => $this->site_data['site_fs_path'] . '/services/mariadb/logs',
+					'container_path'  => '/var/log/mysql',
+				],
+			];
+		}
+
+		if ( ! IS_DARWIN && empty( $this->docker->get_volumes_by_label( $this->site_data['site_url'] ) ) ) {
+			foreach ( $volumes as $volume ) {
+				$this->docker->create_volumes( $this->site_data['site_url'], $volume );
+			}
+		}
 
 		$site_docker_yml = $this->site_data['site_fs_path'] . '/docker-compose.yml';
 
@@ -524,7 +623,7 @@ class WordPress extends EE_Site_Command {
 			$filter[ $key ] = $addon_filter;
 		}
 
-		$docker_compose_content = $site_docker->generate_docker_compose_yml( $filter );
+		$docker_compose_content = $site_docker->generate_docker_compose_yml( $filter, $volumes );
 		$this->fs->dumpFile( $site_docker_yml, $docker_compose_content );
 	}
 
@@ -726,7 +825,8 @@ class WordPress extends EE_Site_Command {
 		\EE::log( 'Site entry created.' );
 
 		\EE::log( 'Creating cron entry' );
-		\EE::runcommand( 'cron create ' . $this->site_data['site_url'] . ' --user=www-data --command=\'wp cron event run --due-now\' --schedule=\'@every 1h\'' );
+		$cron_interval = rand( 0, 9 );
+		\EE::runcommand( 'cron create ' . $this->site_data['site_url'] . " --user=www-data --command='wp cron event run --due-now' --schedule='$cron_interval/10 * * * *'" );
 
 		$this->info( [ $this->site_data['site_url'] ], [] );
 	}
