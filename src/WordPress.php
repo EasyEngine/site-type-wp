@@ -644,7 +644,7 @@ class WordPress extends EE_Site_Command {
 		$filter[]              = $this->site_data['db_host'];
 		$filter['is_ssl']      = $this->site_data['site_ssl'];
 		$filter['site_prefix'] = $this->docker->get_docker_style_prefix( $this->site_data['site_url'] );
-		$filter['php_version'] = $this->site_data['php_version'];
+		$filter['php_version'] = ( string ) $this->site_data['php_version'];
 		$site_docker           = new Site_WP_Docker();
 
 		foreach ( $additional_filters as $key => $addon_filter ) {
