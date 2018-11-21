@@ -4,6 +4,7 @@ declare( ticks=1 );
 
 namespace EE\Site\Type;
 
+use EE;
 use EE\Model\Site;
 use Symfony\Component\Filesystem\Filesystem;
 use function EE\Site\Utils\auto_site_name;
@@ -107,6 +108,16 @@ class WordPress extends EE_Site_Command {
 	 * [--with-local-redis]
 	 * : Enable cache with local redis container.
 	 *
+	 * [--php=<php-version>]
+	 * : PHP version for site. Currently only supports PHP 5.6 and latest.
+	 * ---
+	 * default: latest
+	 * options:
+	 *	- 5.6
+	 *	- 7.2
+	 *	- latest
+	 * ---
+	 *
 	 * [--dbname=<dbname>]
 	 * : Set the database name.
 	 *
@@ -201,6 +212,7 @@ class WordPress extends EE_Site_Command {
 		$this->cache_type                      = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
 		$this->site_data['site_ssl']           = \EE\Utils\get_flag_value( $assoc_args, 'ssl' );
 		$this->site_data['site_ssl_wildcard']  = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
+		$this->site_data['php_version']        = \EE\Utils\get_flag_value( $assoc_args, 'php', 'latest' );
 		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
 		$this->site_data['app_admin_username'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', $this->site_data['site_url'] . '-' . \EE\Utils\random_password( 5 ) );
 		$this->site_data['app_admin_password'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', \EE\Utils\random_password() );
@@ -214,6 +226,21 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['cache_host']         = '';
 		if ( $this->cache_type ) {
 			$this->site_data['cache_host'] = $local_cache ? 'redis' : 'global-redis';
+		}
+
+		$supported_php_versions = [ 5.6, 7.2, 'latest' ];
+		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions ) ) {
+			$old_version = $this->site_data['php_version'];
+			$floor       = (int) floor( $this->site_data['php_version'] );
+			if ( 5 === $floor ) {
+				$this->site_data['php_version'] = 5.6;
+			} elseif ( 7 === $floor ) {
+				$this->site_data['php_version'] = 7.2;
+				$old_version .= ' yet';
+			} else {
+				EE::error( 'Unsupported PHP version: ' . $this->site_data['php_version'] );
+			}
+			\EE::confirm( sprintf( 'EEv4 does not support PHP %s. Continue with PHP %s?', $old_version, $this->site_data['php_version'] ) );
 		}
 
 		if ( \EE\Utils\get_flag_value( $assoc_args, 'local-db' ) ) {
@@ -617,6 +644,7 @@ class WordPress extends EE_Site_Command {
 		$filter[]              = $this->site_data['db_host'];
 		$filter['is_ssl']      = $this->site_data['site_ssl'];
 		$filter['site_prefix'] = $this->docker->get_docker_style_prefix( $this->site_data['site_url'] );
+		$filter['php_version'] = $this->site_data['php_version'];
 		$site_docker           = new Site_WP_Docker();
 
 		foreach ( $additional_filters as $key => $addon_filter ) {
@@ -975,7 +1003,7 @@ class WordPress extends EE_Site_Command {
 			'db_root_password'     => $this->site_data['db_root_password'],
 			'site_ssl'             => $ssl,
 			'site_ssl_wildcard'    => 'subdom' === $this->site_data['app_sub_type'] || $this->site_data['site_ssl_wildcard'] ? 1 : 0,
-			'php_version'          => '7.2',
+			'php_version'          => $this->site_data['php_version'],
 			'created_on'           => date( 'Y-m-d H:i:s', time() ),
 		];
 
