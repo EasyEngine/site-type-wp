@@ -114,7 +114,7 @@ class WordPress extends EE_Site_Command {
 	 * default: latest
 	 * options:
 	 * 	- 5.6
-	 *  - 7.2
+	 * 	- 7.2
 	 * 	- latest
 	 * ---
 	 *
