@@ -6,6 +6,7 @@ namespace EE\Site\Type;
 
 use EE;
 use EE\Model\Site;
+use EE\Model\Site_Meta;
 use Symfony\Component\Filesystem\Filesystem;
 use function EE\Site\Utils\auto_site_name;
 use function EE\Site\Utils\get_site_info;
@@ -62,6 +63,21 @@ class WordPress extends EE_Site_Command {
 	 */
 	private $fs;
 
+	/**
+	 * @var string $vip_go_mu_plugins WordPress VIP Go mu-plugins repo.
+	 */
+	private $vip_go_mu_plugins = 'https://github.com/Automattic/vip-go-mu-plugins-built';
+
+	/**
+	 * @var string $vip_go_mu_plugins WordPress VIP Go mu-plugins repo.
+	 */
+	private $vip_go_skeleton = 'https://github.com/Automattic/vip-go-skeleton.git';
+
+	/**
+	 * @var bool $is_vip To check if site is setup for vip.
+	 */
+	private $is_vip = false;
+
 	public function __construct() {
 
 		parent::__construct();
@@ -83,6 +99,12 @@ class WordPress extends EE_Site_Command {
 	 *
 	 * [--cache]
 	 * : Use redis cache for WordPress.
+	 *
+	 * [--vip]
+	 * : Create WordPress VIP GO site using your vip repo which contains wp-content dir. Default it will use skeleton repo.
+	 * ---
+	 * default: https://github.com/Automattic/vip-go-skeleton.git
+	 * ---
 	 *
 	 * [--mu=<subdir>]
 	 * : WordPress sub-dir Multi-site.
@@ -204,6 +226,34 @@ class WordPress extends EE_Site_Command {
 			\EE::error( "Unrecognized multi-site parameter: $mu. Only `--mu=subdom` and `--mu=subdir` are supported." );
 		}
 		$this->site_data['app_sub_type'] = $mu ?? 'wp';
+
+		$vip_wp_content_repo = \EE\Utils\get_flag_value( $assoc_args, 'vip' );
+
+		if ( ! empty( $vip_wp_content_repo ) && is_bool( $vip_wp_content_repo ) ) {
+			$vip_wp_content_repo = $this->vip_go_skeleton;
+		}
+
+		if ( ! empty( $vip_wp_content_repo ) ) {
+			$this->is_vip                    = true;
+			$this->site_meta['vip_repo_url'] = $vip_wp_content_repo;
+
+
+			\EE::log( "Checking VIP repo access..." );
+
+			$git_check = \EE::exec( 'command -v git' );
+
+			if ( ! $git_check ) {
+				\EE::error( 'git command not found. Please install git to setup vip github repo.' );
+			}
+
+			$check_repo_access = \EE::exec( 'git ls-remote --exit-code -h ' . $vip_wp_content_repo );
+
+			if ( ! $check_repo_access ) {
+				\EE::error( "Could not read from remote repository. Please make sure you have the correct access rights and the repository exists." );
+			}
+
+			\EE::log( "Repo access check completed." );
+		}
 
 		if ( Site::find( $this->site_data['site_url'] ) ) {
 			\EE::error( sprintf( "Site %1\$s already exists. If you want to re-create it please delete the older one using:\n`ee site delete %1\$s`", $this->site_data['site_url'] ) );
@@ -837,6 +887,10 @@ class WordPress extends EE_Site_Command {
 					\EE\Site\Utils\site_status_check( $this->site_data['site_url'] );
 				}
 				$this->install_wp();
+
+				if ( $this->is_vip ) {
+					$this->setup_vip();
+				}
 			}
 
 			$this->www_ssl_wrapper( [ 'nginx' ] );
@@ -845,8 +899,21 @@ class WordPress extends EE_Site_Command {
 		}
 
 		if ( ! empty( $this->cache_type ) ) {
+			$vip_mu_plugins_dir = $this->site_data['site_fs_path'] . '/app/htdocs/wp-content/mu-plugins';
+
+			// TODO: Getting WP VIP Filesystem write permission error on wp plugin install ( it's using wp-content/upgrade dir ).
+			if ( $this->is_vip ) {
+				// Temp disable VIP MU plugins.
+				$this->fs->rename( $vip_mu_plugins_dir, $vip_mu_plugins_dir . '-temp' );
+			}
+
 			$this->enable_object_cache();
 			$this->enable_page_cache();
+
+			if ( $this->is_vip ) {
+				// Enable VIP MU plugins.
+				$this->fs->rename( $vip_mu_plugins_dir . '-temp', $vip_mu_plugins_dir );
+			}
 		}
 
 		$this->create_site_db_entry();
@@ -919,8 +986,15 @@ class WordPress extends EE_Site_Command {
 			}
 		}
 
+		// Added wp-config.php debug constants referred from https://codex.wordpress.org/Debugging_in_WordPress.
+		$extra_php = "if ( isset( \$_SERVER[\"HTTP_X_FORWARDED_PROTO\"] ) && \$_SERVER[\"HTTP_X_FORWARDED_PROTO\"] == \"https\" ) {\n	\$_SERVER[\"HTTPS\"] = \"on\";\n}\n\n// Enable WP_DEBUG mode.\ndefine( \"WP_DEBUG\", false );\n\n// Enable Debug logging to the /wp-content/debug.log file\ndefine( \"WP_DEBUG_LOG\", false );\n\n// Disable display of errors and warnings.\ndefine( \"WP_DEBUG_DISPLAY\", false );\n@ini_set( \"display_errors\", 0 );\n\n// Use dev versions of core JS and CSS files (only needed if you are modifying these core files)\ndefine( \"SCRIPT_DEBUG\", false );";
+
+		if ( $this->is_vip ) {
+			$extra_php .= "\n\nif ( file_exists( __DIR__ . \"/wp-content/vip-config/vip-config.php\" ) ) {\n		require_once( __DIR__ . \"/wp-content/vip-config/vip-config.php\" ); \n}";
+		}
+
 		$db_host                  = isset( $this->site_data['db_port'] ) ? $this->site_data['db_host'] . ':' . $this->site_data['db_port'] : $this->site_data['db_host'];
-		$wp_config_create_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp config create --dbuser=\'%s\' --dbname=\'%s\' --dbpass=\'%s\' --dbhost=\'%s\' %s --extra-php="if ( isset( \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] ) && \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] == \'https\'){\$_SERVER[\'HTTPS\']=\'on\';}"', $this->site_data['db_user'], $this->site_data['db_name'], $this->site_data['db_password'], $db_host, $config_arguments );
+		$wp_config_create_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp config create --dbuser=\'%s\' --dbname=\'%s\' --dbpass=\'%s\' --dbhost=\'%s\' %s --extra-php=\'%s\'', $this->site_data['db_user'], $this->site_data['db_name'], $this->site_data['db_password'], $db_host, $config_arguments, $extra_php );
 
 		try {
 			if ( ! \EE::exec( $wp_config_create_command ) ) {
@@ -970,6 +1044,47 @@ class WordPress extends EE_Site_Command {
 	}
 
 	/**
+	 * Setup VIP Repo and mu plugins into wp-content.
+	 */
+	private function setup_vip() {
+
+		\EE::log( "Setting up VIP Go environment." );
+
+		$site_wp_root_dir = $this->site_data['site_fs_path'] . '/app/htdocs';
+
+		chdir( $site_wp_root_dir );
+
+		if ( file_exists( './wp-content' ) ) {
+			$this->fs->rename( './wp-content', './wp-content-bkp' );
+		}
+
+		$repo_clone_cmd = 'git clone ' . $this->site_meta['vip_repo_url'] . ' wp-content';
+
+		$vip_repo_clone = \EE::exec( $repo_clone_cmd, true, true );
+
+		if ( ! $vip_repo_clone ) {
+			\EE::warning( 'Git clone failed. Please check your repo access.' );
+
+			$this->fs->rename( './wp-content-bkp', './wp-content' );
+		}
+
+		if ( file_exists( './wp-content-bkp' ) ) {
+			$this->fs->remove( './wp-content-bkp' );
+		}
+
+		chdir( $site_wp_root_dir . '/wp-content' );
+
+		$mu_plugins_clone_cmd = 'git clone --depth=1 ' . $this->vip_go_mu_plugins . ' mu-plugins';
+
+		$mu_plugins_clone = \EE::exec( $mu_plugins_clone_cmd );
+
+		if ( ! $mu_plugins_clone ) {
+			\EE::warning( 'Git VIP mu-plugin clone failed. Please check ' . $this->vip_go_mu_plugins . ' repo is accessible.' );
+
+			$this->fs->remove( './mu-plugins' );
+		}
+	}
+	/**
 	 * Function to save the site configuration entry into database.
 	 */
 	private function create_site_db_entry() {
@@ -1013,8 +1128,17 @@ class WordPress extends EE_Site_Command {
 		}
 
 		try {
-			if ( ! Site::create( $data ) ) {
+			$site_id = Site::create( $data );
+
+			if ( ! $site_id ) {
 				throw new \Exception( 'Error creating site entry in database.' );
+			}
+
+			$vip_repo_url = $this->site_meta['vip_repo_url'] ?? '';
+
+			if ( ! empty( $vip_repo_url ) ) {
+				Site_Meta::set( $site_id, 'vip_repo_url', $vip_repo_url );
+				Site_Meta::set( $site_id, 'is_vip', true );
 			}
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
