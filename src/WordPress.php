@@ -317,7 +317,7 @@ class WordPress extends EE_Site_Command {
 		$redis_host    = ( 'redis' === $this->site_data['cache_host'] ) ? $this->site_data['cache_host'] : 'ee-' . $this->site_data['cache_host'];
 		$wp_cli_params = ( 'wp' === $this->site_data['app_sub_type'] ) ? 'option update' : 'network meta update 1';
 
-		$plugin_data = sprintf( '{  
+		$plugin_data = sprintf( '{
 				"log_level":"INFO",
 				"log_filesize":5,
 				"enable_purge":1,
@@ -1081,7 +1081,7 @@ class WordPress extends EE_Site_Command {
 	 */
 	public function reload( $args, $assoc_args, $whitelisted_containers = [], $reload_commands = [] ) {
 		$whitelisted_containers = [ 'nginx', 'php' ];
-		$reload_commands['php'] = 'kill -USR2 1';
+		$reload_commands['php'] = "php bash -c 'kill -USR2 1'";
 		parent::reload( $args, $assoc_args, $whitelisted_containers, $reload_commands );
 	}
 
