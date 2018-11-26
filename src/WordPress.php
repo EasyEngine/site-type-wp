@@ -237,8 +237,28 @@ class WordPress extends EE_Site_Command {
 			$this->is_vip                    = true;
 			$this->site_meta['vip_repo_url'] = $vip_wp_content_repo;
 
+			if ( $this->vip_go_skeleton === $vip_wp_content_repo ) {
+				\EE::log( 'VIP Skeleton repo will be used for wp-content directory: ' . $vip_wp_content_repo );
+			} else {
+				\EE::warning( 'This repo will be clone at wp-content directory make sure the repo has wp-content data.' );
+				\EE::confirm( 'Are you sure want to continue?' );
 
-			\EE::log( "Checking VIP repo access..." );
+				\EE::log( "Checking VIP repo access..." );
+
+				$is_valid_git_url = false;
+
+				if ( 0 === strpos( $vip_wp_content_repo, 'git@github.com' ) ) {
+					$is_valid_git_url = true;
+				}
+
+				if ( 0 === strpos( $vip_wp_content_repo, 'https://github.com' ) ) {
+					$is_valid_git_url = true;
+				}
+
+				if ( empty( $is_valid_git_url ) ) {
+					\EE::error( 'Vip repo url is not valid github repo url. Please add valid ssh/https github url.' );
+				}
+			}
 
 			$git_check = \EE::exec( 'command -v git' );
 
@@ -1048,7 +1068,7 @@ class WordPress extends EE_Site_Command {
 	 */
 	private function setup_vip() {
 
-		\EE::log( "Setting up VIP Go environment." );
+		\EE::log( "Setting up VIP Go environment. This may take time based on your repo size, please wait for a while..." );
 
 		$site_wp_root_dir = $this->site_data['site_fs_path'] . '/app/htdocs';
 
@@ -1058,7 +1078,13 @@ class WordPress extends EE_Site_Command {
 			$this->fs->rename( './wp-content', './wp-content-bkp' );
 		}
 
-		$repo_clone_cmd = 'git clone ' . $this->site_meta['vip_repo_url'] . ' wp-content';
+		$depth = '';
+
+		if ( $this->vip_go_skeleton === $this->site_meta['vip_repo_url'] ) {
+			$depth = ' --depth=1 ';
+		}
+
+		$repo_clone_cmd = 'git clone ' . $depth . $this->site_meta['vip_repo_url'] . ' wp-content';
 
 		$vip_repo_clone = \EE::exec( $repo_clone_cmd, true, true );
 
