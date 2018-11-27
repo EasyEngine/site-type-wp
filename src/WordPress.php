@@ -976,7 +976,7 @@ class WordPress extends EE_Site_Command {
 		$extra_php = "if ( isset( \$_SERVER[\"HTTP_X_FORWARDED_PROTO\"] ) && \$_SERVER[\"HTTP_X_FORWARDED_PROTO\"] == \"https\" ) {\n	\$_SERVER[\"HTTPS\"] = \"on\";\n}\n\n// Enable WP_DEBUG mode.\ndefine( \"WP_DEBUG\", false );\n\n// Enable Debug logging to the /wp-content/debug.log file\ndefine( \"WP_DEBUG_LOG\", false );\n\n// Disable display of errors and warnings.\ndefine( \"WP_DEBUG_DISPLAY\", false );\n@ini_set( \"display_errors\", 0 );\n\n// Use dev versions of core JS and CSS files (only needed if you are modifying these core files)\ndefine( \"SCRIPT_DEBUG\", false );";
 
 		if ( $this->is_vip ) {
-			$extra_php .= "\n\nif ( file_exists( __DIR__ . \"/wp-content/vip-config/vip-config.php\" ) ) {\n		require_once( __DIR__ . \"/wp-content/vip-config/vip-config.php\" ); \n}";
+			$extra_php .= "\n\nif ( file_exists( __DIR__ . \"/htdocs/wp-content/vip-config/vip-config.php\" ) ) {\n		require_once( __DIR__ . \"/htdocs/wp-content/vip-config/vip-config.php\" ); \n}";
 		}
 
 		$db_host                  = isset( $this->site_data['db_port'] ) ? $this->site_data['db_host'] . ':' . $this->site_data['db_port'] : $this->site_data['db_host'];
