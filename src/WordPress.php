@@ -887,6 +887,7 @@ class WordPress extends EE_Site_Command {
 			$this->enable_page_cache();
 
 			if ( $this->is_vip ) {
+				EE::warning( 'Nginx-helper and wp-redis plugin is installed to enable cache. Please add it in your .gitignore to avoid it from git diff and commit' );
 				EE::log( 'Note: Redis cache is setup for this site so it will use wp-redis object cache but not the memcache which is mentioned in VIP development doc from mu-plugin drop-ins.' );
 			}
 		}
@@ -1126,6 +1127,11 @@ class WordPress extends EE_Site_Command {
 			$this->fs->remove( './wp-content-bkp' );
 		}
 
+		if ( ! empty( $this->cache_type ) ) {
+			// Add uploads dir if not exists - this will require during cache operation from nginx-helper.
+			$this->fs->mkdir( './wp-content/uploads' );
+		}
+
 		// Clone at wp root dir and move it to wp-content dir later.
 		// Spacial case for --cache where file operations are happening and vip mu plugins are preventing this.
 		$mu_plugins_clone_cmd = 'git clone --depth=1 ' . $this->vip_go_mu_plugins . ' mu-plugins';
@@ -1146,6 +1152,7 @@ class WordPress extends EE_Site_Command {
 
 		\EE::log( "VIP Go environment setup completed." );
 	}
+
 	/**
 	 * Function to save the site configuration entry into database.
 	 */
