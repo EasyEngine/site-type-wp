@@ -919,22 +919,21 @@ class WordPress extends EE_Site_Command {
 		}
 
 		if ( ! empty( $this->cache_type ) ) {
-			$vip_mu_plugins_dir = $this->site_data['site_fs_path'] . '/app/htdocs/wp-content/mu-plugins';
-
-			// TODO: Getting WP VIP Filesystem write permission error on wp plugin install ( it's using wp-content/upgrade dir ).
-			if ( $this->is_vip ) {
-				// Temp disable VIP MU plugins.
-				$this->fs->rename( $vip_mu_plugins_dir, $vip_mu_plugins_dir . '-temp' );
-			}
 
 			$this->enable_object_cache();
 			$this->enable_page_cache();
 
-			if ( $this->is_vip ) {
-				// Enable VIP MU plugins.
-				$this->fs->rename( $vip_mu_plugins_dir . '-temp', $vip_mu_plugins_dir );
-			}
 		}
+
+		$wp_root_dir = $this->site_data['site_fs_path'] . '/app/htdocs';
+
+		if ( $this->is_vip && file_exists( $wp_root_dir . '/mu-plugins' ) ) {
+			// Enable VIP MU plugins.
+			EE::exec( 'mv ' . $wp_root_dir . '/mu-plugins ' . $wp_root_dir . '/wp-content/' );
+		}
+
+		// Reset wp-content permission which may have been changed during git clone from host machine.
+		EE::exec( "docker-compose exec --user=root php chown -R www-data: /var/www/wp-content" );
 
 		$this->create_site_db_entry();
 		\EE::log( 'Site entry created.' );
@@ -1098,8 +1097,8 @@ class WordPress extends EE_Site_Command {
 			$this->fs->remove( './wp-content-bkp' );
 		}
 
-		chdir( $site_wp_root_dir . '/wp-content' );
-
+		// Clone at wp root dir and move it to wp-content dir later.
+		// Spacial case for --cache where file operations are happening and vip mu plugins are preventing this.
 		$mu_plugins_clone_cmd = 'git clone --depth=1 ' . $this->vip_go_mu_plugins . ' mu-plugins';
 
 		$mu_plugins_clone = \EE::exec( $mu_plugins_clone_cmd );
@@ -1109,6 +1108,11 @@ class WordPress extends EE_Site_Command {
 
 			$this->fs->remove( './mu-plugins' );
 		}
+
+		// Get back to root dir.
+		chdir( $this->site_data['site_fs_path'] );
+
+		\EE::log( "VIP Go environment setup completed." );
 	}
 	/**
 	 * Function to save the site configuration entry into database.
