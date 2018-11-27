@@ -899,7 +899,7 @@ class WordPress extends EE_Site_Command {
 		}
 
 		// Reset wp-content permission which may have been changed during git clone from host machine.
-		EE::exec( "docker-compose exec --user=root php chown -R www-data: /var/www/wp-content" );
+		EE::exec( "docker-compose exec --user=root php chown -R www-data: /var/www/htdocs/wp-content" );
 
 		$this->create_site_db_entry();
 		\EE::log( 'Site entry created.' );
@@ -1142,7 +1142,7 @@ class WordPress extends EE_Site_Command {
 		chdir( $this->site_data['site_fs_path'] );
 
 		// Reset wp-content permission which may have been changed during git clone from host machine.
-		EE::exec( "docker-compose exec --user=root php chown -R www-data: /var/www/wp-content" );
+		EE::exec( "docker-compose exec --user=root php chown -R www-data: /var/www/htdocs/wp-content" );
 
 		\EE::log( "VIP Go environment setup completed." );
 	}
