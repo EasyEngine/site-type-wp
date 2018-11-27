@@ -896,7 +896,7 @@ class WordPress extends EE_Site_Command {
 
 		if ( $this->is_vip && file_exists( $wp_root_dir . '/mu-plugins' ) ) {
 			// Enable VIP MU plugins.
-			EE::exec( 'mv ' . $wp_root_dir . '/mu-plugins ' . $wp_root_dir . '/wp-content/' );
+			$this->fs->rename( $wp_root_dir . '/mu-plugins', $wp_root_dir . '/wp-content/mu-plugins' );
 		}
 
 		// Reset wp-content permission which may have been changed during git clone from host machine.
@@ -1071,7 +1071,7 @@ class WordPress extends EE_Site_Command {
 				$is_valid_git_url = EE::exec( 'git ls-remote --exit-code -h ' . $wp_content_repo );
 
 				if ( $is_valid_git_url ) {
-					$wp_content_repo             = $ssh_git_url;
+					$wp_content_repo                 = $ssh_git_url;
 					$this->site_meta['vip_repo_url'] = $ssh_git_url;
 					$check_repo_access               = true;
 				} else {
@@ -1079,7 +1079,7 @@ class WordPress extends EE_Site_Command {
 					$is_valid_git_url = EE::exec( 'git ls-remote --exit-code -h ' . $wp_content_repo );
 
 					if ( $is_valid_git_url ) {
-						$wp_content_repo             = $https_git_url;
+						$wp_content_repo                 = $https_git_url;
 						$this->site_meta['vip_repo_url'] = $https_git_url;
 						$check_repo_access               = true;
 					}
@@ -1132,16 +1132,40 @@ class WordPress extends EE_Site_Command {
 			$this->fs->mkdir( './wp-content/uploads' );
 		}
 
-		// Clone at wp root dir and move it to wp-content dir later.
-		// Spacial case for --cache where file operations are happening and vip mu plugins are preventing this.
-		$mu_plugins_clone_cmd = 'git clone --depth=1 ' . $this->vip_go_mu_plugins . ' mu-plugins';
+		$skip_vip_mu_plugins = false;
 
-		$mu_plugins_clone = \EE::exec( $mu_plugins_clone_cmd );
+		if ( file_exists( './wp-content/mu-plugins' ) ) {
+			EE::warning( 'You already have mu-plugins directory from your remote repo. This should be used from VIP mu plugins. Please move your all current mu-plugins to client-mu-plugins.' );
+			$move_mu_plugins = EE::confirm( 'Continue to move your mu-plugins to client-mu-plugins?', [], false );
 
-		if ( ! $mu_plugins_clone ) {
-			\EE::warning( 'VIP mu-plugin git clone failed. Please check if  ' . $this->vip_go_mu_plugins . ' repo is accessible to you.' );
+			if ( $move_mu_plugins ) {
+				if ( file_exists( './wp-content/client-mu-plugins' ) ) {
+					EE::warning( 'It seems you already have client-mu-plugins directory. Please move your mu-plugins to proper place to and manually install VIP mu-plugins using below command.' );
+					EE::log( 'git clone --depth=1 ' . $this->vip_go_mu_plugins . ' mu-plugins' );
+					$skip_vip_mu_plugins = true;
+				} else {
+					$this->fs->rename( './wp-content/mu-plugins', './wp-content/client-mu-plugins' );
+					EE::log( 'Moved all mu-plugins to client-mu-plugins successfully.' );
+				}
+			} else {
+				$skip_vip_mu_plugins = true;
+			}
+		}
 
-			$this->fs->remove( './mu-plugins' );
+		if ( $skip_vip_mu_plugins ) {
+			EE::log( 'VIP mu-plugins installation is skipped.' );
+		} else {
+			// Clone at wp root dir and move it to wp-content dir later.
+			// Spacial case for --cache where file operations are happening and vip mu plugins are preventing this.
+			$mu_plugins_clone_cmd = 'git clone --depth=1 ' . $this->vip_go_mu_plugins . ' mu-plugins';
+
+			$mu_plugins_clone = \EE::exec( $mu_plugins_clone_cmd );
+
+			if ( ! $mu_plugins_clone ) {
+				\EE::warning( 'VIP mu-plugin git clone failed. Please check if  ' . $this->vip_go_mu_plugins . ' repo is accessible to you.' );
+
+				$this->fs->remove( './mu-plugins' );
+			}
 		}
 
 		// Get back to root dir.
