@@ -235,64 +235,7 @@ class WordPress extends EE_Site_Command {
 		}
 
 		if ( ! empty( $vip_wp_content_repo ) ) {
-			$this->is_vip                    = true;
-			$this->site_meta['vip_repo_url'] = $vip_wp_content_repo;
-
-			$git_check = \EE::exec( 'command -v git' );
-
-			if ( ! $git_check ) {
-				\EE::error( 'git command not found. Please install git to setup vip github repo.' );
-			}
-
-			$check_repo_access = false;
-
-			if ( $this->vip_go_skeleton !== $vip_wp_content_repo ) {
-				\EE::warning( 'Your repo will be clone at wp-content directory make sure the repo has wp-content data.' );
-				\EE::confirm( 'Are you sure want to continue?' );
-
-				\EE::log( "Checking VIP repo access..." );
-
-				$is_valid_git_url = false;
-
-				if ( 0 === strpos( $vip_wp_content_repo, 'git@github.com' ) ) {
-					$is_valid_git_url = true;
-				}
-
-				if ( 0 === strpos( $vip_wp_content_repo, 'https://github.com' ) ) {
-					$is_valid_git_url = true;
-				}
-
-				if ( empty( $is_valid_git_url ) ) {
-					$ssh_git_url = 'git@github.com:' . $vip_wp_content_repo . '.git';
-
-					$is_valid_git_url = EE::exec( 'git ls-remote --exit-code -h ' . $vip_wp_content_repo );
-
-					if ( $is_valid_git_url ) {
-						$vip_wp_content_repo             = $ssh_git_url;
-						$this->site_meta['vip_repo_url'] = $ssh_git_url;
-						$check_repo_access               = true;
-					} else {
-						$https_git_url    = 'https://github.com/' . $vip_wp_content_repo . '.git';
-						$is_valid_git_url = EE::exec( 'git ls-remote --exit-code -h ' . $vip_wp_content_repo );
-
-						if ( $is_valid_git_url ) {
-							$vip_wp_content_repo             = $https_git_url;
-							$this->site_meta['vip_repo_url'] = $https_git_url;
-							$check_repo_access               = true;
-						}
-					}
-				}
-			}
-
-			if ( empty( $check_repo_access ) ) {
-				$check_repo_access = \EE::exec( 'git ls-remote --exit-code -h ' . $vip_wp_content_repo );
-
-				if ( ! $check_repo_access ) {
-					\EE::error( "Could not read from remote repository. Please make sure you have the correct access rights and the repository exists." );
-				}
-			}
-
-			\EE::log( "Repo access check completed." );
+			$this->check_repo_access( $vip_wp_content_repo );
 		}
 
 		if ( Site::find( $this->site_data['site_url'] ) ) {
@@ -1083,6 +1026,75 @@ class WordPress extends EE_Site_Command {
 		}
 
 		\EE::success( $prefix . $this->site_data['site_url'] . ' has been created successfully!' );
+	}
+
+	/**
+	 * Check access of wp-content repo provided from --vip flag/arg.
+	 *
+	 * @param string $wp_content_repo git repo url or user/repo-name.
+	 *
+	 * @return void
+	 */
+	private function check_repo_access( $wp_content_repo ) {
+
+		$this->is_vip                    = true;
+		$this->site_meta['vip_repo_url'] = $wp_content_repo;
+
+		$git_check = \EE::exec( 'command -v git' );
+
+		if ( ! $git_check ) {
+			EE::error( 'git command not found. Please install git to setup vip github repo.' );
+		}
+
+		$check_repo_access = false;
+
+		if ( $this->vip_go_skeleton !== $wp_content_repo ) {
+			EE::warning( 'Your repo will be clone at wp-content directory make sure the repo has wp-content data.' );
+			EE::confirm( 'Are you sure want to continue?' );
+
+			EE::log( "Checking VIP repo access..." );
+
+			$is_valid_git_url = false;
+
+			if ( 0 === strpos( $wp_content_repo, 'git@github.com' ) ) {
+				$is_valid_git_url = true;
+			}
+
+			if ( 0 === strpos( $wp_content_repo, 'https://github.com' ) ) {
+				$is_valid_git_url = true;
+			}
+
+			if ( empty( $is_valid_git_url ) ) {
+				$ssh_git_url = 'git@github.com:' . $wp_content_repo . '.git';
+
+				$is_valid_git_url = EE::exec( 'git ls-remote --exit-code -h ' . $wp_content_repo );
+
+				if ( $is_valid_git_url ) {
+					$wp_content_repo             = $ssh_git_url;
+					$this->site_meta['vip_repo_url'] = $ssh_git_url;
+					$check_repo_access               = true;
+				} else {
+					$https_git_url    = 'https://github.com/' . $wp_content_repo . '.git';
+					$is_valid_git_url = EE::exec( 'git ls-remote --exit-code -h ' . $wp_content_repo );
+
+					if ( $is_valid_git_url ) {
+						$wp_content_repo             = $https_git_url;
+						$this->site_meta['vip_repo_url'] = $https_git_url;
+						$check_repo_access               = true;
+					}
+				}
+			}
+		}
+
+		if ( empty( $check_repo_access ) ) {
+			$check_repo_access = \EE::exec( 'git ls-remote --exit-code -h ' . $wp_content_repo );
+
+			if ( ! $check_repo_access ) {
+				EE::error( "Could not read from remote repository. Please make sure you have the correct access rights and the repository exists." );
+			}
+		}
+
+		EE::log( "Repo access check completed." );
 	}
 
 	/**
