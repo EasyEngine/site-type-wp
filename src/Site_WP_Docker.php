@@ -3,6 +3,8 @@
 namespace EE\Site\Type;
 
 use function EE\Utils\mustache_render;
+use function EE\Utils\get_image_versions;
+use EE_DOCKER;
 
 class Site_WP_Docker {
 
@@ -12,12 +14,12 @@ class Site_WP_Docker {
 	 * @param array $filters Array of flags to determine the docker-compose.yml generation.
 	 *                       Empty/Default -> Generates default WordPress docker-compose.yml
 	 *                       ['le']        -> Enables letsencrypt in the generation.
-	 * @param array $volumes Array containing volume info passable to \EE_DOCKER::get_mounting_volume_array().
+	 * @param array $volumes Array containing volume info passable to EE_DOCKER::get_mounting_volume_array().
 	 *
 	 * @return String docker-compose.yml content string.
 	 */
 	public function generate_docker_compose_yml( array $filters = [], $volumes ) {
-		$img_versions = \EE\Utils\get_image_versions();
+		$img_versions = get_image_versions();
 		$base         = [];
 
 		$restart_default = [ 'name' => 'always' ];
@@ -39,7 +41,7 @@ class Site_WP_Docker {
 			];
 			$db['volumes']      = [
 				[
-					'vol' => \EE_DOCKER::get_mounting_volume_array( $volumes['db'] ),
+					'vol' => EE_DOCKER::get_mounting_volume_array( $volumes['db'] ),
 				],
 			];
 			$db['environment']  = [
@@ -74,7 +76,7 @@ class Site_WP_Docker {
 		];
 		$php['volumes']     = [
 			[
-				'vol' => \EE_DOCKER::get_mounting_volume_array( $volumes['php'] ),
+				'vol' => EE_DOCKER::get_mounting_volume_array( $volumes['php'] ),
 			],
 		];
 		$php['environment'] = [
@@ -125,7 +127,7 @@ class Site_WP_Docker {
 			$nginx['environment']['env'][] = [ 'name' => 'HTTPS_METHOD=nohttps' ];
 		}
 		$nginx['volumes']  = [
-			'vol' => \EE_DOCKER::get_mounting_volume_array( $volumes['nginx'] ),
+			'vol' => EE_DOCKER::get_mounting_volume_array( $volumes['nginx'] ),
 		];
 		$nginx['labels']   = [
 			'label' => [
@@ -177,7 +179,7 @@ class Site_WP_Docker {
 			],
 		];
 		$postfix['volumes']      = [
-			'vol' => \EE_DOCKER::get_mounting_volume_array( $volumes['postfix'] ),
+			'vol' => EE_DOCKER::get_mounting_volume_array( $volumes['postfix'] ),
 		];
 		$postfix['networks']     = $network_default;
 
