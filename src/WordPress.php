@@ -1121,7 +1121,7 @@ class WordPress extends EE_Site_Command {
 		$mu_plugins_clone = \EE::exec( $mu_plugins_clone_cmd );
 
 		if ( ! $mu_plugins_clone ) {
-			\EE::warning( 'Git VIP mu-plugin clone failed. Please check ' . $this->vip_go_mu_plugins . ' repo is accessible.' );
+			\EE::warning( 'VIP mu-plugin git clone failed. Please check if  ' . $this->vip_go_mu_plugins . ' repo is accessible to you.' );
 
 			$this->fs->remove( './mu-plugins' );
 		}
