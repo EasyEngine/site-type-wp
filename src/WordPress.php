@@ -24,11 +24,6 @@ class WordPress extends EE_Site_Command {
 	private $cache_type;
 
 	/**
-	 * @var object $docker Object to access `\EE::docker()` functions.
-	 */
-	private $docker;
-
-	/**
 	 * @var int $level The level of creation in progress. Essential for rollback in case of failure.
 	 */
 	private $level;
@@ -82,7 +77,6 @@ class WordPress extends EE_Site_Command {
 
 		parent::__construct();
 		$this->level  = 0;
-		$this->docker = \EE::docker();
 		$this->logger = \EE::get_file_logger()->withName( 'site_wp_command' );
 		$this->fs     = new Filesystem();
 
@@ -250,7 +244,7 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['site_ssl_wildcard']  = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
 		$this->site_data['php_version']        = \EE\Utils\get_flag_value( $assoc_args, 'php', 'latest' );
 		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
-		$this->site_data['app_admin_username'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', $this->site_data['site_url'] . '-' . \EE\Utils\random_password( 5 ) );
+		$this->site_data['app_admin_username'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', 'admin' );
 		$this->site_data['app_admin_password'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', \EE\Utils\random_password() );
 		$this->site_data['db_name']            = \EE\Utils\get_flag_value( $assoc_args, 'dbname', str_replace( [ '.', '-' ], '_', $this->site_data['site_url'] ) );
 		$this->site_data['db_host']            = \EE\Utils\get_flag_value( $assoc_args, 'dbhost', GLOBAL_DB );
@@ -666,9 +660,9 @@ class WordPress extends EE_Site_Command {
 			];
 		}
 
-		if ( ! IS_DARWIN && empty( $this->docker->get_volumes_by_label( $this->site_data['site_url'] ) ) ) {
+		if ( ! IS_DARWIN && empty( \EE_DOCKER::get_volumes_by_label( $this->site_data['site_url'] ) ) ) {
 			foreach ( $volumes as $volume ) {
-				$this->docker->create_volumes( $this->site_data['site_url'], $volume );
+				\EE_DOCKER::create_volumes( $this->site_data['site_url'], $volume );
 			}
 		}
 
@@ -679,7 +673,7 @@ class WordPress extends EE_Site_Command {
 		$filter[]              = $this->site_data['cache_host'];
 		$filter[]              = $this->site_data['db_host'];
 		$filter['is_ssl']      = $this->site_data['site_ssl'];
-		$filter['site_prefix'] = $this->docker->get_docker_style_prefix( $this->site_data['site_url'] );
+		$filter['site_prefix'] = \EE_DOCKER::get_docker_style_prefix( $this->site_data['site_url'] );
 		$filter['php_version'] = ( string ) $this->site_data['php_version'];
 		$site_docker           = new Site_WP_Docker();
 
@@ -1024,6 +1018,8 @@ class WordPress extends EE_Site_Command {
 			$this->site_data['app_admin_email'],
 			$this->site_data['app_admin_password'],
 		] );
+
+		EE::exec( 'docker-compose exec php wp rewrite structure "/%year%/%monthnum%/%day%/%postname%/" --hard' );
 
 		if ( ! $core_install ) {
 			\EE::warning( 'WordPress install failed. Please check logs.' );
