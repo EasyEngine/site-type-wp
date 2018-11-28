@@ -1070,7 +1070,7 @@ class WordPress extends EE_Site_Command {
 			if ( empty( $is_valid_git_url ) ) {
 				$ssh_git_url = 'git@github.com:' . $wp_content_repo . '.git';
 
-				$is_valid_git_url = EE::exec( 'git ls-remote --exit-code -h ' . $wp_content_repo );
+				$is_valid_git_url = EE::exec( 'git ls-remote --exit-code -h ' . $ssh_git_url );
 
 				if ( $is_valid_git_url ) {
 					$wp_content_repo                 = $ssh_git_url;
@@ -1078,7 +1078,7 @@ class WordPress extends EE_Site_Command {
 					$check_repo_access               = true;
 				} else {
 					$https_git_url    = 'https://github.com/' . $wp_content_repo . '.git';
-					$is_valid_git_url = EE::exec( 'git ls-remote --exit-code -h ' . $wp_content_repo );
+					$is_valid_git_url = EE::exec( 'git ls-remote --exit-code -h ' . $https_git_url );
 
 					if ( $is_valid_git_url ) {
 						$wp_content_repo                 = $https_git_url;
