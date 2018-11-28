@@ -24,11 +24,6 @@ class WordPress extends EE_Site_Command {
 	private $cache_type;
 
 	/**
-	 * @var object $docker Object to access `\EE::docker()` functions.
-	 */
-	private $docker;
-
-	/**
 	 * @var int $level The level of creation in progress. Essential for rollback in case of failure.
 	 */
 	private $level;
@@ -82,7 +77,6 @@ class WordPress extends EE_Site_Command {
 
 		parent::__construct();
 		$this->level  = 0;
-		$this->docker = \EE::docker();
 		$this->logger = \EE::get_file_logger()->withName( 'site_wp_command' );
 		$this->fs     = new Filesystem();
 
@@ -666,9 +660,9 @@ class WordPress extends EE_Site_Command {
 			];
 		}
 
-		if ( ! IS_DARWIN && empty( $this->docker->get_volumes_by_label( $this->site_data['site_url'] ) ) ) {
+		if ( ! IS_DARWIN && empty( \EE_DOCKER::get_volumes_by_label( $this->site_data['site_url'] ) ) ) {
 			foreach ( $volumes as $volume ) {
-				$this->docker->create_volumes( $this->site_data['site_url'], $volume );
+				\EE_DOCKER::create_volumes( $this->site_data['site_url'], $volume );
 			}
 		}
 
@@ -679,7 +673,7 @@ class WordPress extends EE_Site_Command {
 		$filter[]              = $this->site_data['cache_host'];
 		$filter[]              = $this->site_data['db_host'];
 		$filter['is_ssl']      = $this->site_data['site_ssl'];
-		$filter['site_prefix'] = $this->docker->get_docker_style_prefix( $this->site_data['site_url'] );
+		$filter['site_prefix'] = \EE_DOCKER::get_docker_style_prefix( $this->site_data['site_url'] );
 		$filter['php_version'] = ( string ) $this->site_data['php_version'];
 		$site_docker           = new Site_WP_Docker();
 
