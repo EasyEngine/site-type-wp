@@ -1022,6 +1022,8 @@ class WordPress extends EE_Site_Command {
 			$this->site_data['app_admin_password'],
 		] );
 
+		EE::exec( 'docker-compose exec php wp rewrite structure "/%year%/%monthnum%/%day%/%postname%/" --hard' );
+
 		if ( ! $core_install ) {
 			\EE::warning( 'WordPress install failed. Please check logs.' );
 		}
