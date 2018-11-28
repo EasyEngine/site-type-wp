@@ -185,6 +185,9 @@ class WordPress extends EE_Site_Command {
 	 * [--wildcard]
 	 * : Gets wildcard SSL .
 	 *
+	 * [--yes]
+	 * : Do not prompt for confirmation.
+	 *
 	 * [--force]
 	 * : Resets the remote database if it is not empty.
 	 *
@@ -273,7 +276,7 @@ class WordPress extends EE_Site_Command {
 			} else {
 				EE::error( 'Unsupported PHP version: ' . $this->site_data['php_version'] );
 			}
-			\EE::confirm( sprintf( 'EEv4 does not support PHP %s. Continue with PHP %s?', $old_version, $this->site_data['php_version'] ) );
+			\EE::confirm( sprintf( 'EEv4 does not support PHP %s. Continue with PHP %s?', $old_version, $this->site_data['php_version'] ), $assoc_args );
 		}
 
 		if ( \EE\Utils\get_flag_value( $assoc_args, 'local-db' ) ) {
@@ -872,7 +875,7 @@ class WordPress extends EE_Site_Command {
 				$this->install_wp();
 
 				if ( $this->is_vip ) {
-					$this->setup_vip();
+					$this->setup_vip( $assoc_args );
 				}
 			}
 
@@ -1050,8 +1053,7 @@ class WordPress extends EE_Site_Command {
 		$check_repo_access = false;
 
 		if ( $this->vip_go_skeleton !== $wp_content_repo ) {
-			EE::warning( 'Your repo will be clone at wp-content directory make sure the repo has wp-content data.' );
-			EE::confirm( 'Are you sure want to continue?' );
+			EE::warning( 'Your repo is being cloned at wp-content directory make sure the repo has wp-content data.' );
 
 			EE::log( "Checking VIP repo access..." );
 
@@ -1101,7 +1103,7 @@ class WordPress extends EE_Site_Command {
 	/**
 	 * Setup VIP Repo and mu plugins into wp-content.
 	 */
-	private function setup_vip() {
+	private function setup_vip( $assoc_args ) {
 
 		\EE::log( "Setting up VIP Go environment. This may take time based on your repo size, please wait for a while..." );
 
@@ -1136,7 +1138,7 @@ class WordPress extends EE_Site_Command {
 
 		if ( file_exists( './wp-content/mu-plugins' ) ) {
 			EE::warning( 'You already have mu-plugins directory from your remote repo. This should be used from VIP mu plugins. Please move your all current mu-plugins to client-mu-plugins.' );
-			$move_mu_plugins = EE::confirm( 'Continue to move your mu-plugins to client-mu-plugins?', [], false );
+			$move_mu_plugins = EE::confirm( 'Continue to move your mu-plugins to client-mu-plugins?', $assoc_args, false );
 
 			if ( $move_mu_plugins ) {
 				if ( file_exists( './wp-content/client-mu-plugins' ) ) {
