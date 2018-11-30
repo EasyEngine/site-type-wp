@@ -102,7 +102,8 @@ class Site_WP_Docker {
 			],
 		];
 
-		if ( ! empty ( array_intersect( [ GLOBAL_DB, GLOBAL_REDIS ], $filters ) ) ) {
+		$global_network = array_intersect( [ GLOBAL_DB, GLOBAL_REDIS ], $filters );
+		if ( ! empty ( $global_network ) ) {
 			$php['networks']['net'][] = [ 'name' => 'global-backend-network' ];
 		}
 
