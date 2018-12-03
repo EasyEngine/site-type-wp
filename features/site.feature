@@ -17,6 +17,13 @@ Feature: Site Command
     usage: ee site
     """
 
+  Scenario: Check site create sub command is present
+    When I run 'bin/ee site create'
+    Then STDOUT should return exactly
+    """
+    usage: ee site create <site-name> [--ssl=<value>] [--wildcard] [--type=<type>] [--skip-status-check]
+    """
+
   Scenario: Create wp site successfully
     When I run 'bin/ee site create wp.test --type=wp'
     Then After delay of 5 seconds
@@ -26,7 +33,7 @@ Feature: Site Command
         | header           |
         | HTTP/1.1 200 OK  |
 
-  Scenario: Create wp site successfully
+  Scenario: Create wp cache site successfully
     When I run 'bin/ee site create wpcache.test --type=wp --cache'
     Then After delay of 5 seconds
     And The site 'wpcache.test' should have webroot
@@ -34,7 +41,7 @@ Feature: Site Command
     And Request on 'wpcache.test' should contain following headers:
       | header           |
       | HTTP/1.1 200 OK  |
-  
+
   Scenario: Create wpsubdir site successfully
     When I run 'bin/ee site create wpsubdir.test --type=wp --mu=subdir'
       And I create subsite '1' in 'wpsubdir.test'
@@ -65,6 +72,102 @@ Feature: Site Command
     wpcache.test
     wpsubdir.test
     wpsubdom.test
+    """
+
+  Scenario: Check site disable sub command is present
+    When I run 'bin/ee site disable'
+    Then STDERR should return something like
+    """
+    Error: Could not find the site you wish to run site disable command on.
+    Either pass it as an argument: `ee site disable <site-name>`
+    or run `ee site disable` from inside the site folder.
+    """
+
+  Scenario: Disable the site
+    When I run 'bin/ee site disable wp.test'
+    Then STDOUT should return exactly
+    """
+    Disabling site wp.test.
+    Success: Site wp.test disabled.
+    """
+    And Request on 'wp.test' should contain following headers:
+        | header                                       |
+        | HTTP/1.1 503 Service Temporarily Unavailable |
+
+  Scenario: Check site reload sub command is present
+    When I run 'bin/ee site reload'
+    Then STDERR should return something like
+    """
+    Error: Could not find the site you wish to run site reload command on.
+    Either pass it as an argument: `ee site reload <site-name>`
+    or run `ee site reload` from inside the site folder.
+    """
+
+  Scenario: Reload site services
+    When I run 'bin/ee site reload wp.test'
+    Then STDERR should return something like
+    """
+    Error: Site wp.test is not enabled. Use `ee site enable wp.test` to enable it.
+    """
+
+  Scenario: Check site enable sub command is present
+    When I run 'bin/ee site enable'
+    Then STDERR should return something like
+    """
+    Error: Could not find the site you wish to run site enable command on.
+    Either pass it as an argument: `ee site enable <site-name>`
+    or run `ee site enable` from inside the site folder.
+    """
+
+  Scenario: Enable the site
+    When I run 'bin/ee site enable wp.test'
+    Then STDOUT should return exactly
+    """
+    Enabling site wp.test.
+    Success: Site wp.test enabled.
+    Running post enable configurations.
+    Starting site's services.
+    Success: Post enable configurations complete.
+    """
+    And Request on 'wp.test' should contain following headers:
+        | header           |
+        | HTTP/1.1 200 OK  |
+
+  Scenario: Check site info sub command is present
+    When I run 'bin/ee site info'
+    Then STDERR should return something like
+    """
+    Error: Could not find the site you wish to run site info command on.
+    Either pass it as an argument: `ee site info <site-name>`
+    or run `ee site info` from inside the site folder.
+    """
+
+  Scenario: Details of the site uing site info command
+    When I run 'bin/ee site info wp.test'
+    Then STDOUT should return something like
+    """
+    | Site               | http://wp.test
+    """
+
+  Scenario: Reload site services
+    When I run 'bin/ee site reload wp.test'
+    Then STDOUT should return something like
+    """
+    Reloading nginx
+    """
+
+  Scenario: Reload site nginx services
+    When I run 'bin/ee site reload wp.test --nginx'
+    Then STDOUT should return something like
+    """
+    Reloading nginx
+    """
+
+  Scenario: Check site delete sub command is present
+    When I run 'bin/ee site delete'
+    Then STDOUT should return exactly
+    """
+    usage: ee site delete <site-name> [--yes]
     """
 
   Scenario: Delete the sites
