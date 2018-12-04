@@ -326,7 +326,9 @@ class WordPress extends EE_Site_Command {
 	 * Enable object cache.
 	 */
 	private function enable_object_cache() {
-		$redis_plugin_constant    = 'docker-compose exec --user=\'www-data\' php wp config set --type=variable redis_server "array(\'host\'=> \'ee-global-redis\',\'port\'=> 6379,)" --raw';
+
+		$redis_host               = ( 'redis' === $this->site_data['cache_host'] ) ? $this->site_data['cache_host'] : 'ee-' . $this->site_data['cache_host'];
+		$redis_plugin_constant    = 'docker-compose exec --user=\'www-data\' php wp config set --type=variable redis_server "array(\'host\'=> \'' . $redis_host . '\',\'port\'=> 6379,)" --raw';
 		$activate_wp_redis_plugin = "docker-compose exec --user='www-data' php wp plugin install wp-redis --activate";
 		$enable_redis_cache       = "docker-compose exec --user='www-data' php wp redis enable";
 
@@ -375,7 +377,7 @@ class WordPress extends EE_Site_Command {
 			$page_cache_key_prefix
 		);
 
-		$add_hostname_constant = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_HOSTNAME ee-global-redis --add=true --type=constant";
+		$add_hostname_constant = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_HOSTNAME $redis_host --add=true --type=constant";
 		$add_port_constant     = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PORT 6379 --add=true --type=constant";
 		$add_prefix_constant   = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX $page_cache_key_prefix --add=true --type=constant";
 		$add_cache_key_salt    = "docker-compose exec --user='www-data' php wp config set WP_CACHE_KEY_SALT $obj_cache_key_prefix --add=true --type=constant";
