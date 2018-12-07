@@ -240,7 +240,7 @@ class WordPress extends EE_Site_Command {
 		}
 
 		$this->cache_type                      = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
-		$this->site_data['site_ssl']           = \EE\Utils\get_flag_value( $assoc_args, 'ssl' );
+		$this->site_data['site_ssl']           = \EE\Utils\get_flag_value( $assoc_args, 'ssl', '' );
 		$this->site_data['site_ssl_wildcard']  = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
 		$this->site_data['php_version']        = \EE\Utils\get_flag_value( $assoc_args, 'php', 'latest' );
 		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
@@ -1183,13 +1183,6 @@ class WordPress extends EE_Site_Command {
 	private function create_site_db_entry() {
 		$ssl = null;
 
-		if ( $this->site_data['site_ssl'] ) {
-			$ssl = 'letsencrypt';
-			if ( 'subdom' === $this->site_data['app_sub_type'] ) {
-				$ssl = 'wildcard';
-			}
-		}
-
 		$data = [
 			'site_url'             => $this->site_data['site_url'],
 			'site_type'            => $this->site_data['site_type'],
@@ -1209,7 +1202,7 @@ class WordPress extends EE_Site_Command {
 			'db_port'              => isset( $this->site_data['db_port'] ) ? $this->site_data['db_port'] : '',
 			'db_password'          => $this->site_data['db_password'],
 			'db_root_password'     => $this->site_data['db_root_password'],
-			'site_ssl'             => $ssl,
+			'site_ssl'             => $this->site_data['site_ssl'],
 			'site_ssl_wildcard'    => 'subdom' === $this->site_data['app_sub_type'] || $this->site_data['site_ssl_wildcard'] ? 1 : 0,
 			'php_version'          => $this->site_data['php_version'],
 			'created_on'           => date( 'Y-m-d H:i:s', time() ),
