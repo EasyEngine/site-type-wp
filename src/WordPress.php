@@ -1297,6 +1297,49 @@ class WordPress extends EE_Site_Command {
 
 
 	/**
+	 * Publishes site online using ngrok.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <site-name>
+	 * : Name of website.
+	 *
+	 * [--disable]
+	 * : Take online link down.
+	 *
+	 * [--refresh]
+	 * : Refresh site publish if link has expired.
+	 *
+	 * [--token=<token>]
+	 * : ngrok token.
+	 */
+	public function publish( $args, $assoc_args ) {
+
+		parent::publish( $args, $assoc_args );
+
+		$disable = \EE\Utils\get_flag_value( $assoc_args, 'disable', false );
+		$refresh = \EE\Utils\get_flag_value( $assoc_args, 'refresh', false );
+
+		if ( $refresh ) {
+			return;
+		}
+
+		EE::log( 'Running additional WordPress configurations.' );
+		chdir( $this->site_data->site_fs_path );
+		if ( $disable ) {
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp plugin delete relative-url' );
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config delete WP_SITEURL' );
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config delete WP_HOME' );
+		} else {
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp plugin install relative-url --activate' );
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_SITEURL "\'http://\' . $_SERVER[\'HTTP_HOST\']" --raw' );
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_HOME "\'http://\' . $_SERVER[\'HTTP_HOST\']" --raw' );
+		}
+
+		EE::success( 'WordPress configurations updated for publish.' );
+	}
+
+	/**
 	 * Catch and clean exceptions.
 	 *
 	 * @param \Exception $e
