@@ -202,6 +202,9 @@ class WordPress extends EE_Site_Command {
 	 *     # Create WordPress site with wildcard ssl
 	 *     $ ee site create example.com --type=wp --ssl=le --wildcard
 	 *
+	 *     # Create WordPress site with self signed certificate
+	 *     $ ee site create example.com --type=wp --ssl=self
+	 *
 	 *     # Create WordPress site with remote database
 	 *     $ ee site create example.com --type=wp --dbhost=localhost --dbuser=username --dbpass=password
 	 *
