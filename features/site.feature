@@ -188,3 +188,33 @@ Feature: Site Command
         | db         |
         | redis      |
         | phpmyadmin |
+
+  Scenario: Create WordPress site with local DB and global redis
+    When I run 'bin/ee site create wp-local-db.test --cache --type=wp --local-db'
+    Then After delay of 5 seconds
+    And The site 'wp-local-db.test' should have webroot
+    And The site 'wp-local-db.test' should have WordPress
+    And Request on 'wp-local-db.test' should contain following headers:
+      | header          |
+      | HTTP/1.1 200 OK |
+    And Check global redis cache for 'wp-local-db.test'
+
+  Scenario: Create WordPress site with local redis and global db
+    When I run 'bin/ee site create wp-local-redis.test --cache --type=wp --with-local-redis'
+    Then After delay of 5 seconds
+    And The site 'wp-local-redis.test' should have webroot
+    And The site 'wp-local-redis.test' should have WordPress
+    And Request on 'wp-local-redis.test' should contain following headers:
+      | header          |
+      | HTTP/1.1 200 OK |
+    And Check local redis cache for 'wp-local-redis.test'
+
+  Scenario: Create WordPress site with local DB and local redis
+    When I run 'bin/ee site create wp-local-db-redis.test --cache --type=wp --local-db --with-local-redis'
+    Then After delay of 5 seconds
+    And The site 'wp-local-db-redis.test' should have webroot
+    And The site 'wp-local-db-redis.test' should have WordPress
+    And Request on 'wp-local-db-redis.test' should contain following headers:
+      | header          |
+      | HTTP/1.1 200 OK |
+    And Check local redis cache for 'wp-local-db-redis.test'

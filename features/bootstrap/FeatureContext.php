@@ -405,6 +405,9 @@ class FeatureContext implements Context
 			'www.example3.test',
 			'labels.test',
 			'wpcache.test',
+			'wp-local-db.test',
+			'wp-local-redis.test',
+			'wp-local-db-redis.test'
 		];
 
 		$result = EE::launch( 'sudo bin/ee site list --format=text',false, true );
@@ -421,5 +424,32 @@ class FeatureContext implements Context
 		if(file_exists('ee-old.phar')) {
 			unlink('ee-old.phar');
 		}
+	}
+
+	/**
+	 * @Then Check global redis cache for :site
+	 */
+	public function checkGlobalRedisCacheOfSite($site)
+	{
+		exec("docker exec -it ee-global-redis redis-cli set 'easyengine' 'rock'");
+		$output = exec("docker exec -it ee-global-redis redis-cli get 'easyengine'");
+		if ( '"rock"' !== $output ) {
+			throw new Exception("Global redis not working for $site site. Getting '$output' instead of 'rock'");
+		}
+		exec("docker exec -it ee-global-redis redis-cli del 'easyengine'");
+	}
+
+	/**
+	 * @Then Check local redis cache for :site
+	 */
+	public function checkLocalRedisCacheOfSite($site)
+	{
+		$site_root_folder = EE_SITE_ROOT . '/' . $site;
+		exec("cd $site_root_folder && docker-compose exec redis redis-cli set 'easyengine' 'rock'");
+		$output = exec("cd $site_root_folder && docker-compose exec redis redis-cli get 'easyengine'");
+		if ( '"rock"' !== $output ) {
+			throw new Exception("Local redis not working for $site site. Getting '$output' instead of 'rock'.");
+		}
+		exec("cd $site_root_folder && docker-compose exec redis redis-cli del 'easyengine'");
 	}
 }
