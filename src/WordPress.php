@@ -10,6 +10,7 @@ use EE\Model\Site_Meta;
 use Symfony\Component\Filesystem\Filesystem;
 use function EE\Site\Utils\auto_site_name;
 use function EE\Site\Utils\get_site_info;
+use function EE\Utils\get_flag_value;
 
 /**
  * Adds `wp` site type to `ee site` command.
@@ -1312,13 +1313,25 @@ class WordPress extends EE_Site_Command {
 	 *
 	 * [--token=<token>]
 	 * : ngrok token.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Publish site online
+	 *     $ ee site publish example.com
+	 *
+	 *     # Refresh published link if expired
+	 *     $ ee site publish example.com --refresh
+	 *
+	 *     # Disable online link
+	 *     $ ee site publish example.com --disable
+	 *
 	 */
 	public function publish( $args, $assoc_args ) {
 
 		parent::publish( $args, $assoc_args );
 
-		$disable = \EE\Utils\get_flag_value( $assoc_args, 'disable', false );
-		$refresh = \EE\Utils\get_flag_value( $assoc_args, 'refresh', false );
+		$disable = get_flag_value( $assoc_args, 'disable', false );
+		$refresh = get_flag_value( $assoc_args, 'refresh', false );
 
 		if ( $refresh ) {
 			return;
