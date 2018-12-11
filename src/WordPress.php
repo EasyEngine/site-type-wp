@@ -1236,6 +1236,18 @@ class WordPress extends EE_Site_Command {
 	}
 
 	/**
+	 * Funciton to update ssl of a site.
+	 */
+	protected function update_ssl( $assoc_args ) {
+
+		parent::update_ssl( $assoc_args );
+		EE::log( 'Running search-repalce.' );
+		chdir( $this->site_data['site_fs_path'] );
+		EE::exec( sprintf( 'docker-compose exec php wp search-replace http://%1$s https://%1$s', $this->site_data['site_url'] ) );
+		EE::success( 'Successfully completed search-replace.' );
+	}
+
+	/**
 	 * Restarts containers associated with site.
 	 * When no service(--nginx etc.) is specified, all site containers will be restarted.
 	 *
