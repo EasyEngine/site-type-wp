@@ -1241,10 +1241,31 @@ class WordPress extends EE_Site_Command {
 	protected function update_ssl( $assoc_args ) {
 
 		parent::update_ssl( $assoc_args );
-		EE::log( 'Running search-repalce.' );
 		chdir( $this->site_data['site_fs_path'] );
-		EE::exec( sprintf( 'docker-compose exec php wp search-replace http://%1$s https://%1$s', $this->site_data['site_url'] ) );
+
+		EE::log( 'Running search-repalce.' );
+		EE::log( 'Taking database backup before search-replace.' );
+		EE::exec( sprintf( 'docker-compose exec php wp db export %s.db', $this->site_data['site_url'] ) );
+
+		$db_file         = $this->site_data['site_fs_path'] . '/app/htdocs/' . $this->site_data['site_url'] . '.db';
+		$backup_location = EE_BACKUP_DIR . '/' . $this->site_data['site_url'] . '/' . $this->site_data['site_url'] . '.db';
+		$this->fs->mkdir( dirname( $backup_location ) );
+
+		$backup_success = false;
+		if ( $this->fs->exists( $db_file ) ) {
+			$this->fs->remove( $backup_location );
+			$this->fs->rename( $db_file, $backup_location );
+			$backup_success = true;
+		}
+
+		$extra_flags = '--precise';
+		$extra_flags .= ( 'wp' === $this->site_data['app_sub_type'] ) ? '' : ' --network';
+		EE::exec( sprintf( 'docker-compose exec php wp search-replace http://%1$s https://%1$s %2$s', $this->site_data['site_url'], $extra_flags ), true, true );
 		EE::success( 'Successfully completed search-replace.' );
+
+		if ( $backup_success ) {
+			EE::log( "In case something is not working as intended. You can restore your DB from backup file generated before search-replace located at:\n `$backup_location`\nand proceed with search-replace according to your needs." );
+		}
 	}
 
 	/**
