@@ -8,8 +8,7 @@ env:
     - TEST_COMMAND=$(echo $TRAVIS_REPO_SLUG | cut -d/ -f 2) # Get command name to be tested
 
 before_script:
-  - ls -al /etc/mysql
-  - ls -al /etc/mysql/conf.d
+  - cat /etc/mysql/my.cnf
   - sudo curl -L https://github.com/docker/compose/releases/download/1.22.0/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
   - |
     # Remove Xdebug for a huge performance increase:
