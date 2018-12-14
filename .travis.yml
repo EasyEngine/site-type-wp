@@ -38,3 +38,6 @@ addons:
   apt:
     packages:
       - docker-ce
+
+services:
+  - mysql
