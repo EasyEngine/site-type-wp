@@ -409,6 +409,7 @@ class FeatureContext implements Context
 			'wp-local-redis.test',
 			'wp-local-db-redis.test',
 			'wp-remote-db-local-redis.test',
+			'wp-remote-db-global-redis.test',
 
 		];
 

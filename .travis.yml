@@ -17,6 +17,8 @@ before_script:
       echo "xdebug.ini does not exist"
     fi
   - ./ci/prepare.sh
+  - ls -al /ets/mysql
+  - ls -al /ets/mysql/conf.d
 
 script:
   - cd "$TRAVIS_BUILD_DIR/../easyengine"
