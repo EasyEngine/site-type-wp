@@ -1028,7 +1028,7 @@ class WordPress extends EE_Site_Command {
 		EE::exec( 'docker-compose exec php wp rewrite structure "/%year%/%monthnum%/%day%/%postname%/" --hard' );
 
 		if ( ! $core_install ) {
-			\EE::warning( 'WordPress install failed. Please check logs.' );
+			throw new \Exception( 'WordPress install failed. Please check logs.' );
 		}
 
 		\EE::success( $prefix . $this->site_data['site_url'] . ' has been created successfully!' );
