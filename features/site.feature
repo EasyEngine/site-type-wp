@@ -237,4 +237,4 @@ Feature: Site Command
     And Request on 'wp-remote-db-global-redis.test' should contain following headers:
       | header          |
       | HTTP/1.1 200 OK |
-    And Check local redis cache for 'wp-remote-db-global-redis.test'
+    And Check global redis cache for 'wp-remote-db-global-redis.test'
