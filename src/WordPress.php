@@ -331,7 +331,7 @@ class WordPress extends EE_Site_Command {
 	 */
 	private function enable_object_cache() {
 
-		$redis_host               = ( 'redis' === $this->site_data['cache_host'] ) ? $this->site_data['cache_host'] : 'ee-' . $this->site_data['cache_host'];
+		$redis_host               = ( 'redis' === $this->site_data['cache_host'] ) ? $this->site_data['cache_host'] : sprintf( 'services_%s_1', $this->site_data['cache_host'] );
 		$redis_plugin_constant    = 'docker-compose exec --user=\'www-data\' php wp config set --type=variable redis_server "array(\'host\'=> \'' . $redis_host . '\',\'port\'=> 6379,)" --raw';
 		$activate_wp_redis_plugin = "docker-compose exec --user='www-data' php wp plugin install wp-redis --activate";
 		$enable_redis_cache       = "docker-compose exec --user='www-data' php wp redis enable";
@@ -350,7 +350,7 @@ class WordPress extends EE_Site_Command {
 		$page_cache_key_prefix = $this->site_data['site_url'] . '_page:';
 		$obj_cache_key_prefix  = $this->site_data['site_url'] . '_obj:';
 
-		$redis_host    = ( 'redis' === $this->site_data['cache_host'] ) ? $this->site_data['cache_host'] : 'ee-' . $this->site_data['cache_host'];
+		$redis_host    = ( 'redis' === $this->site_data['cache_host'] ) ? $this->site_data['cache_host'] : sprintf( 'services_%s_1', $this->site_data['cache_host'] );
 		$wp_cli_params = ( 'wp' === $this->site_data['app_sub_type'] ) ? 'option update' : 'network meta update 1';
 
 		$plugin_data = sprintf( '{
