@@ -1297,7 +1297,13 @@ class WordPress extends EE_Site_Command {
 	 *
 	 */
 	public function restart( $args, $assoc_args, $whitelisted_containers = [] ) {
-		$whitelisted_containers = [ 'nginx', 'php', 'db' ];
+		$this->site_data = get_site_info( $args, false );
+		$whitelisted_containers = [ 'nginx', 'php' ];
+
+		if ( 'db' === $this->site_data['db_host'] ) {
+			$whitelisted_containers[] = 'db';
+		}
+
 		parent::restart( $args, $assoc_args, $whitelisted_containers );
 	}
 
