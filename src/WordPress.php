@@ -1032,7 +1032,7 @@ class WordPress extends EE_Site_Command {
 		EE::exec( 'docker-compose exec php wp rewrite structure "/%year%/%monthnum%/%day%/%postname%/" --hard' );
 
 		if ( ! $core_install ) {
-			\EE::warning( 'WordPress install failed. Please check logs.' );
+			throw new \Exception( 'WordPress install failed. Please check logs.' );
 		}
 
 		\EE::success( $prefix . $this->site_data['site_url'] . ' has been created successfully!' );
@@ -1301,7 +1301,13 @@ class WordPress extends EE_Site_Command {
 	 *
 	 */
 	public function restart( $args, $assoc_args, $whitelisted_containers = [] ) {
-		$whitelisted_containers = [ 'nginx', 'php', 'db' ];
+		$this->site_data = get_site_info( $args, false );
+		$whitelisted_containers = [ 'nginx', 'php' ];
+
+		if ( 'db' === $this->site_data['db_host'] ) {
+			$whitelisted_containers[] = 'db';
+		}
+
 		parent::restart( $args, $assoc_args, $whitelisted_containers );
 	}
 
