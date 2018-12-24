@@ -869,7 +869,7 @@ class WordPress extends EE_Site_Command {
 			$this->wp_download_and_config( $assoc_args );
 
 			if ( ! $this->skip_install ) {
-				if ( ! $this->site_data['site_ssl'] ) {
+				if ( ! $this->site_data['site_ssl'] || 'self' === $this->site_data['site_ssl'] ) {
 					\EE\Site\Utils\create_etc_hosts_entry( $this->site_data['site_url'] );
 				}
 				if ( ! $this->skip_status_check ) {
