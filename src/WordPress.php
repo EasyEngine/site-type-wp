@@ -855,6 +855,10 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['site_fs_path'] = WEBROOT . $this->site_data['site_url'];
 		$this->level                     = 1;
 		try {
+			if ( 'inherit' === $this->site_data['site_ssl'] ) {
+				$this->check_parent_site_certs( $this->site_data['site_url'] );
+			}
+
 			\EE\Site\Utils\create_site_root( $this->site_data['site_fs_path'], $this->site_data['site_url'] );
 			$this->level = 2;
 			$this->maybe_verify_remote_db_connection();
@@ -978,6 +982,10 @@ class WordPress extends EE_Site_Command {
 		// Added wp-config.php debug constants referred from https://codex.wordpress.org/Debugging_in_WordPress.
 		$extra_php = "if ( isset( \$_SERVER[\"HTTP_X_FORWARDED_PROTO\"] ) && \$_SERVER[\"HTTP_X_FORWARDED_PROTO\"] == \"https\" ) {\n	\$_SERVER[\"HTTPS\"] = \"on\";\n}\n\n// Enable WP_DEBUG mode.\ndefine( \"WP_DEBUG\", false );\n\n// Enable Debug logging to the /wp-content/debug.log file\ndefine( \"WP_DEBUG_LOG\", false );\n\n// Disable display of errors and warnings.\ndefine( \"WP_DEBUG_DISPLAY\", false );\n@ini_set( \"display_errors\", 0 );\n\n// Use dev versions of core JS and CSS files (only needed if you are modifying these core files)\ndefine( \"SCRIPT_DEBUG\", false );";
 
+		if ( 'wp' !== $this->site_data['app_sub_type'] ) {
+			$extra_php .= "\n\n// Disable cookie domain.\ndefine( \"COOKIE_DOMAIN\", false );";
+		}
+
 		if ( $this->is_vip ) {
 			$extra_php .= "\n\nif ( file_exists( __DIR__ . \"/htdocs/wp-content/vip-config/vip-config.php\" ) ) {\n		require_once( __DIR__ . \"/htdocs/wp-content/vip-config/vip-config.php\" ); \n}";
 		}
@@ -1028,7 +1036,7 @@ class WordPress extends EE_Site_Command {
 		EE::exec( 'docker-compose exec php wp rewrite structure "/%year%/%monthnum%/%day%/%postname%/" --hard' );
 
 		if ( ! $core_install ) {
-			\EE::warning( 'WordPress install failed. Please check logs.' );
+			throw new \Exception( 'WordPress install failed. Please check logs.' );
 		}
 
 		\EE::success( $prefix . $this->site_data['site_url'] . ' has been created successfully!' );
@@ -1297,7 +1305,13 @@ class WordPress extends EE_Site_Command {
 	 *
 	 */
 	public function restart( $args, $assoc_args, $whitelisted_containers = [] ) {
-		$whitelisted_containers = [ 'nginx', 'php', 'db' ];
+		$this->site_data = get_site_info( $args, false );
+		$whitelisted_containers = [ 'nginx', 'php' ];
+
+		if ( 'db' === $this->site_data['db_host'] ) {
+			$whitelisted_containers[] = 'db';
+		}
+
 		parent::restart( $args, $assoc_args, $whitelisted_containers );
 	}
 
@@ -1334,7 +1348,7 @@ class WordPress extends EE_Site_Command {
 
 
 	/**
-	 * Publishes site online using ngrok.
+	 * Share a site online using ngrok.
 	 *
 	 * ## OPTIONS
 	 *
@@ -1345,26 +1359,25 @@ class WordPress extends EE_Site_Command {
 	 * : Take online link down.
 	 *
 	 * [--refresh]
-	 * : Refresh site publish if link has expired.
+	 * : Refresh site share if link has expired.
 	 *
 	 * [--token=<token>]
 	 * : ngrok token.
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # Publish site online
-	 *     $ ee site publish example.com
+	 *     # Share a site online
+	 *     $ ee site share example.com
 	 *
-	 *     # Refresh published link if expired
-	 *     $ ee site publish example.com --refresh
+	 *     # Refresh shareed link if expired
+	 *     $ ee site share example.com --refresh
 	 *
 	 *     # Disable online link
-	 *     $ ee site publish example.com --disable
+	 *     $ ee site share example.com --disable
 	 *
 	 */
-	public function publish( $args, $assoc_args ) {
-
-		parent::publish( $args, $assoc_args );
+	public function share( $args, $assoc_args ) {
+		parent::share( $args, $assoc_args );
 
 		$disable = get_flag_value( $assoc_args, 'disable', false );
 		$refresh = get_flag_value( $assoc_args, 'refresh', false );
@@ -1377,12 +1390,8 @@ class WordPress extends EE_Site_Command {
 		chdir( $this->site_data->site_fs_path );
 		if ( $disable ) {
 			EE::exec( 'docker-compose exec --user=\'www-data\' php wp plugin delete relative-url' );
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config delete WP_SITEURL' );
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config delete WP_HOME' );
 		} else {
 			EE::exec( 'docker-compose exec --user=\'www-data\' php wp plugin install relative-url --activate' );
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_SITEURL "\'http://\' . $_SERVER[\'HTTP_HOST\']" --raw' );
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_HOME "\'http://\' . $_SERVER[\'HTTP_HOST\']" --raw' );
 		}
 
 		EE::success( 'WordPress configurations updated for publish.' );
