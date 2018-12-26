@@ -243,6 +243,7 @@ class WordPress extends EE_Site_Command {
 			\EE::error( sprintf( "Site %1\$s already exists. If you want to re-create it please delete the older one using:\n`ee site delete %1\$s`", $this->site_data['site_url'] ) );
 		}
 
+		$this->site_data['site_fs_path']       = WEBROOT . $this->site_data['site_url'];
 		$this->cache_type                      = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
 		$this->site_data['site_ssl']           = \EE\Utils\get_flag_value( $assoc_args, 'ssl', '' );
 		$this->site_data['site_ssl_wildcard']  = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
@@ -331,7 +332,7 @@ class WordPress extends EE_Site_Command {
 	 */
 	private function enable_object_cache() {
 
-		$redis_host               = ( 'redis' === $this->site_data['cache_host'] ) ? $this->site_data['cache_host'] : 'ee-' . $this->site_data['cache_host'];
+		$redis_host               = $this->site_data['cache_host'];
 		$redis_plugin_constant    = 'docker-compose exec --user=\'www-data\' php wp config set --type=variable redis_server "array(\'host\'=> \'' . $redis_host . '\',\'port\'=> 6379,)" --raw';
 		$activate_wp_redis_plugin = "docker-compose exec --user='www-data' php wp plugin install wp-redis --activate";
 		$enable_redis_cache       = "docker-compose exec --user='www-data' php wp redis enable";
@@ -350,7 +351,7 @@ class WordPress extends EE_Site_Command {
 		$page_cache_key_prefix = $this->site_data['site_url'] . '_page:';
 		$obj_cache_key_prefix  = $this->site_data['site_url'] . '_obj:';
 
-		$redis_host    = ( 'redis' === $this->site_data['cache_host'] ) ? $this->site_data['cache_host'] : 'ee-' . $this->site_data['cache_host'];
+		$redis_host    = $this->site_data['cache_host'];
 		$wp_cli_params = ( 'wp' === $this->site_data['app_sub_type'] ) ? 'option update' : 'network meta update 1';
 
 		$plugin_data = sprintf( '{
@@ -852,7 +853,6 @@ class WordPress extends EE_Site_Command {
 	 */
 	private function create_site( $assoc_args ) {
 
-		$this->site_data['site_fs_path'] = WEBROOT . $this->site_data['site_url'];
 		$this->level                     = 1;
 		try {
 			if ( 'inherit' === $this->site_data['site_ssl'] ) {
@@ -1390,8 +1390,13 @@ class WordPress extends EE_Site_Command {
 		chdir( $this->site_data->site_fs_path );
 		if ( $disable ) {
 			EE::exec( 'docker-compose exec --user=\'www-data\' php wp plugin delete relative-url' );
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config delete WP_SITEURL' );
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config delete WP_HOME' );
 		} else {
 			EE::exec( 'docker-compose exec --user=\'www-data\' php wp plugin install relative-url --activate' );
+			$set_url = 'http://\' . empty( \$_SERVER[\'HTTP_HOST\'] ) ? \'' . $this->site_data->site_url . '\'  : \$_SERVER[\'HTTP_HOST\']';
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_SITEURL \'' . $set_url . '\' --raw' );
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_HOME \'' . $set_url . '\' --raw' );
 		}
 
 		EE::success( 'WordPress configurations updated for publish.' );
