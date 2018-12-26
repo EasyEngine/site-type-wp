@@ -1390,8 +1390,13 @@ class WordPress extends EE_Site_Command {
 		chdir( $this->site_data->site_fs_path );
 		if ( $disable ) {
 			EE::exec( 'docker-compose exec --user=\'www-data\' php wp plugin delete relative-url' );
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config delete WP_SITEURL' );
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config delete WP_HOME' );
 		} else {
 			EE::exec( 'docker-compose exec --user=\'www-data\' php wp plugin install relative-url --activate' );
+			$set_url = 'http://\' . empty( \$_SERVER[\'HTTP_HOST\'] ) ? \'' . $this->site_data->site_url . '\'  : \$_SERVER[\'HTTP_HOST\']';
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_SITEURL \'' . $set_url . '\' --raw' );
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_HOME \'' . $set_url . '\' --raw' );
 		}
 
 		EE::success( 'WordPress configurations updated for publish.' );
