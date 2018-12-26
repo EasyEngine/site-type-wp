@@ -1394,8 +1394,9 @@ class WordPress extends EE_Site_Command {
 			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config delete WP_HOME' );
 		} else {
 			EE::exec( 'docker-compose exec --user=\'www-data\' php wp plugin install relative-url --activate' );
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_SITEURL "\'http://\' . empty( \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] ) ? \'' . $this->site_data->site_url . '\'  : \$_SERVER[\'HTTP_X_FORWARDED_PROTO\']" --raw' );
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_HOME "\'http://\' . empty( \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] ) ? \'' . $this->site_data->site_url . '\'  : \$_SERVER[\'HTTP_X_FORWARDED_PROTO\']" --raw' );
+			$set_url = 'http://\' . empty( \$_SERVER[\'HTTP_HOST\'] ) ? \'' . $this->site_data->site_url . '\'  : \$_SERVER[\'HTTP_HOST\']';
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_SITEURL \'' . $set_url . '\' --raw' );
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_HOME \'' . $set_url . '\' --raw' );
 		}
 
 		EE::success( 'WordPress configurations updated for publish.' );
