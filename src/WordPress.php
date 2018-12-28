@@ -1305,7 +1305,9 @@ class WordPress extends EE_Site_Command {
 	 *
 	 */
 	public function restart( $args, $assoc_args, $whitelisted_containers = [] ) {
-		$this->site_data = get_site_info( $args, false );
+
+		$args                   = auto_site_name( $args, 'site', __FUNCTION__ );
+		$this->site_data        = get_site_info( $args, false );
 		$whitelisted_containers = [ 'nginx', 'php' ];
 
 		if ( 'db' === $this->site_data['db_host'] ) {
