@@ -34,7 +34,7 @@ Feature: Site Command
     And Request on 'wpcache.test' should contain following headers:
       | header           |
       | HTTP/1.1 200 OK  |
-  
+
   Scenario: Create wpsubdir site successfully
     When I run 'bin/ee site create wpsubdir.test --type=wp --mu=subdir'
       And I create subsite '1' in 'wpsubdir.test'
@@ -85,3 +85,7 @@ Feature: Site Command
         | db         |
         | redis      |
         | phpmyadmin |
+
+  @site50
+  Scenario: Create 50 sites to test Docker limit
+    When Create '50' WordPress site to fix docker issue
