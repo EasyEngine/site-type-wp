@@ -8,6 +8,10 @@ env:
     - TEST_COMMAND=$(echo $TRAVIS_REPO_SLUG | cut -d/ -f 2) # Get command name to be tested
 
 before_script:
+  - cat /etc/mysql/my.cnf | grep -i 'bind-address'
+  - sudo sed -i 's/^bind-address.*/bind-address = "0.0.0.0"/' /etc/mysql/my.cnf
+  - cat /etc/mysql/my.cnf | grep -i 'bind-address'
+  - sudo service mysql restart
   - sudo curl -L https://github.com/docker/compose/releases/download/1.22.0/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
   - |
     # Remove Xdebug for a huge performance increase:
@@ -17,7 +21,6 @@ before_script:
       echo "xdebug.ini does not exist"
     fi
   - ./ci/prepare.sh
-  - ./ci/add-test-certs.sh
 
 script:
   - cd "$TRAVIS_BUILD_DIR/../easyengine"
@@ -39,3 +42,6 @@ addons:
   apt:
     packages:
       - docker-ce
+
+services:
+  - mysql
