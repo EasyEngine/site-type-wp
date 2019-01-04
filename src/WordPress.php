@@ -216,7 +216,7 @@ class WordPress extends EE_Site_Command {
 	 *     # Create WordPress site with custom site title, locale, admin user, admin email and admin password
 	 *     $ ee site create example.com --type=wp --title=easyengine  --locale=nl_NL --admin-email=easyengine@example.com --admin-user=easyengine --admin-pass=easyengine
 	 *
-	 *     # Create html site with custom source directory
+	 *     # Create WordPress site with custom source directory
 	 *     $ ee site create example.com --type=wp --public-dir=src
 	 *
 	 */
