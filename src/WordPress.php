@@ -1020,9 +1020,17 @@ class WordPress extends EE_Site_Command {
 			if ( ! \EE::exec( $wp_config_create_command ) ) {
 				throw new \Exception( sprintf( 'Couldn\'t connect to %s:%s or there was issue in `wp config create`. Please check logs.', $this->site_data['db_host'], $this->site_data['db_port'] ) );
 			}
-			$default_wp_config_path = sprintf( '%s/app/htdocs/%swp-config.php', $this->site_data['site_fs_path'], $public_dir_path );
-			$new_wp_config_path     = $this->site_data['site_fs_path'] . '/app/wp-config.php';
-			$this->fs->rename( $default_wp_config_path, $new_wp_config_path );
+
+			$default_wp_config_path = sprintf( '%s/wp-config.php', $this->site_data['site_container_fs_path'] );
+			$level_above_path       = preg_replace( '/[^\/]+$/', '', $this->site_data['site_container_fs_path'] );
+			$new_wp_config_path     = sprintf( '%swp-config.php', $level_above_path );
+
+			$move_wp_config_command = sprintf( 'docker-compose exec php mv %1$s %2$s', $default_wp_config_path, $new_wp_config_path );
+			if ( ! EE::exec( $move_wp_config_command ) ) {
+				throw new \Exception( sprintf( 'Couldn\'t move wp-config.php from %1$s to %2$s', $default_wp_config_path, $new_wp_config_path ) );
+			}
+			EE::log( sprintf( 'Moved %1$s to %2$s successfully', $default_wp_config_path, $new_wp_config_path ) );
+
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
 		}
