@@ -245,7 +245,7 @@ class WordPress extends EE_Site_Command {
 
 		$this->site_data['site_fs_path']       = WEBROOT . $this->site_data['site_url'];
 		$this->cache_type                      = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
-		$this->site_data['site_ssl']           = \EE\Utils\get_flag_value( $assoc_args, 'ssl', '' );
+		$this->site_data['site_ssl']           = \EE\Utils\get_flag_value( $assoc_args, 'ssl', 'le' );
 		$this->site_data['site_ssl_wildcard']  = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
 		$this->site_data['php_version']        = \EE\Utils\get_flag_value( $assoc_args, 'php', 'latest' );
 		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
