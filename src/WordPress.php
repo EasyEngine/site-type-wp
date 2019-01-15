@@ -1220,8 +1220,8 @@ class WordPress extends EE_Site_Command {
 		// Get back to root dir.
 		chdir( $this->site_data['site_fs_path'] );
 
-		// Reset wp-content permission which may have been changed during git clone from host machine.
-		EE::exec( "docker-compose exec --user=root php chown -R www-data: /var/www/htdocs/wp-content" );
+		// Reset wp-content permission which may have been changed during git clone from host machine. Making it `/var/www/htdocs/` so that it accomodates the changes of `--public-dir` input if any.
+		EE::exec( "docker-compose exec --user=root php chown -R www-data: /var/www/htdocs/" );
 
 		\EE::log( "VIP Go environment setup completed." );
 	}
