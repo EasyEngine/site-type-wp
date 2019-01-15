@@ -10,6 +10,7 @@ use EE\Model\Site_Meta;
 use Symfony\Component\Filesystem\Filesystem;
 use function EE\Site\Utils\auto_site_name;
 use function EE\Site\Utils\get_site_info;
+use function EE\Site\Utils\get_public_dir;
 use function EE\Utils\get_flag_value;
 use function EE\Utils\trailingslashit;
 use function EE\Utils\get_value_if_flag_isset;
