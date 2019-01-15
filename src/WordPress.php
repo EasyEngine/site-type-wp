@@ -128,7 +128,7 @@ class WordPress extends EE_Site_Command {
 	 * : Enable cache with local redis container.
 	 *
 	 * [--public-dir]
-	 * : Set custom source directory for site.
+	 * : Set custom source directory for site inside htdocs.
 	 *
 	 * [--php=<php-version>]
 	 * : PHP version for site. Currently only supports PHP 5.6 and latest.
@@ -223,8 +223,8 @@ class WordPress extends EE_Site_Command {
 	 *     # Create WordPress site with custom site title, locale, admin user, admin email and admin password
 	 *     $ ee site create example.com --type=wp --title=easyengine  --locale=nl_NL --admin-email=easyengine@example.com --admin-user=easyengine --admin-pass=easyengine
 	 *
-	 *     # Create WordPress site with custom source directory
-	 *     $ ee site create example.com --type=wp --public-dir=src
+	 *     # Create WordPress site with custom source directory inside htdocs ( SITE_ROOT/app/htdocs/current )
+	 *     $ ee site create example.com --type=wp --public-dir=current
 	 *
 	 */
 	public function create( $args, $assoc_args ) {
