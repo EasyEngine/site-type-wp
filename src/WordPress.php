@@ -198,6 +198,9 @@ class WordPress extends EE_Site_Command {
 	 * [--force]
 	 * : Resets the remote database if it is not empty.
 	 *
+	 * [--alias=<aliases>]
+	 * : Add site aliases with coma separate.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Create WordPress site
@@ -226,6 +229,9 @@ class WordPress extends EE_Site_Command {
 	 *
 	 *     # Create WordPress site with custom source directory inside htdocs ( SITE_ROOT/app/htdocs/current )
 	 *     $ ee site create example.com --type=wp --public-dir=current
+	 *
+	 *     # Crate WordPress site with aliases.
+	 *     $ ee site create example.com --alias=example.net,example.org
 	 *
 	 */
 	public function create( $args, $assoc_args ) {
@@ -279,6 +285,7 @@ class WordPress extends EE_Site_Command {
 
 		$this->site_data['site_container_fs_path'] = get_public_dir( $assoc_args );
 		$this->site_data['site_ssl']               = get_value_if_flag_isset( $assoc_args, 'ssl', [ 'le', 'self', 'inherit' ], 'le' );
+		$this->site_data['site_aliases']           = get_flag_value( $assoc_args, 'alias' );
 
 		$supported_php_versions = [ 5.6, 7.2, 'latest' ];
 		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions ) ) {
@@ -510,6 +517,16 @@ class WordPress extends EE_Site_Command {
 		$custom_conf_source      = SITE_WP_TEMPLATE_ROOT . '/config/nginx/user.conf.mustache';
 		$process_user            = posix_getpwuid( posix_geteuid() );
 
+		if ( ! empty( $this->site_data['site_aliases'] ) ) {
+
+			$domains = explode( ',', $this->site_data['site_aliases'] );
+			if ( ! empty( $domains ) ) {
+				foreach ( $domains as $domain ) {
+					$server_name .= ( 'subdom' === $this->site_data['app_sub_type'] ) ? sprintf( ' %1$s *.%1$s', $domain ) : sprintf( ' %1$s', $domain );
+				}
+			}
+		}
+
 		\EE::log( 'Creating WordPress site ' . $this->site_data['site_url'] );
 		\EE::log( 'Copying configuration files.' );
 
@@ -520,6 +537,7 @@ class WordPress extends EE_Site_Command {
 		$env_data = [
 			'local'         => $local,
 			'virtual_host'  => $this->site_data['site_url'],
+			'alias_domains' => $this->site_data['site_aliases'],
 			'root_password' => $this->site_data['db_root_password'],
 			'database_name' => $this->site_data['db_name'],
 			'database_user' => $this->site_data['db_user'],
@@ -1234,6 +1252,7 @@ class WordPress extends EE_Site_Command {
 
 		$data = [
 			'site_url'               => $this->site_data['site_url'],
+			'site_aliases'           => $this->site_data['site_aliases'],
 			'site_type'              => $this->site_data['site_type'],
 			'app_admin_url'          => $this->site_data['app_admin_url'],
 			'app_admin_email'        => $this->site_data['app_admin_email'],
