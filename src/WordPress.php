@@ -7,6 +7,7 @@ namespace EE\Site\Type;
 use EE;
 use EE\Model\Site;
 use EE\Model\Site_Meta;
+use EE\Model\ConfigHash;
 use Symfony\Component\Filesystem\Filesystem;
 use function EE\Site\Utils\auto_site_name;
 use function EE\Site\Utils\get_site_info;
@@ -1269,6 +1270,12 @@ class WordPress extends EE_Site_Command {
 			if ( ! $site_id ) {
 				throw new \Exception( 'Error creating site entry in database.' );
 			}
+
+			// Get site config files.
+			$files = ConfigHash::get_files_in_path( $this->site_data['site_fs_path'] );
+
+			// Create entries for sites' configuration files.
+			ConfigHash::insert_hash_data( $files, $this->site_data['site_url'] );
 
 			$vip_repo_url = $this->site_meta['vip_repo_url'] ?? '';
 
