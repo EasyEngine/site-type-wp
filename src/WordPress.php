@@ -58,11 +58,6 @@ class WordPress extends EE_Site_Command {
 	private $force;
 
 	/**
-	 * @var Filesystem $fs Symfony Filesystem object.
-	 */
-	private $fs;
-
-	/**
 	 * @var string $vip_go_mu_plugins WordPress VIP Go mu-plugins repo.
 	 */
 	private $vip_go_mu_plugins = 'https://github.com/Automattic/vip-go-mu-plugins-built';
@@ -82,7 +77,6 @@ class WordPress extends EE_Site_Command {
 		parent::__construct();
 		$this->level  = 0;
 		$this->logger = \EE::get_file_logger()->withName( 'site_wp_command' );
-		$this->fs     = new Filesystem();
 
 		$this->site_data['site_type'] = 'wp';
 	}
@@ -286,6 +280,13 @@ class WordPress extends EE_Site_Command {
 
 		$this->site_data['site_container_fs_path'] = get_public_dir( $assoc_args );
 		$this->site_data['site_ssl']               = get_value_if_flag_isset( $assoc_args, 'ssl', [ 'le', 'self', 'inherit', 'custom' ], 'le' );
+		if ( 'custom' === $this->site_data['site_ssl'] ) {
+			try {
+				$this->validate_site_custom_ssl( get_flag_value( $assoc_args, 'ssl-key' ), get_flag_value( $assoc_args, 'ssl-crt' ) );
+			} catch ( \Exception $e ) {
+				$this->catch_clean( $e );
+			}
+		}
 
 		$supported_php_versions = [ 5.6, 7.2, 'latest' ];
 		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions ) ) {
@@ -909,7 +910,7 @@ class WordPress extends EE_Site_Command {
 			}
 
 			if ( 'custom' === $this->site_data['site_ssl'] ) {
-				$this->custom_site_ssl( get_flag_value( $assoc_args, 'ssl-key' ), get_flag_value( $assoc_args, 'ssl-crt' ) );
+				$this->custom_site_ssl();
 			}
 			$this->www_ssl_wrapper( [ 'nginx' ] );
 		} catch ( \Exception $e ) {
