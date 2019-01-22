@@ -1271,11 +1271,8 @@ class WordPress extends EE_Site_Command {
 				throw new \Exception( 'Error creating site entry in database.' );
 			}
 
-			// Get site config files.
-			$files = ConfigHash::get_files_in_path( $this->site_data['site_fs_path'] );
-
 			// Create entries for sites' configuration files.
-			ConfigHash::insert_hash_data( $files, $this->site_data['site_url'] );
+			ConfigHash::create_site_config_hash( $this->site_data['site_fs_path'], $this->site_data['site_url'] );
 
 			$vip_repo_url = $this->site_meta['vip_repo_url'] ?? '';
 
