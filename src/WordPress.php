@@ -1289,7 +1289,7 @@ class WordPress extends EE_Site_Command {
 		parent::update_ssl( $assoc_args );
 		chdir( $this->site_data['site_fs_path'] );
 
-		EE::log( 'Running search-repalce.' );
+		EE::log( 'Running search-replace.' );
 		EE::log( 'Taking database backup before search-replace.' );
 		EE::exec( sprintf( 'docker-compose exec php wp db export %s.db', $this->site_data['site_url'] ) );
 
