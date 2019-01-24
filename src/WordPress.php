@@ -188,7 +188,7 @@ class WordPress extends EE_Site_Command {
 	 * : Path to the SSL key file.
 	 *
 	 * [--ssl-crt=<ssl-crt-path>]
-	 * : Path ro the SSL crt file.
+	 * : Path to the SSL crt file.
 	 *
 	 * [--wildcard]
 	 * : Gets wildcard SSL .
@@ -227,6 +227,9 @@ class WordPress extends EE_Site_Command {
 	 *
 	 *     # Create WordPress site with custom source directory inside htdocs ( SITE_ROOT/app/htdocs/current )
 	 *     $ ee site create example.com --type=wp --public-dir=current
+	 *
+	 *     # Create WordPress site with custom ssl certs
+	 *     $ ee site create example.com --ssl=custom  --ssl-key='/path/to/example.com.key' --ssl-crt='/path/to/example.com.crt'
 	 *
 	 */
 	public function create( $args, $assoc_args ) {
