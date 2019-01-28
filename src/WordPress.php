@@ -10,7 +10,10 @@ use EE\Model\Site_Meta;
 use Symfony\Component\Filesystem\Filesystem;
 use function EE\Site\Utils\auto_site_name;
 use function EE\Site\Utils\get_site_info;
+use function EE\Site\Utils\get_public_dir;
 use function EE\Utils\get_flag_value;
+use function EE\Utils\trailingslashit;
+use function EE\Utils\get_value_if_flag_isset;
 
 /**
  * Adds `wp` site type to `ee site` command.
@@ -55,11 +58,6 @@ class WordPress extends EE_Site_Command {
 	private $force;
 
 	/**
-	 * @var Filesystem $fs Symfony Filesystem object.
-	 */
-	private $fs;
-
-	/**
 	 * @var string $vip_go_mu_plugins WordPress VIP Go mu-plugins repo.
 	 */
 	private $vip_go_mu_plugins = 'https://github.com/Automattic/vip-go-mu-plugins-built';
@@ -79,7 +77,6 @@ class WordPress extends EE_Site_Command {
 		parent::__construct();
 		$this->level  = 0;
 		$this->logger = \EE::get_file_logger()->withName( 'site_wp_command' );
-		$this->fs     = new Filesystem();
 
 		$this->site_data['site_type'] = 'wp';
 	}
@@ -124,6 +121,9 @@ class WordPress extends EE_Site_Command {
 	 *
 	 * [--with-local-redis]
 	 * : Enable cache with local redis container.
+	 *
+	 * [--public-dir]
+	 * : Set custom source directory for site inside htdocs.
 	 *
 	 * [--php=<php-version>]
 	 * : PHP version for site. Currently only supports PHP 5.6 and latest.
@@ -174,8 +174,21 @@ class WordPress extends EE_Site_Command {
 	 * [--skip-status-check]
 	 * : Skips site status check.
 	 *
-	 * [--ssl=<value>]
+	 * [--ssl]
 	 * : Enables ssl on site.
+	 * ---
+	 * options:
+	 *      - le
+	 *      - self
+	 *      - inherit
+	 *      - custom
+	 * ---
+	 *
+	 * [--ssl-key=<ssl-key-path>]
+	 * : Path to the SSL key file.
+	 *
+	 * [--ssl-crt=<ssl-crt-path>]
+	 * : Path to the SSL crt file.
 	 *
 	 * [--wildcard]
 	 * : Gets wildcard SSL .
@@ -212,6 +225,12 @@ class WordPress extends EE_Site_Command {
 	 *     # Create WordPress site with custom site title, locale, admin user, admin email and admin password
 	 *     $ ee site create example.com --type=wp --title=easyengine  --locale=nl_NL --admin-email=easyengine@example.com --admin-user=easyengine --admin-pass=easyengine
 	 *
+	 *     # Create WordPress site with custom source directory inside htdocs ( SITE_ROOT/app/htdocs/current )
+	 *     $ ee site create example.com --type=wp --public-dir=current
+	 *
+	 *     # Create WordPress site with custom ssl certs
+	 *     $ ee site create example.com --ssl=custom  --ssl-key='/path/to/example.com.key' --ssl-crt='/path/to/example.com.crt'
+	 *
 	 */
 	public function create( $args, $assoc_args ) {
 
@@ -245,7 +264,6 @@ class WordPress extends EE_Site_Command {
 
 		$this->site_data['site_fs_path']       = WEBROOT . $this->site_data['site_url'];
 		$this->cache_type                      = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
-		$this->site_data['site_ssl']           = \EE\Utils\get_flag_value( $assoc_args, 'ssl', '' );
 		$this->site_data['site_ssl_wildcard']  = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
 		$this->site_data['php_version']        = \EE\Utils\get_flag_value( $assoc_args, 'php', 'latest' );
 		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
@@ -261,6 +279,16 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['cache_host']         = '';
 		if ( $this->cache_type ) {
 			$this->site_data['cache_host'] = $local_cache ? 'redis' : 'global-redis';
+		}
+
+		$this->site_data['site_container_fs_path'] = get_public_dir( $assoc_args );
+		$this->site_data['site_ssl']               = get_value_if_flag_isset( $assoc_args, 'ssl', [ 'le', 'self', 'inherit', 'custom' ], 'le' );
+		if ( 'custom' === $this->site_data['site_ssl'] ) {
+			try {
+				$this->validate_site_custom_ssl( get_flag_value( $assoc_args, 'ssl-key' ), get_flag_value( $assoc_args, 'ssl-crt' ) );
+			} catch ( \Exception $e ) {
+				$this->catch_clean( $e );
+			}
 		}
 
 		$supported_php_versions = [ 5.6, 7.2, 'latest' ];
@@ -711,6 +739,7 @@ class WordPress extends EE_Site_Command {
 		$default_conf_data['include_wpsubdir_conf'] = $site_type === 'subdir';
 		$default_conf_data['include_redis_conf']    = $cache_type;
 		$default_conf_data['cache_host']            = $this->site_data['cache_host'];
+		$default_conf_data['document_root']         = $this->site_data['site_container_fs_path'];
 
 		return \EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/nginx/main.conf.mustache', $default_conf_data );
 	}
@@ -883,6 +912,9 @@ class WordPress extends EE_Site_Command {
 				}
 			}
 
+			if ( 'custom' === $this->site_data['site_ssl'] ) {
+				$this->custom_site_ssl();
+			}
 			$this->www_ssl_wrapper( [ 'nginx' ] );
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
@@ -957,10 +989,21 @@ class WordPress extends EE_Site_Command {
 
 		\EE::log( 'Downloading and configuring WordPress.' );
 
+		// Get site src path from container fs path.
+		$public_dir_path = str_replace( '/var/www/htdocs/', '', trailingslashit( $this->site_data['site_container_fs_path'] ) );
+		if ( ! empty( $public_dir_path ) ) {
+
+			$wp_cli_data = EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/wp-cli.yml.mustache', [ 'wp_path' => $public_dir_path ] );
+			$this->fs->dumpFile( $this->site_data['site_fs_path'] . '/app/htdocs/wp-cli.yml', $wp_cli_data );
+
+			EE::exec( sprintf( 'docker-compose exec --user=root php mkdir -p %s', $public_dir_path ) );
+		}
+
 		$chown_command = "docker-compose exec --user=root php chown -R www-data: /var/www/";
 		\EE::exec( $chown_command );
 
-		$core_download_command = "docker-compose exec --user='www-data' php wp core download --locale='$this->locale' $core_download_arguments";
+		$wp_download_path      = $this->site_data['site_container_fs_path'];
+		$core_download_command = "docker-compose exec --user='www-data' php wp core download --path=$wp_download_path --locale='$this->locale' $core_download_arguments";
 
 		if ( ! \EE::exec( $core_download_command ) ) {
 			\EE::error( 'Unable to download wp core.', false );
@@ -997,9 +1040,17 @@ class WordPress extends EE_Site_Command {
 			if ( ! \EE::exec( $wp_config_create_command ) ) {
 				throw new \Exception( sprintf( 'Couldn\'t connect to %s:%s or there was issue in `wp config create`. Please check logs.', $this->site_data['db_host'], $this->site_data['db_port'] ) );
 			}
-			$default_wp_config_path = $this->site_data['site_fs_path'] . '/app/htdocs/wp-config.php';
-			$new_wp_config_path     = $this->site_data['site_fs_path'] . '/app/wp-config.php';
-			$this->fs->rename( $default_wp_config_path, $new_wp_config_path );
+
+			$default_wp_config_path = sprintf( '%s/wp-config.php', $this->site_data['site_container_fs_path'] );
+			$level_above_path       = preg_replace( '/[^\/]+$/', '', $this->site_data['site_container_fs_path'] );
+			$new_wp_config_path     = sprintf( '%swp-config.php', $level_above_path );
+
+			$move_wp_config_command = sprintf( 'docker-compose exec php mv %1$s %2$s', $default_wp_config_path, $new_wp_config_path );
+			if ( ! EE::exec( $move_wp_config_command ) ) {
+				throw new \Exception( sprintf( 'Couldn\'t move wp-config.php from %1$s to %2$s', $default_wp_config_path, $new_wp_config_path ) );
+			}
+			EE::log( sprintf( 'Moved %1$s to %2$s successfully', $default_wp_config_path, $new_wp_config_path ) );
+
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
 		}
@@ -1183,8 +1234,8 @@ class WordPress extends EE_Site_Command {
 		// Get back to root dir.
 		chdir( $this->site_data['site_fs_path'] );
 
-		// Reset wp-content permission which may have been changed during git clone from host machine.
-		EE::exec( "docker-compose exec --user=root php chown -R www-data: /var/www/htdocs/wp-content" );
+		// Reset wp-content permission which may have been changed during git clone from host machine. Making it `/var/www/htdocs/` so that it accomodates the changes of `--public-dir` input if any.
+		EE::exec( "docker-compose exec --user=root php chown -R www-data: /var/www/htdocs/" );
 
 		\EE::log( "VIP Go environment setup completed." );
 	}
@@ -1196,28 +1247,29 @@ class WordPress extends EE_Site_Command {
 		$ssl = null;
 
 		$data = [
-			'site_url'             => $this->site_data['site_url'],
-			'site_type'            => $this->site_data['site_type'],
-			'app_admin_url'        => $this->site_data['app_admin_url'],
-			'app_admin_email'      => $this->site_data['app_admin_email'],
-			'app_mail'             => 'postfix',
-			'app_sub_type'         => $this->site_data['app_sub_type'],
-			'cache_nginx_browser'  => (int) $this->cache_type,
-			'cache_nginx_fullpage' => (int) $this->cache_type,
-			'cache_mysql_query'    => (int) $this->cache_type,
-			'cache_app_object'     => (int) $this->cache_type,
-			'cache_host'           => $this->site_data['cache_host'],
-			'site_fs_path'         => $this->site_data['site_fs_path'],
-			'db_name'              => $this->site_data['db_name'],
-			'db_user'              => $this->site_data['db_user'],
-			'db_host'              => $this->site_data['db_host'],
-			'db_port'              => isset( $this->site_data['db_port'] ) ? $this->site_data['db_port'] : '',
-			'db_password'          => $this->site_data['db_password'],
-			'db_root_password'     => $this->site_data['db_root_password'],
-			'site_ssl'             => $this->site_data['site_ssl'],
-			'site_ssl_wildcard'    => 'subdom' === $this->site_data['app_sub_type'] || $this->site_data['site_ssl_wildcard'] ? 1 : 0,
-			'php_version'          => $this->site_data['php_version'],
-			'created_on'           => date( 'Y-m-d H:i:s', time() ),
+			'site_url'               => $this->site_data['site_url'],
+			'site_type'              => $this->site_data['site_type'],
+			'app_admin_url'          => $this->site_data['app_admin_url'],
+			'app_admin_email'        => $this->site_data['app_admin_email'],
+			'app_mail'               => 'postfix',
+			'app_sub_type'           => $this->site_data['app_sub_type'],
+			'cache_nginx_browser'    => (int) $this->cache_type,
+			'cache_nginx_fullpage'   => (int) $this->cache_type,
+			'cache_mysql_query'      => (int) $this->cache_type,
+			'cache_app_object'       => (int) $this->cache_type,
+			'cache_host'             => $this->site_data['cache_host'],
+			'site_fs_path'           => $this->site_data['site_fs_path'],
+			'db_name'                => $this->site_data['db_name'],
+			'db_user'                => $this->site_data['db_user'],
+			'db_host'                => $this->site_data['db_host'],
+			'db_port'                => isset( $this->site_data['db_port'] ) ? $this->site_data['db_port'] : '',
+			'db_password'            => $this->site_data['db_password'],
+			'db_root_password'       => $this->site_data['db_root_password'],
+			'site_ssl'               => $this->site_data['site_ssl'],
+			'site_ssl_wildcard'      => 'subdom' === $this->site_data['app_sub_type'] || $this->site_data['site_ssl_wildcard'] ? 1 : 0,
+			'php_version'            => $this->site_data['php_version'],
+			'created_on'             => date( 'Y-m-d H:i:s', time() ),
+			'site_container_fs_path' => rtrim( $this->site_data['site_container_fs_path'], '/' ),
 		];
 
 		if ( ! $this->skip_install ) {
@@ -1251,7 +1303,7 @@ class WordPress extends EE_Site_Command {
 		parent::update_ssl( $assoc_args );
 		chdir( $this->site_data['site_fs_path'] );
 
-		EE::log( 'Running search-repalce.' );
+		EE::log( 'Running search-replace.' );
 		EE::log( 'Taking database backup before search-replace.' );
 		EE::exec( sprintf( 'docker-compose exec php wp db export %s.db', $this->site_data['site_url'] ) );
 
