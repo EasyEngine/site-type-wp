@@ -58,11 +58,6 @@ class WordPress extends EE_Site_Command {
 	private $force;
 
 	/**
-	 * @var Filesystem $fs Symfony Filesystem object.
-	 */
-	private $fs;
-
-	/**
 	 * @var string $vip_go_mu_plugins WordPress VIP Go mu-plugins repo.
 	 */
 	private $vip_go_mu_plugins = 'https://github.com/Automattic/vip-go-mu-plugins-built';
@@ -82,7 +77,6 @@ class WordPress extends EE_Site_Command {
 		parent::__construct();
 		$this->level  = 0;
 		$this->logger = \EE::get_file_logger()->withName( 'site_wp_command' );
-		$this->fs     = new Filesystem();
 
 		$this->site_data['site_type'] = 'wp';
 	}
@@ -193,7 +187,14 @@ class WordPress extends EE_Site_Command {
 	 *      - le
 	 *      - self
 	 *      - inherit
+	 *      - custom
 	 * ---
+	 *
+	 * [--ssl-key=<ssl-key-path>]
+	 * : Path to the SSL key file.
+	 *
+	 * [--ssl-crt=<ssl-crt-path>]
+	 * : Path to the SSL crt file.
 	 *
 	 * [--wildcard]
 	 * : Gets wildcard SSL .
@@ -232,6 +233,9 @@ class WordPress extends EE_Site_Command {
 	 *
 	 *     # Create WordPress site with custom source directory inside htdocs ( SITE_ROOT/app/htdocs/current )
 	 *     $ ee site create example.com --type=wp --public-dir=current
+	 *
+	 *     # Create WordPress site with custom ssl certs
+	 *     $ ee site create example.com --ssl=custom  --ssl-key='/path/to/example.com.key' --ssl-crt='/path/to/example.com.crt'
 	 *
 	 */
 	public function create( $args, $assoc_args ) {
@@ -284,7 +288,14 @@ class WordPress extends EE_Site_Command {
 		}
 
 		$this->site_data['site_container_fs_path'] = get_public_dir( $assoc_args );
-		$this->site_data['site_ssl']               = get_value_if_flag_isset( $assoc_args, 'ssl', [ 'le', 'self', 'inherit' ], 'le' );
+		$this->site_data['site_ssl']               = get_value_if_flag_isset( $assoc_args, 'ssl', [ 'le', 'self', 'inherit', 'custom' ], 'le' );
+		if ( 'custom' === $this->site_data['site_ssl'] ) {
+			try {
+				$this->validate_site_custom_ssl( get_flag_value( $assoc_args, 'ssl-key' ), get_flag_value( $assoc_args, 'ssl-crt' ) );
+			} catch ( \Exception $e ) {
+				$this->catch_clean( $e );
+			}
+		}
 
 		$supported_php_versions = [ 5.6, 7.2, 'latest' ];
 		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions ) ) {
@@ -907,6 +918,9 @@ class WordPress extends EE_Site_Command {
 				}
 			}
 
+			if ( 'custom' === $this->site_data['site_ssl'] ) {
+				$this->custom_site_ssl();
+			}
 			$this->www_ssl_wrapper( [ 'nginx' ] );
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
@@ -1301,7 +1315,7 @@ class WordPress extends EE_Site_Command {
 		parent::update_ssl( $assoc_args );
 		chdir( $this->site_data['site_fs_path'] );
 
-		EE::log( 'Running search-repalce.' );
+		EE::log( 'Running search-replace.' );
 		EE::log( 'Taking database backup before search-replace.' );
 		EE::exec( sprintf( 'docker-compose exec php wp db export %s.db', $this->site_data['site_url'] ) );
 
