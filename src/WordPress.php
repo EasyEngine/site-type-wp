@@ -638,7 +638,6 @@ class WordPress extends EE_Site_Command {
 					'path_to_symlink' => $this->site_data['site_fs_path'] . '/logs/php',
 					'container_path'  => '/var/log/php',
 				],
-
 			],
 			'postfix' => [
 				[
@@ -700,6 +699,14 @@ class WordPress extends EE_Site_Command {
 				\EE_DOCKER::create_volumes( $this->site_data['site_url'], $volume );
 			}
 		}
+
+		// Add newrelic volume later on as it is not required to be created. There is a global volume for it.
+		$volumes['php'][] = [
+			'name'            => 'newrelic_sock',
+			'path_to_symlink' => '',
+			'container_path'  => '/run/newrelic',
+			'skip_darwin'     => true,
+		];
 
 		$site_docker_yml = $this->site_data['site_fs_path'] . '/docker-compose.yml';
 
