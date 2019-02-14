@@ -96,6 +96,8 @@ class Site_WP_Docker {
 				[ 'name' => 'USER_ID' ],
 				[ 'name' => 'GROUP_ID' ],
 				[ 'name' => 'VIRTUAL_HOST' ],
+				[ 'name' => 'NEWRELIC_APPNAME=${VIRTUAL_HOST}' ],
+				[ 'name' => 'NEWRELIC_LICENSE_KEY' ],
 			],
 		];
 
@@ -228,6 +230,7 @@ class Site_WP_Docker {
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'data_postfix' ],
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'ssl_postfix' ],
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'config_postfix' ],
+				[ 'prefix' => GLOBAL_NEWRELIC_DAEMON, 'ext_vol_name' => 'newrelic_sock' ],
 			],
 		];
 
