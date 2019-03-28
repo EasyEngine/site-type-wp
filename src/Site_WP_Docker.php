@@ -63,7 +63,7 @@ class Site_WP_Docker {
 			$db['networks']     = $network_default;
 		}
 		// PHP configuration.
-		$php_image_key = ( '5.6' === $filters['php_version'] ? 'easyengine/php5.6' : 'easyengine/php' );
+		$php_image_key = ( 'latest' === $filters['php_version'] ? 'easyengine/php' : 'easyengine/php' . $filters['php_version'] );
 
 		$php['service_name'] = [ 'name' => 'php' ];
 		$php['image']        = [ 'name' => $php_image_key . ':' . $img_versions[ $php_image_key ] ];
