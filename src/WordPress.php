@@ -131,6 +131,7 @@ class WordPress extends EE_Site_Command {
 	 * default: latest
 	 * options:
 	 *	- 5.6
+	 *	- 7.0
 	 *	- 7.2
 	 *	- 7.3
 	 *	- latest
@@ -292,7 +293,7 @@ class WordPress extends EE_Site_Command {
 			}
 		}
 
-		$supported_php_versions = [ 5.6, 7.2, 7.3, 'latest' ];
+		$supported_php_versions = [ 5.6, 7.0, 7.2, 7.3, 'latest' ];
 		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions ) ) {
 			$old_version = $this->site_data['php_version'];
 			$floor       = (int) floor( $this->site_data['php_version'] );
