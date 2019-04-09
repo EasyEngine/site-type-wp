@@ -131,7 +131,9 @@ class WordPress extends EE_Site_Command {
 	 * default: latest
 	 * options:
 	 *	- 5.6
+	 *	- 7.0
 	 *	- 7.2
+	 *	- 7.3
 	 *	- latest
 	 * ---
 	 *
@@ -291,7 +293,7 @@ class WordPress extends EE_Site_Command {
 			}
 		}
 
-		$supported_php_versions = [ 5.6, 7.2, 'latest' ];
+		$supported_php_versions = [ 5.6, 7.0, 7.2, 7.3, 'latest' ];
 		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions ) ) {
 			$old_version = $this->site_data['php_version'];
 			$floor       = (int) floor( $this->site_data['php_version'] );
@@ -305,6 +307,8 @@ class WordPress extends EE_Site_Command {
 			}
 			\EE::confirm( sprintf( 'EEv4 does not support PHP %s. Continue with PHP %s?', $old_version, $this->site_data['php_version'] ), $assoc_args );
 		}
+
+		$this->site_data['php_version'] = ( 7.2 === (double) $this->site_data['php_version'] ) ? 'latest' : $this->site_data['php_version'];
 
 		if ( \EE\Utils\get_flag_value( $assoc_args, 'local-db' ) ) {
 			$this->site_data['db_host'] = 'db';
