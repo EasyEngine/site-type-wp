@@ -91,6 +91,12 @@ class WordPress extends EE_Site_Command {
 	 *
 	 * [--cache]
 	 * : Use redis cache for WordPress.
+	 * ---
+	 * options:
+	 *  - all
+	 *  - object
+	 *  - page
+	 * ---
 	 *
 	 * [--vip]
 	 * : Create WordPress VIP GO site using your vip repo which contains wp-content dir. Default it will use skeleton repo.
@@ -265,7 +271,7 @@ class WordPress extends EE_Site_Command {
 		}
 
 		$this->site_data['site_fs_path']       = WEBROOT . $this->site_data['site_url'];
-		$this->cache_type                      = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
+		$this->cache_type                      = get_value_if_flag_isset( $assoc_args, 'cache', [ 'all', 'object', 'page' ], 'all' );
 		$this->site_data['site_ssl_wildcard']  = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
 		$this->site_data['php_version']        = \EE\Utils\get_flag_value( $assoc_args, 'php', 'latest' );
 		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
@@ -368,10 +374,13 @@ class WordPress extends EE_Site_Command {
 		$redis_plugin_constant    = 'docker-compose exec --user=\'www-data\' php wp config set --type=variable redis_server "array(\'host\'=> \'' . $redis_host . '\',\'port\'=> 6379,)" --raw';
 		$activate_wp_redis_plugin = "docker-compose exec --user='www-data' php wp plugin install wp-redis --activate";
 		$enable_redis_cache       = "docker-compose exec --user='www-data' php wp redis enable";
+		$obj_cache_key_prefix     = $this->site_data['site_url'] . '_obj:';
+		$add_cache_key_salt       = "docker-compose exec --user='www-data' php wp config set WP_CACHE_KEY_SALT $obj_cache_key_prefix --add=true --type=constant";
 
 		$this->docker_compose_exec( $redis_plugin_constant, 'Unable to download or activate wp-redis plugin.' );
 		$this->docker_compose_exec( $activate_wp_redis_plugin, 'Unable to download or activate wp-redis plugin.' );
 		$this->docker_compose_exec( $enable_redis_cache, 'Unable to enable object cache' );
+		$this->docker_compose_exec( $add_cache_key_salt, 'Unable to set cache key salt' );
 	}
 
 	/**
@@ -381,7 +390,6 @@ class WordPress extends EE_Site_Command {
 		$activate_nginx_helper = 'docker-compose exec --user=\'www-data\' php wp plugin install nginx-helper --activate';
 		$nginx_helper_fail_msg = 'Unable to download or activate nginx-helper plugin properly.';
 		$page_cache_key_prefix = $this->site_data['site_url'] . '_page:';
-		$obj_cache_key_prefix  = $this->site_data['site_url'] . '_obj:';
 
 		$redis_host    = $this->site_data['cache_host'];
 		$wp_cli_params = ( 'wp' === $this->site_data['app_sub_type'] ) ? 'option update' : 'network meta update 1';
@@ -417,14 +425,12 @@ class WordPress extends EE_Site_Command {
 		$add_hostname_constant = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_HOSTNAME $redis_host --add=true --type=constant";
 		$add_port_constant     = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PORT 6379 --add=true --type=constant";
 		$add_prefix_constant   = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX $page_cache_key_prefix --add=true --type=constant";
-		$add_cache_key_salt    = "docker-compose exec --user='www-data' php wp config set WP_CACHE_KEY_SALT $obj_cache_key_prefix --add=true --type=constant";
 		$add_redis_maxttl      = "docker-compose exec --user='www-data' php wp config set WP_REDIS_MAXTTL 14400 --add=true --type=constant";
 		$add_plugin_data       = "docker-compose exec --user='www-data' php wp $wp_cli_params rt_wp_nginx_helper_options '$plugin_data' --format=json";
 
 		$this->docker_compose_exec( $add_hostname_constant, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $add_port_constant, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $add_prefix_constant, $nginx_helper_fail_msg );
-		$this->docker_compose_exec( $add_cache_key_salt, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $activate_nginx_helper, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $add_plugin_data, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $add_redis_maxttl, $nginx_helper_fail_msg );
@@ -933,8 +939,14 @@ class WordPress extends EE_Site_Command {
 
 		if ( ! empty( $this->cache_type ) ) {
 
-			$this->enable_object_cache();
-			$this->enable_page_cache();
+			if ( 'all' === $this->cache_type ) {
+				$this->enable_object_cache();
+				$this->enable_page_cache();
+			} elseif ( 'object' === $this->cache_type ) {
+				$this->enable_object_cache();
+			} elseif ( 'page' === $this->cache_type ) {
+				$this->enable_page_cache();
+			}
 
 			if ( $this->is_vip ) {
 				EE::warning( 'Nginx-helper and wp-redis plugin is installed to enable cache. Please add it in your .gitignore to avoid it from git diff and commit' );
