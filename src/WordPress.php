@@ -548,12 +548,9 @@ class WordPress extends EE_Site_Command {
 			'group_id'      => $process_user['gid'],
 		];
 
-		$php_ini_data = [
-			'admin_email' => $this->site_data['app_admin_email'],
-		];
 
 		$env_content     = \EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/.env.mustache', $env_data );
-		$php_ini_content = \EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/php-fpm/php.ini.mustache', $php_ini_data );
+		$php_ini_content = file_get_contents( SITE_WP_TEMPLATE_ROOT . '/config/php-fpm/php.ini.mustache' );
 
 		try {
 			$this->dump_docker_compose_yml( [ 'nohttps' => true ] );
