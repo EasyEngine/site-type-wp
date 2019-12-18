@@ -126,7 +126,7 @@ class WordPress extends EE_Site_Command {
 	 * : Set custom source directory for site inside htdocs.
 	 *
 	 * [--php=<php-version>]
-	 * : PHP version for site. Currently only supports PHP 5.6 and latest.
+	 * : PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4 and latest.
 	 * ---
 	 * default: latest
 	 * options:
@@ -134,6 +134,7 @@ class WordPress extends EE_Site_Command {
 	 *	- 7.0
 	 *	- 7.2
 	 *	- 7.3
+	 *	- 7.4
 	 *	- latest
 	 * ---
 	 *
@@ -293,14 +294,14 @@ class WordPress extends EE_Site_Command {
 			}
 		}
 
-		$supported_php_versions = [ 5.6, 7.0, 7.2, 7.3, 'latest' ];
+		$supported_php_versions = [ 5.6, 7.0, 7.2, 7.3, 7.4, 'latest' ];
 		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions ) ) {
 			$old_version = $this->site_data['php_version'];
 			$floor       = (int) floor( $this->site_data['php_version'] );
 			if ( 5 === $floor ) {
 				$this->site_data['php_version'] = 5.6;
 			} elseif ( 7 === $floor ) {
-				$this->site_data['php_version'] = 7.2;
+				$this->site_data['php_version'] = 7.4;
 				$old_version .= ' yet';
 			} else {
 				EE::error( 'Unsupported PHP version: ' . $this->site_data['php_version'] );
@@ -308,7 +309,7 @@ class WordPress extends EE_Site_Command {
 			\EE::confirm( sprintf( 'EEv4 does not support PHP %s. Continue with PHP %s?', $old_version, $this->site_data['php_version'] ), $assoc_args );
 		}
 
-		$this->site_data['php_version'] = ( 7.2 === (double) $this->site_data['php_version'] ) ? 'latest' : $this->site_data['php_version'];
+		$this->site_data['php_version'] = ( 7.4 === (double) $this->site_data['php_version'] ) ? 'latest' : $this->site_data['php_version'];
 
 		if ( \EE\Utils\get_flag_value( $assoc_args, 'local-db' ) ) {
 			$this->site_data['db_host'] = 'db';
@@ -547,12 +548,9 @@ class WordPress extends EE_Site_Command {
 			'group_id'      => $process_user['gid'],
 		];
 
-		$php_ini_data = [
-			'admin_email' => $this->site_data['app_admin_email'],
-		];
-
+		$custom_ini      = '5.6' === (string) $this->site_data['php_version'] ? 'php.ini-56.mustache' : 'php.ini.mustache';
 		$env_content     = \EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/.env.mustache', $env_data );
-		$php_ini_content = \EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/config/php-fpm/php.ini.mustache', $php_ini_data );
+		$php_ini_content = file_get_contents( SITE_WP_TEMPLATE_ROOT . '/config/php-fpm/' . $custom_ini );
 
 		try {
 			$this->dump_docker_compose_yml( [ 'nohttps' => true ] );
