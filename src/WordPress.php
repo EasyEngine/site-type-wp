@@ -98,11 +98,11 @@ class WordPress extends EE_Site_Command {
 	 * default: https://github.com/Automattic/vip-go-skeleton.git
 	 * ---
 	 *
-	 * [--mu=<subdir>]
-	 * : WordPress sub-dir Multi-site.
+	 * [--mu=<subdir|subdom>]
+	 * : Specify WordPress Multi-site type.
 	 *
-	 * [--mu=<subdom>]
-	 * : WordPress sub-domain Multi-site.
+	 * [--alias-domains=<domains>]
+	 * : Comma separated list of alias domains for the site.
 	 *
 	 * [--title=<title>]
 	 * : Title of your site.
@@ -267,7 +267,8 @@ class WordPress extends EE_Site_Command {
 
 		$this->site_data['site_fs_path']       = WEBROOT . $this->site_data['site_url'];
 		$this->cache_type                      = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
-		$this->site_data['site_ssl_wildcard']  = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
+		$wildcard_flag                         = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
+		$this->site_data['site_ssl_wildcard']  = 'subdom' === $this->site_data['app_sub_type'] || $wildcard_flag ? true : false;
 		$this->site_data['php_version']        = \EE\Utils\get_flag_value( $assoc_args, 'php', 'latest' );
 		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
 		$this->site_data['app_admin_username'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', \EE\Utils\random_name_generator() );
@@ -277,6 +278,7 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['db_port']            = '3306';
 		$this->site_data['db_user']            = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
 		$this->site_data['db_password']        = \EE\Utils\get_flag_value( $assoc_args, 'dbpass', \EE\Utils\random_password() );
+		$alias_domains                         = \EE\Utils\get_flag_value( $assoc_args, 'alias-domains', '' );
 		$this->locale                          = \EE\Utils\get_flag_value( $assoc_args, 'locale', \EE::get_config( 'locale' ) );
 		$local_cache                           = \EE\Utils\get_flag_value( $assoc_args, 'with-local-redis' );
 		$this->site_data['cache_host']         = '';
@@ -293,6 +295,19 @@ class WordPress extends EE_Site_Command {
 				$this->catch_clean( $e );
 			}
 		}
+
+		$this->site_data['alias_domains'] = ( 'subdom' === $this->site_data['app_sub_type'] ) ? $this->site_data['site_url'] . ',*.' . $this->site_data['site_url'] : $this->site_data['site_url'];
+		$this->site_data['alias_domains'] .= ',';
+		if ( ! empty( $alias_domains ) ) {
+			$comma_seprated_domains = explode( ',', $alias_domains );
+			foreach ( $comma_seprated_domains as $domain ) {
+				$trimmed_domain = trim( $domain );
+				if ( filter_var( $trimmed_domain, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME ) ) {
+					$this->site_data['alias_domains'] .= $trimmed_domain . ',';
+				}
+			}
+		}
+		$this->site_data['alias_domains'] = substr( $this->site_data['alias_domains'], 0, - 1 );
 
 		$supported_php_versions = [ 5.6, 7.0, 7.2, 7.3, 7.4, 'latest' ];
 		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions ) ) {
@@ -521,13 +536,14 @@ class WordPress extends EE_Site_Command {
 		$site_conf_env           = $this->site_data['site_fs_path'] . '/.env';
 		$site_nginx_default_conf = $site_conf_dir . '/nginx/conf.d/main.conf';
 		$site_php_ini            = $site_conf_dir . '/php/php/conf.d/custom.ini';
-		$server_name             = ( 'subdom' === $this->site_data['app_sub_type'] ) ? $this->site_data['site_url'] . ' *.' . $this->site_data['site_url'] : $this->site_data['site_url'];
 		$custom_conf_dest        = $site_conf_dir . '/nginx/custom/user.conf';
 		$custom_conf_source      = SITE_WP_TEMPLATE_ROOT . '/config/nginx/user.conf.mustache';
 		$process_user            = posix_getpwuid( posix_geteuid() );
 
 		\EE::log( 'Creating WordPress site ' . $this->site_data['site_url'] );
 		\EE::log( 'Copying configuration files.' );
+
+		$server_name = implode( ' ', explode( ',', $this->site_data['alias_domains'] ) );
 
 		$default_conf_content = $this->generate_default_conf( $this->site_data['app_sub_type'], $this->cache_type, $server_name );
 		$local                = ( 'db' === $this->site_data['db_host'] ) ? true : false;
@@ -712,14 +728,15 @@ class WordPress extends EE_Site_Command {
 
 		$site_docker_yml = $this->site_data['site_fs_path'] . '/docker-compose.yml';
 
-		$filter                = [];
-		$filter[]              = $this->site_data['app_sub_type'];
-		$filter[]              = $this->site_data['cache_host'];
-		$filter[]              = $this->site_data['db_host'];
-		$filter['is_ssl']      = $this->site_data['site_ssl'];
-		$filter['site_prefix'] = \EE_DOCKER::get_docker_style_prefix( $this->site_data['site_url'] );
-		$filter['php_version'] = ( string ) $this->site_data['php_version'];
-		$site_docker           = new Site_WP_Docker();
+		$filter                  = [];
+		$filter[]                = $this->site_data['app_sub_type'];
+		$filter[]                = $this->site_data['cache_host'];
+		$filter[]                = $this->site_data['db_host'];
+		$filter['is_ssl']        = $this->site_data['site_ssl'];
+		$filter['site_prefix']   = \EE_DOCKER::get_docker_style_prefix( $this->site_data['site_url'] );
+		$filter['php_version']   = ( string ) $this->site_data['php_version'];
+		$filter['alias_domains'] = implode( ',', array_diff( explode( ',', $this->site_data['alias_domains'] ), [ $this->site_data['site_url'] ] ) );
+		$site_docker             = new Site_WP_Docker();
 
 		foreach ( $additional_filters as $key => $addon_filter ) {
 			$filter[ $key ] = $addon_filter;
@@ -1262,6 +1279,7 @@ class WordPress extends EE_Site_Command {
 			'app_admin_email'        => $this->site_data['app_admin_email'],
 			'app_mail'               => 'postfix',
 			'app_sub_type'           => $this->site_data['app_sub_type'],
+			'alias_domains'          => $this->site_data['alias_domains'],
 			'cache_nginx_browser'    => (int) $this->cache_type,
 			'cache_nginx_fullpage'   => (int) $this->cache_type,
 			'cache_mysql_query'      => (int) $this->cache_type,
