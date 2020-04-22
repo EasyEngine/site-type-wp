@@ -244,11 +244,13 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['site_url'] = strtolower( \EE\Utils\remove_trailing_slash( $args[0] ) );
 
 		$mu = \EE\Utils\get_flag_value( $assoc_args, 'mu' );
+		$this->site_data['app_sub_type'] = $mu ?? 'wp';
+
+		EE::log( 'Starting site creation.' );
 
 		if ( isset( $assoc_args['mu'] ) && ! in_array( $mu, [ 'subdom', 'subdir' ], true ) ) {
 			\EE::error( "Unrecognized multi-site parameter: $mu. Only `--mu=subdom` and `--mu=subdir` are supported." );
 		}
-		$this->site_data['app_sub_type'] = $mu ?? 'wp';
 
 		$vip_wp_content_repo = \EE\Utils\get_flag_value( $assoc_args, 'vip' );
 
@@ -271,7 +273,7 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['php_version']        = \EE\Utils\get_flag_value( $assoc_args, 'php', 'latest' );
 		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
 		$this->site_data['app_admin_username'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', \EE\Utils\random_name_generator() );
-		$this->site_data['app_admin_password'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', \EE\Utils\random_password() );
+		$this->site_data['app_admin_password'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', '' );
 		$this->site_data['db_name']            = \EE\Utils\get_flag_value( $assoc_args, 'dbname', str_replace( [ '.', '-' ], '_', $this->site_data['site_url'] ) );
 		$this->site_data['db_host']            = \EE\Utils\get_flag_value( $assoc_args, 'dbhost', GLOBAL_DB );
 		$this->site_data['db_port']            = '3306';
@@ -282,6 +284,31 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['cache_host']         = '';
 		if ( $this->cache_type ) {
 			$this->site_data['cache_host'] = $local_cache ? 'redis' : 'global-redis';
+		}
+
+		if ( empty( $this->site_data['app_admin_password'] ) ) {
+			$this->site_data['app_admin_password'] = \EE\Utils\random_password( 18 );
+		} else {
+			$pass_error_msg = [];
+			if ( strlen( $this->site_data['app_admin_password'] ) < 8 ) {
+				$pass_error_msg[] = "Password too short! Must be at least 8 characters long.";
+			}
+
+			if ( ! preg_match( "#[0-9]+#", $this->site_data['app_admin_password'] ) ) {
+				$pass_error_msg[] = "Password must include at least one number!";
+			}
+
+			if ( ! preg_match( "#[a-zA-Z]+#", $this->site_data['app_admin_password'] ) ) {
+				$pass_error_msg[] = "Password must include at least one letter!";
+			}
+
+			if ( ! empty( $pass_error_msg ) ) {
+				$final_error_msg = 'Issues found in input password: `' . $this->site_data['app_admin_password'] . "`\n\t";
+				foreach ( $pass_error_msg as $err_msg ) {
+					$final_error_msg .= '* ' . $err_msg . "\n\t";
+				}
+				EE::error( $final_error_msg );
+			}
 		}
 
 		$this->site_data['site_container_fs_path'] = get_public_dir( $assoc_args );
