@@ -507,6 +507,10 @@ class WordPress extends EE_Site_Command {
 			$info[] = [ 'WordPress Username', $this->site_data['app_admin_username'] ];
 			$info[] = [ 'WordPress Password', $this->site_data['app_admin_password'] ];
 		}
+		$alias_domains            = implode( ',', array_diff( explode( ',', $this->site_data['alias_domains'] ), [ $this->site_data['site_url'] ] ) );
+		$info_alias_domains_value = empty( $alias_domains ) ? 'None' : $alias_domains;
+		$info[]                   = [ 'Alias Domains', $info_alias_domains_value ];
+
 		$info[] = [ 'DB Host', $this->site_data['db_host'] ];
 		if ( ! empty( $this->site_data['db_root_password'] ) ) {
 			$info[] = [ 'DB Root Password', $this->site_data['db_root_password'] ];
