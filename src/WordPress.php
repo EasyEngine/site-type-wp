@@ -194,7 +194,22 @@ class WordPress extends EE_Site_Command {
 	 * : Path to the SSL crt file.
 	 *
 	 * [--wildcard]
-	 * : Gets wildcard SSL .
+	 * : Gets wildcard SSL.
+	 * 
+	 * [--proxy-cache=<on-or-off>]
+	 * : Enable or disable proxy cache on site.
+	 * ---
+	 * default: off
+	 * options:
+	 *  - on
+	 *  - off
+	 * ---
+	 *
+	 * [--proxy-cache-max-size=<size-in-m-or-g>]
+	 * : Max size for proxy-cache.
+	 *
+	 * [--proxy-cache-max-time=<time-in-s-or-m>]
+	 * : Max time for proxy cache to last.
 	 *
 	 * [--yes]
 	 * : Do not prompt for confirmation.
@@ -279,9 +294,13 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['db_port']            = '3306';
 		$this->site_data['db_user']            = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
 		$this->site_data['db_password']        = \EE\Utils\get_flag_value( $assoc_args, 'dbpass', \EE\Utils\random_password() );
+		$this->site_data['proxy-cache']        = \EE\Utils\get_flag_value( $assoc_args, 'proxy-cache' );
 		$this->locale                          = \EE\Utils\get_flag_value( $assoc_args, 'locale', \EE::get_config( 'locale' ) );
 		$local_cache                           = \EE\Utils\get_flag_value( $assoc_args, 'with-local-redis' );
 		$this->site_data['cache_host']         = '';
+		if ( 'on' === $this->site_data['proxy-cache'] ) {
+			$this->cache_type = true;
+		}
 		if ( $this->cache_type ) {
 			$this->site_data['cache_host'] = $local_cache ? 'redis' : 'global-redis';
 		}
@@ -962,6 +981,10 @@ class WordPress extends EE_Site_Command {
 			$this->enable_object_cache();
 			$this->enable_page_cache();
 
+			if ( 'on' === $this->site_data['proxy-cache'] ) {
+				$this->update_proxy_cache( [], $assoc_args, true );
+			}
+
 			if ( $this->is_vip ) {
 				EE::warning( 'Nginx-helper and wp-redis plugin is installed to enable cache. Please add it in your .gitignore to avoid it from git diff and commit' );
 				EE::log( 'Note: Redis cache is setup for this site so it will use wp-redis object cache but not the memcache which is mentioned in VIP development doc from mu-plugin drop-ins.' );
@@ -1295,6 +1318,7 @@ class WordPress extends EE_Site_Command {
 			'cache_mysql_query'      => (int) $this->cache_type,
 			'cache_app_object'       => (int) $this->cache_type,
 			'cache_host'             => $this->site_data['cache_host'],
+			'proxy_cache'            => $this->site_data['proxy-cache'],
 			'site_fs_path'           => $this->site_data['site_fs_path'],
 			'db_name'                => $this->site_data['db_name'],
 			'db_user'                => $this->site_data['db_user'],
