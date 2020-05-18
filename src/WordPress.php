@@ -194,7 +194,22 @@ class WordPress extends EE_Site_Command {
 	 * : Path to the SSL crt file.
 	 *
 	 * [--wildcard]
-	 * : Gets wildcard SSL .
+	 * : Gets wildcard SSL.
+	 * 
+	 * [--proxy-cache=<on-or-off>]
+	 * : Enable or disable proxy cache on site.
+	 * ---
+	 * default: off
+	 * options:
+	 *  - on
+	 *  - off
+	 * ---
+	 *
+	 * [--proxy-cache-max-size=<size-in-m-or-g>]
+	 * : Max size for proxy-cache.
+	 *
+	 * [--proxy-cache-max-time=<time-in-s-or-m>]
+	 * : Max time for proxy cache to last.
 	 *
 	 * [--yes]
 	 * : Do not prompt for confirmation.
@@ -244,11 +259,13 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['site_url'] = strtolower( \EE\Utils\remove_trailing_slash( $args[0] ) );
 
 		$mu = \EE\Utils\get_flag_value( $assoc_args, 'mu' );
+		$this->site_data['app_sub_type'] = $mu ?? 'wp';
+
+		EE::log( 'Starting site creation.' );
 
 		if ( isset( $assoc_args['mu'] ) && ! in_array( $mu, [ 'subdom', 'subdir' ], true ) ) {
 			\EE::error( "Unrecognized multi-site parameter: $mu. Only `--mu=subdom` and `--mu=subdir` are supported." );
 		}
-		$this->site_data['app_sub_type'] = $mu ?? 'wp';
 
 		$vip_wp_content_repo = \EE\Utils\get_flag_value( $assoc_args, 'vip' );
 
@@ -272,18 +289,47 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['php_version']        = \EE\Utils\get_flag_value( $assoc_args, 'php', 'latest' );
 		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
 		$this->site_data['app_admin_username'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', \EE\Utils\random_name_generator() );
-		$this->site_data['app_admin_password'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', \EE\Utils\random_password() );
+		$this->site_data['app_admin_password'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', '' );
 		$this->site_data['db_name']            = \EE\Utils\get_flag_value( $assoc_args, 'dbname', str_replace( [ '.', '-' ], '_', $this->site_data['site_url'] ) );
 		$this->site_data['db_host']            = \EE\Utils\get_flag_value( $assoc_args, 'dbhost', GLOBAL_DB );
 		$this->site_data['db_port']            = '3306';
 		$this->site_data['db_user']            = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
 		$this->site_data['db_password']        = \EE\Utils\get_flag_value( $assoc_args, 'dbpass', \EE\Utils\random_password() );
 		$alias_domains                         = \EE\Utils\get_flag_value( $assoc_args, 'alias-domains', '' );
+		$this->site_data['proxy-cache']        = \EE\Utils\get_flag_value( $assoc_args, 'proxy-cache' );
 		$this->locale                          = \EE\Utils\get_flag_value( $assoc_args, 'locale', \EE::get_config( 'locale' ) );
 		$local_cache                           = \EE\Utils\get_flag_value( $assoc_args, 'with-local-redis' );
 		$this->site_data['cache_host']         = '';
+		if ( 'on' === $this->site_data['proxy-cache'] ) {
+			$this->cache_type = true;
+		}
 		if ( $this->cache_type ) {
 			$this->site_data['cache_host'] = $local_cache ? 'redis' : 'global-redis';
+		}
+
+		if ( empty( $this->site_data['app_admin_password'] ) ) {
+			$this->site_data['app_admin_password'] = \EE\Utils\random_password( 18 );
+		} else {
+			$pass_error_msg = [];
+			if ( strlen( $this->site_data['app_admin_password'] ) < 8 ) {
+				$pass_error_msg[] = "Password too short! Must be at least 8 characters long.";
+			}
+
+			if ( ! preg_match( "#[0-9]+#", $this->site_data['app_admin_password'] ) ) {
+				$pass_error_msg[] = "Password must include at least one number!";
+			}
+
+			if ( ! preg_match( "#[a-zA-Z]+#", $this->site_data['app_admin_password'] ) ) {
+				$pass_error_msg[] = "Password must include at least one letter!";
+			}
+
+			if ( ! empty( $pass_error_msg ) ) {
+				$final_error_msg = 'Issues found in input password: `' . $this->site_data['app_admin_password'] . "`\n\t";
+				foreach ( $pass_error_msg as $err_msg ) {
+					$final_error_msg .= '* ' . $err_msg . "\n\t";
+				}
+				EE::error( $final_error_msg );
+			}
 		}
 
 		$this->site_data['site_container_fs_path'] = get_public_dir( $assoc_args );
@@ -360,7 +406,8 @@ class WordPress extends EE_Site_Command {
 			$this->site_data['db_port'] = empty( $arg_host_port[1] ) ? '3306' : $arg_host_port[1];
 		}
 
-		$this->site_data['app_admin_email'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-email', strtolower( 'admin@' . $this->site_data['site_url'] ) );
+		$default_email                      = \EE::get_runner()->config['wp-mail'] ?? 'admin@' . $this->site_data['site_url'];
+		$this->site_data['app_admin_email'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-email', strtolower( $default_email ) );
 		$this->skip_install                 = \EE\Utils\get_flag_value( $assoc_args, 'skip-install' );
 		$this->skip_status_check            = \EE\Utils\get_flag_value( $assoc_args, 'skip-status-check' );
 		$this->force                        = \EE\Utils\get_flag_value( $assoc_args, 'force' );
@@ -955,6 +1002,10 @@ class WordPress extends EE_Site_Command {
 			$this->enable_object_cache();
 			$this->enable_page_cache();
 
+			if ( 'on' === $this->site_data['proxy-cache'] ) {
+				$this->update_proxy_cache( [], $assoc_args, true );
+			}
+
 			if ( $this->is_vip ) {
 				EE::warning( 'Nginx-helper and wp-redis plugin is installed to enable cache. Please add it in your .gitignore to avoid it from git diff and commit' );
 				EE::log( 'Note: Redis cache is setup for this site so it will use wp-redis object cache but not the memcache which is mentioned in VIP development doc from mu-plugin drop-ins.' );
@@ -1289,6 +1340,7 @@ class WordPress extends EE_Site_Command {
 			'cache_mysql_query'      => (int) $this->cache_type,
 			'cache_app_object'       => (int) $this->cache_type,
 			'cache_host'             => $this->site_data['cache_host'],
+			'proxy_cache'            => $this->site_data['proxy-cache'],
 			'site_fs_path'           => $this->site_data['site_fs_path'],
 			'db_name'                => $this->site_data['db_name'],
 			'db_user'                => $this->site_data['db_user'],
