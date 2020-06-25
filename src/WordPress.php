@@ -102,7 +102,7 @@ class WordPress extends EE_Site_Command {
 	 * : Specify WordPress Multi-site type.
 	 *
 	 * [--alias-domains=<domains>]
-	 * : Comma separated list of alias domains for the site.
+	 * : Comma separated list of alias domains for the site. Currently only supported in WordPress subdom MU site.
 	 *
 	 * [--title=<title>]
 	 * : Title of your site.
@@ -305,6 +305,10 @@ class WordPress extends EE_Site_Command {
 		}
 		if ( $this->cache_type ) {
 			$this->site_data['cache_host'] = $local_cache ? 'redis' : 'global-redis';
+		}
+
+		if ( ! empty( $alias_domains ) && $mu !== 'subdom' ) {
+			\EE::error( "Currently alias domains is only supported with WordPress subdomain MU, i.e., with `--mu=subdom` sites." );
 		}
 
 		if ( empty( $this->site_data['app_admin_password'] ) ) {
@@ -554,9 +558,12 @@ class WordPress extends EE_Site_Command {
 			$info[] = [ 'WordPress Username', $this->site_data['app_admin_username'] ];
 			$info[] = [ 'WordPress Password', $this->site_data['app_admin_password'] ];
 		}
-		$alias_domains            = implode( ',', array_diff( explode( ',', $this->site_data['alias_domains'] ), [ $this->site_data['site_url'] ] ) );
-		$info_alias_domains_value = empty( $alias_domains ) ? 'None' : $alias_domains;
-		$info[]                   = [ 'Alias Domains', $info_alias_domains_value ];
+		if ( 'subdom' === $this->site_data['app_sub_type'] ) {
+
+			$alias_domains            = implode( ',', array_diff( explode( ',', $this->site_data['alias_domains'] ), [ $this->site_data['site_url'] ] ) );
+			$info_alias_domains_value = empty( $alias_domains ) ? 'None' : $alias_domains;
+			$info[]                   = [ 'Alias Domains', $info_alias_domains_value ];
+		}
 
 		$info[] = [ 'DB Host', $this->site_data['db_host'] ];
 		if ( ! empty( $this->site_data['db_root_password'] ) ) {
