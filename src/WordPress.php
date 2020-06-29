@@ -196,7 +196,7 @@ class WordPress extends EE_Site_Command {
 	 *
 	 * [--wildcard]
 	 * : Gets wildcard SSL.
-	 * 
+	 *
 	 * [--proxy-cache=<on-or-off>]
 	 * : Enable or disable proxy cache on site.
 	 * ---
@@ -285,7 +285,7 @@ class WordPress extends EE_Site_Command {
 
 		$parent_site = get_parent_of_alias( $this->site_data['site_url'] );
 
-		if ( ! empty($parent_site) ) {
+		if ( ! empty( $parent_site ) ) {
 			\EE::error( sprintf( "Site %1\$s already exists as an alias domain for site: %2\$s. Please delete it from alias domains of %2\$s if you want to create an independent site for it.", $this->site_data['site_url'], $parent_site ) );
 		}
 
