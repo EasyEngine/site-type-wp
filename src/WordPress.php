@@ -586,7 +586,7 @@ class WordPress extends EE_Site_Command {
 			$info[] = [ 'SSL Wildcard', $this->site_data['site_ssl_wildcard'] ? 'Yes' : 'No' ];
 		}
 		$info[] = [ 'Cache', $this->cache_type ? 'Enabled' : 'None' ];
-		$info[] = [ 'Proxy Cache', $this->site_data['proxy_cache'] ? 'Enabled' : 'Off' ];
+		$info[] = [ 'Proxy Cache', 'on' === $this->site_data['proxy_cache'] ? 'Enabled' : 'Off' ];
 
 		\EE\Utils\format_table( $info );
 
