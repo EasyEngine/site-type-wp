@@ -303,11 +303,11 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['db_user']            = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
 		$this->site_data['db_password']        = \EE\Utils\get_flag_value( $assoc_args, 'dbpass', \EE\Utils\random_password() );
 		$alias_domains                         = \EE\Utils\get_flag_value( $assoc_args, 'alias-domains', '' );
-		$this->site_data['proxy-cache']        = \EE\Utils\get_flag_value( $assoc_args, 'proxy-cache' );
+		$this->site_data['proxy_cache']        = \EE\Utils\get_flag_value( $assoc_args, 'proxy-cache' );
 		$this->locale                          = \EE\Utils\get_flag_value( $assoc_args, 'locale', \EE::get_config( 'locale' ) );
 		$local_cache                           = \EE\Utils\get_flag_value( $assoc_args, 'with-local-redis' );
 		$this->site_data['cache_host']         = '';
-		if ( 'on' === $this->site_data['proxy-cache'] ) {
+		if ( 'on' === $this->site_data['proxy_cache'] ) {
 			$this->cache_type = true;
 		}
 		if ( $this->cache_type ) {
@@ -1017,7 +1017,7 @@ class WordPress extends EE_Site_Command {
 			$this->enable_object_cache();
 			$this->enable_page_cache();
 
-			if ( 'on' === $this->site_data['proxy-cache'] ) {
+			if ( 'on' === $this->site_data['proxy_cache'] ) {
 				$this->update_proxy_cache( [], $assoc_args, true );
 			}
 
@@ -1355,7 +1355,7 @@ class WordPress extends EE_Site_Command {
 			'cache_mysql_query'      => (int) $this->cache_type,
 			'cache_app_object'       => (int) $this->cache_type,
 			'cache_host'             => $this->site_data['cache_host'],
-			'proxy_cache'            => $this->site_data['proxy-cache'],
+			'proxy_cache'            => $this->site_data['proxy_cache'],
 			'site_fs_path'           => $this->site_data['site_fs_path'],
 			'db_name'                => $this->site_data['db_name'],
 			'db_user'                => $this->site_data['db_user'],
