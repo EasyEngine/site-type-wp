@@ -250,6 +250,9 @@ class WordPress extends EE_Site_Command {
 	 *     # Create WordPress site with custom ssl certs
 	 *     $ ee site create example.com --ssl=custom  --ssl-key='/path/to/example.com.key' --ssl-crt='/path/to/example.com.crt'
 	 *
+	 *     # Create subodm MU WordPress site with alias domains and ssl
+	 *     $ ee site create example.com --type=wp --mu=subdom --alias-domains='a.com,*.a.com,b.com' --ssl=le
+	 *
 	 */
 	public function create( $args, $assoc_args ) {
 
