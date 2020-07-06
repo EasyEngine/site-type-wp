@@ -126,7 +126,12 @@ class Site_WP_Docker {
 		$nginx['depends_on']['dependency'][] = [ 'name' => 'php' ];
 		$nginx['restart']                    = $restart_default;
 
-		$v_host = in_array( 'subdom', $filters, true ) ? 'VIRTUAL_HOST=${VIRTUAL_HOST},*.${VIRTUAL_HOST}' : 'VIRTUAL_HOST';
+		if ( ! empty( $filters['alias_domains'] ) ) {
+			$v_host = in_array( 'subdom', $filters, true ) ? 'VIRTUAL_HOST=${VIRTUAL_HOST},*.${VIRTUAL_HOST}' : 'VIRTUAL_HOST=${VIRTUAL_HOST}';
+			$v_host .= ',' . $filters['alias_domains'];
+		} else {
+			$v_host = in_array( 'subdom', $filters, true ) ? 'VIRTUAL_HOST=${VIRTUAL_HOST},*.${VIRTUAL_HOST}' : 'VIRTUAL_HOST';
+		}
 
 		$nginx['environment'] = [
 			'env' => [
@@ -135,6 +140,10 @@ class Site_WP_Docker {
 				[ 'name' => 'HSTS=off' ],
 			],
 		];
+
+		if ( ! empty( $filters['alias_domains'] ) ) {
+			$nginx['environment']['env'][] = [ 'name' => 'CERT_NAME=${VIRTUAL_HOST}' ];
+		}
 
 		$ssl_policy = get_ssl_policy();
 		if ( ! empty( $filters['nohttps'] ) && $filters['nohttps'] ) {

@@ -11,6 +11,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use function EE\Site\Utils\auto_site_name;
 use function EE\Site\Utils\get_site_info;
 use function EE\Site\Utils\get_public_dir;
+use function EE\Site\Utils\get_parent_of_alias;
 use function EE\Utils\get_flag_value;
 use function EE\Utils\trailingslashit;
 use function EE\Utils\get_value_if_flag_isset;
@@ -98,11 +99,11 @@ class WordPress extends EE_Site_Command {
 	 * default: https://github.com/Automattic/vip-go-skeleton.git
 	 * ---
 	 *
-	 * [--mu=<subdir>]
-	 * : WordPress sub-dir Multi-site.
+	 * [--mu=<subdir|subdom>]
+	 * : Specify WordPress Multi-site type.
 	 *
-	 * [--mu=<subdom>]
-	 * : WordPress sub-domain Multi-site.
+	 * [--alias-domains=<domains>]
+	 * : Comma separated list of alias domains for the site. Currently only supported in WordPress subdom MU site.
 	 *
 	 * [--title=<title>]
 	 * : Title of your site.
@@ -194,7 +195,22 @@ class WordPress extends EE_Site_Command {
 	 * : Path to the SSL crt file.
 	 *
 	 * [--wildcard]
-	 * : Gets wildcard SSL .
+	 * : Gets wildcard SSL.
+	 *
+	 * [--proxy-cache=<on-or-off>]
+	 * : Enable or disable proxy cache on site.
+	 * ---
+	 * default: off
+	 * options:
+	 *  - on
+	 *  - off
+	 * ---
+	 *
+	 * [--proxy-cache-max-size=<size-in-m-or-g>]
+	 * : Max size for proxy-cache.
+	 *
+	 * [--proxy-cache-max-time=<time-in-s-or-m>]
+	 * : Max time for proxy cache to last.
 	 *
 	 * [--yes]
 	 * : Do not prompt for confirmation.
@@ -234,6 +250,9 @@ class WordPress extends EE_Site_Command {
 	 *     # Create WordPress site with custom ssl certs
 	 *     $ ee site create example.com --ssl=custom  --ssl-key='/path/to/example.com.key' --ssl-crt='/path/to/example.com.crt'
 	 *
+	 *     # Create subodm MU WordPress site with alias domains and ssl
+	 *     $ ee site create example.com --type=wp --mu=subdom --alias-domains='a.com,*.a.com,b.com' --ssl=le
+	 *
 	 */
 	public function create( $args, $assoc_args ) {
 
@@ -244,11 +263,13 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['site_url'] = strtolower( \EE\Utils\remove_trailing_slash( $args[0] ) );
 
 		$mu = \EE\Utils\get_flag_value( $assoc_args, 'mu' );
+		$this->site_data['app_sub_type'] = $mu ?? 'wp';
+
+		EE::log( 'Starting site creation.' );
 
 		if ( isset( $assoc_args['mu'] ) && ! in_array( $mu, [ 'subdom', 'subdir' ], true ) ) {
 			\EE::error( "Unrecognized multi-site parameter: $mu. Only `--mu=subdom` and `--mu=subdir` are supported." );
 		}
-		$this->site_data['app_sub_type'] = $mu ?? 'wp';
 
 		$vip_wp_content_repo = \EE\Utils\get_flag_value( $assoc_args, 'vip' );
 
@@ -265,23 +286,64 @@ class WordPress extends EE_Site_Command {
 			\EE::error( sprintf( "Site %1\$s already exists. If you want to re-create it please delete the older one using:\n`ee site delete %1\$s`", $this->site_data['site_url'] ) );
 		}
 
+		$parent_site = get_parent_of_alias( $this->site_data['site_url'] );
+
+		if ( ! empty( $parent_site ) ) {
+			\EE::error( sprintf( "Site %1\$s already exists as an alias domain for site: %2\$s. Please delete it from alias domains of %2\$s if you want to create an independent site for it.", $this->site_data['site_url'], $parent_site ) );
+		}
+
 		$this->site_data['site_fs_path']       = WEBROOT . $this->site_data['site_url'];
 		$this->cache_type                      = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
-		$this->site_data['site_ssl_wildcard']  = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
+		$wildcard_flag                         = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
+		$this->site_data['site_ssl_wildcard']  = 'subdom' === $this->site_data['app_sub_type'] || $wildcard_flag ? true : false;
 		$this->site_data['php_version']        = \EE\Utils\get_flag_value( $assoc_args, 'php', 'latest' );
 		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
 		$this->site_data['app_admin_username'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', \EE\Utils\random_name_generator() );
-		$this->site_data['app_admin_password'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', \EE\Utils\random_password() );
+		$this->site_data['app_admin_password'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', '' );
 		$this->site_data['db_name']            = \EE\Utils\get_flag_value( $assoc_args, 'dbname', str_replace( [ '.', '-' ], '_', $this->site_data['site_url'] ) );
 		$this->site_data['db_host']            = \EE\Utils\get_flag_value( $assoc_args, 'dbhost', GLOBAL_DB );
 		$this->site_data['db_port']            = '3306';
 		$this->site_data['db_user']            = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
 		$this->site_data['db_password']        = \EE\Utils\get_flag_value( $assoc_args, 'dbpass', \EE\Utils\random_password() );
+		$alias_domains                         = \EE\Utils\get_flag_value( $assoc_args, 'alias-domains', '' );
+		$this->site_data['proxy_cache']        = \EE\Utils\get_flag_value( $assoc_args, 'proxy-cache' );
 		$this->locale                          = \EE\Utils\get_flag_value( $assoc_args, 'locale', \EE::get_config( 'locale' ) );
 		$local_cache                           = \EE\Utils\get_flag_value( $assoc_args, 'with-local-redis' );
 		$this->site_data['cache_host']         = '';
+		if ( 'on' === $this->site_data['proxy_cache'] ) {
+			$this->cache_type = true;
+		}
 		if ( $this->cache_type ) {
 			$this->site_data['cache_host'] = $local_cache ? 'redis' : 'global-redis';
+		}
+
+		if ( ! empty( $alias_domains ) && $mu !== 'subdom' ) {
+			\EE::error( "Currently alias domains is only supported with WordPress subdomain MU, i.e., with `--mu=subdom` sites." );
+		}
+
+		if ( empty( $this->site_data['app_admin_password'] ) ) {
+			$this->site_data['app_admin_password'] = \EE\Utils\random_password( 18 );
+		} else {
+			$pass_error_msg = [];
+			if ( strlen( $this->site_data['app_admin_password'] ) < 8 ) {
+				$pass_error_msg[] = "Password too short! Must be at least 8 characters long.";
+			}
+
+			if ( ! preg_match( "#[0-9]+#", $this->site_data['app_admin_password'] ) ) {
+				$pass_error_msg[] = "Password must include at least one number!";
+			}
+
+			if ( ! preg_match( "#[a-zA-Z]+#", $this->site_data['app_admin_password'] ) ) {
+				$pass_error_msg[] = "Password must include at least one letter!";
+			}
+
+			if ( ! empty( $pass_error_msg ) ) {
+				$final_error_msg = 'Issues found in input password: `' . $this->site_data['app_admin_password'] . "`\n\t";
+				foreach ( $pass_error_msg as $err_msg ) {
+					$final_error_msg .= '* ' . $err_msg . "\n\t";
+				}
+				EE::error( $final_error_msg );
+			}
 		}
 
 		$this->site_data['site_container_fs_path'] = get_public_dir( $assoc_args );
@@ -293,6 +355,19 @@ class WordPress extends EE_Site_Command {
 				$this->catch_clean( $e );
 			}
 		}
+
+		$this->site_data['alias_domains'] = ( 'subdom' === $this->site_data['app_sub_type'] ) ? $this->site_data['site_url'] . ',*.' . $this->site_data['site_url'] : $this->site_data['site_url'];
+		$this->site_data['alias_domains'] .= ',';
+		if ( ! empty( $alias_domains ) ) {
+			$comma_seprated_domains = explode( ',', $alias_domains );
+			foreach ( $comma_seprated_domains as $domain ) {
+				$trimmed_domain = trim( $domain );
+				if ( filter_var( $trimmed_domain, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME ) ) {
+					$this->site_data['alias_domains'] .= $trimmed_domain . ',';
+				}
+			}
+		}
+		$this->site_data['alias_domains'] = substr( $this->site_data['alias_domains'], 0, - 1 );
 
 		$supported_php_versions = [ 5.6, 7.0, 7.2, 7.3, 7.4, 'latest' ];
 		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions ) ) {
@@ -345,7 +420,8 @@ class WordPress extends EE_Site_Command {
 			$this->site_data['db_port'] = empty( $arg_host_port[1] ) ? '3306' : $arg_host_port[1];
 		}
 
-		$this->site_data['app_admin_email'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-email', strtolower( 'admin@' . $this->site_data['site_url'] ) );
+		$default_email                      = \EE::get_runner()->config['wp-mail'] ?? 'admin@' . $this->site_data['site_url'];
+		$this->site_data['app_admin_email'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-email', strtolower( $default_email ) );
 		$this->skip_install                 = \EE\Utils\get_flag_value( $assoc_args, 'skip-install' );
 		$this->skip_status_check            = \EE\Utils\get_flag_value( $assoc_args, 'skip-status-check' );
 		$this->force                        = \EE\Utils\get_flag_value( $assoc_args, 'force' );
@@ -492,6 +568,13 @@ class WordPress extends EE_Site_Command {
 			$info[] = [ 'WordPress Username', $this->site_data['app_admin_username'] ];
 			$info[] = [ 'WordPress Password', $this->site_data['app_admin_password'] ];
 		}
+		if ( 'subdom' === $this->site_data['app_sub_type'] ) {
+
+			$alias_domains            = implode( ',', array_diff( explode( ',', $this->site_data['alias_domains'] ), [ $this->site_data['site_url'] ] ) );
+			$info_alias_domains_value = empty( $alias_domains ) ? 'None' : $alias_domains;
+			$info[]                   = [ 'Alias Domains', $info_alias_domains_value ];
+		}
+
 		$info[] = [ 'DB Host', $this->site_data['db_host'] ];
 		if ( ! empty( $this->site_data['db_root_password'] ) ) {
 			$info[] = [ 'DB Root Password', $this->site_data['db_root_password'] ];
@@ -506,6 +589,7 @@ class WordPress extends EE_Site_Command {
 			$info[] = [ 'SSL Wildcard', $this->site_data['site_ssl_wildcard'] ? 'Yes' : 'No' ];
 		}
 		$info[] = [ 'Cache', $this->cache_type ? 'Enabled' : 'None' ];
+		$info[] = [ 'Proxy Cache', 'on' === $this->site_data['proxy_cache'] ? 'Enabled' : 'Off' ];
 
 		\EE\Utils\format_table( $info );
 
@@ -521,13 +605,14 @@ class WordPress extends EE_Site_Command {
 		$site_conf_env           = $this->site_data['site_fs_path'] . '/.env';
 		$site_nginx_default_conf = $site_conf_dir . '/nginx/conf.d/main.conf';
 		$site_php_ini            = $site_conf_dir . '/php/php/conf.d/custom.ini';
-		$server_name             = ( 'subdom' === $this->site_data['app_sub_type'] ) ? $this->site_data['site_url'] . ' *.' . $this->site_data['site_url'] : $this->site_data['site_url'];
 		$custom_conf_dest        = $site_conf_dir . '/nginx/custom/user.conf';
 		$custom_conf_source      = SITE_WP_TEMPLATE_ROOT . '/config/nginx/user.conf.mustache';
 		$process_user            = posix_getpwuid( posix_geteuid() );
 
 		\EE::log( 'Creating WordPress site ' . $this->site_data['site_url'] );
 		\EE::log( 'Copying configuration files.' );
+
+		$server_name = implode( ' ', explode( ',', $this->site_data['alias_domains'] ) );
 
 		$default_conf_content = $this->generate_default_conf( $this->site_data['app_sub_type'], $this->cache_type, $server_name );
 		$local                = ( 'db' === $this->site_data['db_host'] ) ? true : false;
@@ -712,14 +797,15 @@ class WordPress extends EE_Site_Command {
 
 		$site_docker_yml = $this->site_data['site_fs_path'] . '/docker-compose.yml';
 
-		$filter                = [];
-		$filter[]              = $this->site_data['app_sub_type'];
-		$filter[]              = $this->site_data['cache_host'];
-		$filter[]              = $this->site_data['db_host'];
-		$filter['is_ssl']      = $this->site_data['site_ssl'];
-		$filter['site_prefix'] = \EE_DOCKER::get_docker_style_prefix( $this->site_data['site_url'] );
-		$filter['php_version'] = ( string ) $this->site_data['php_version'];
-		$site_docker           = new Site_WP_Docker();
+		$filter                  = [];
+		$filter[]                = $this->site_data['app_sub_type'];
+		$filter[]                = $this->site_data['cache_host'];
+		$filter[]                = $this->site_data['db_host'];
+		$filter['is_ssl']        = $this->site_data['site_ssl'];
+		$filter['site_prefix']   = \EE_DOCKER::get_docker_style_prefix( $this->site_data['site_url'] );
+		$filter['php_version']   = ( string ) $this->site_data['php_version'];
+		$filter['alias_domains'] = implode( ',', array_diff( explode( ',', $this->site_data['alias_domains'] ), [ $this->site_data['site_url'] ] ) );
+		$site_docker             = new Site_WP_Docker();
 
 		foreach ( $additional_filters as $key => $addon_filter ) {
 			$filter[ $key ] = $addon_filter;
@@ -933,6 +1019,10 @@ class WordPress extends EE_Site_Command {
 
 			$this->enable_object_cache();
 			$this->enable_page_cache();
+
+			if ( 'on' === $this->site_data['proxy_cache'] ) {
+				$this->update_proxy_cache( [], $assoc_args, true );
+			}
 
 			if ( $this->is_vip ) {
 				EE::warning( 'Nginx-helper and wp-redis plugin is installed to enable cache. Please add it in your .gitignore to avoid it from git diff and commit' );
@@ -1262,11 +1352,13 @@ class WordPress extends EE_Site_Command {
 			'app_admin_email'        => $this->site_data['app_admin_email'],
 			'app_mail'               => 'postfix',
 			'app_sub_type'           => $this->site_data['app_sub_type'],
+			'alias_domains'          => $this->site_data['alias_domains'],
 			'cache_nginx_browser'    => (int) $this->cache_type,
 			'cache_nginx_fullpage'   => (int) $this->cache_type,
 			'cache_mysql_query'      => (int) $this->cache_type,
 			'cache_app_object'       => (int) $this->cache_type,
 			'cache_host'             => $this->site_data['cache_host'],
+			'proxy_cache'            => $this->site_data['proxy_cache'],
 			'site_fs_path'           => $this->site_data['site_fs_path'],
 			'db_name'                => $this->site_data['db_name'],
 			'db_user'                => $this->site_data['db_user'],
