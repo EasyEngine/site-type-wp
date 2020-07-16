@@ -4,6 +4,7 @@ namespace EE\Site\Type;
 
 use function EE\Utils\mustache_render;
 use function EE\Site\Utils\get_ssl_policy;
+use function EE\Site\Utils\get_subnet_ip;
 
 class Site_WP_Docker {
 
@@ -28,6 +29,8 @@ class Site_WP_Docker {
 			],
 		];
 
+		$ip = get_subnet_ip();
+
 		$network = [
 			'networks_labels' => [
 				'label' => [
@@ -35,6 +38,7 @@ class Site_WP_Docker {
 					[ 'name' => 'io.easyengine.site=${VIRTUAL_HOST}' ],
 				],
 			],
+			'subnet_ip' => $ip,
 		];
 
 		if ( in_array( 'db', $filters, true ) ) {
