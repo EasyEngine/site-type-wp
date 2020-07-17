@@ -3,6 +3,7 @@
 namespace EE\Site\Type;
 
 use function EE\Utils\mustache_render;
+use function EE\Site\Utils\get_ssl_policy;
 
 class Site_WP_Docker {
 
@@ -24,6 +25,15 @@ class Site_WP_Docker {
 		$network_default = [
 			'net' => [
 				[ 'name' => 'site-network' ],
+			],
+		];
+
+		$network = [
+			'networks_labels' => [
+				'label' => [
+					[ 'name' => 'org.label-schema.vendor=EasyEngine' ],
+					[ 'name' => 'io.easyengine.site=${VIRTUAL_HOST}' ],
+				],
 			],
 		];
 
@@ -53,7 +63,7 @@ class Site_WP_Docker {
 			$db['networks']     = $network_default;
 		}
 		// PHP configuration.
-		$php_image_key = ( 5.6 === $filters['php_version'] ? 'easyengine/php5.6' : 'easyengine/php' );
+		$php_image_key = ( 'latest' === $filters['php_version'] ? 'easyengine/php' : 'easyengine/php' . $filters['php_version'] );
 
 		$php['service_name'] = [ 'name' => 'php' ];
 		$php['image']        = [ 'name' => $php_image_key . ':' . $img_versions[ $php_image_key ] ];
@@ -86,6 +96,8 @@ class Site_WP_Docker {
 				[ 'name' => 'USER_ID' ],
 				[ 'name' => 'GROUP_ID' ],
 				[ 'name' => 'VIRTUAL_HOST' ],
+				[ 'name' => 'NEWRELIC_APPNAME=${VIRTUAL_HOST}' ],
+				[ 'name' => 'NEWRELIC_LICENSE_KEY' ],
 			],
 		];
 
@@ -102,8 +114,10 @@ class Site_WP_Docker {
 			],
 		];
 
-		if ( in_array( GLOBAL_DB, $filters, true ) ) {
-			$php['networks']['net'][] = [ 'name' => 'global-backend-network' ];
+		$global_network = array_intersect( [ GLOBAL_DB, GLOBAL_REDIS ], $filters );
+		if ( ! empty ( $global_network ) ) {
+			$php['networks']['net'][]          = [ 'name' => 'global-backend-network' ];
+			$network['enable_backend_network'] = true;
 		}
 
 		// nginx configuration.
@@ -112,7 +126,12 @@ class Site_WP_Docker {
 		$nginx['depends_on']['dependency'][] = [ 'name' => 'php' ];
 		$nginx['restart']                    = $restart_default;
 
-		$v_host = in_array( 'subdom', $filters, true ) ? 'VIRTUAL_HOST=${VIRTUAL_HOST},*.${VIRTUAL_HOST}' : 'VIRTUAL_HOST';
+		if ( ! empty( $filters['alias_domains'] ) ) {
+			$v_host = in_array( 'subdom', $filters, true ) ? 'VIRTUAL_HOST=${VIRTUAL_HOST},*.${VIRTUAL_HOST}' : 'VIRTUAL_HOST=${VIRTUAL_HOST}';
+			$v_host .= ',' . $filters['alias_domains'];
+		} else {
+			$v_host = in_array( 'subdom', $filters, true ) ? 'VIRTUAL_HOST=${VIRTUAL_HOST},*.${VIRTUAL_HOST}' : 'VIRTUAL_HOST';
+		}
 
 		$nginx['environment'] = [
 			'env' => [
@@ -121,9 +140,18 @@ class Site_WP_Docker {
 				[ 'name' => 'HSTS=off' ],
 			],
 		];
+
+		if ( ! empty( $filters['alias_domains'] ) ) {
+			$nginx['environment']['env'][] = [ 'name' => 'CERT_NAME=${VIRTUAL_HOST}' ];
+		}
+
+		$ssl_policy = get_ssl_policy();
 		if ( ! empty( $filters['nohttps'] ) && $filters['nohttps'] ) {
 			$nginx['environment']['env'][] = [ 'name' => 'HTTPS_METHOD=nohttps' ];
+		} elseif ( 'Mozilla-Modern' !== $ssl_policy ) {
+			$nginx['environment']['env'][] = [ 'name' => "SSL_POLICY=$ssl_policy" ];
 		}
+
 		$nginx['volumes']  = [
 			'vol' => \EE_DOCKER::get_mounting_volume_array( $volumes['nginx'] ),
 		];
@@ -139,7 +167,8 @@ class Site_WP_Docker {
 			],
 		];
 		if ( in_array( GLOBAL_REDIS, $filters, true ) ) {
-			$nginx['networks']['net'][] = [ 'name' => 'global-backend-network' ];
+			$nginx['networks']['net'][]        = [ 'name' => 'global-backend-network' ];
+			$network['enable_backend_network'] = true;
 		}
 
 		// mailhog configuration.
@@ -210,15 +239,7 @@ class Site_WP_Docker {
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'data_postfix' ],
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'ssl_postfix' ],
 				[ 'prefix' => $filters['site_prefix'], 'ext_vol_name' => 'config_postfix' ],
-			],
-		];
-
-		$network = [
-			'networks_labels' => [
-				'label' => [
-					[ 'name' => 'org.label-schema.vendor=EasyEngine' ],
-					[ 'name' => 'io.easyengine.site=${VIRTUAL_HOST}' ],
-				],
+				[ 'prefix' => GLOBAL_NEWRELIC_DAEMON, 'ext_vol_name' => 'newrelic_sock' ],
 			],
 		];
 

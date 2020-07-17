@@ -16,7 +16,7 @@ This package implements the following commands:
 Runs the standard WordPress Site installation.
 
 ~~~
-ee site create --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [--title=<title>] [--admin-user=<admin-user>] [--admin-pass=<admin-pass>] [--admin-email=<admin-email>] [--dbname=<dbname>] [--dbuser=<dbuser>] [--dbpass=<dbpass>] [--dbhost=<dbhost>] [--dbprefix=<dbprefix>] [--dbcharset=<dbcharset>] [--dbcollate=<dbcollate>] [--skip-check] [--version=<version>] [--skip-content] [--skip-install] [--skip-status-check] [--ssl=<value>] [--wildcard] [--force]
+ee site create --type=wp <site-name> [--cache] [--vip] [--mu=<subdir>] [--mu=<subdom>] [--title=<title>] [--admin-user=<admin-user>] [--admin-pass=<admin-pass>] [--admin-email=<admin-email>] [--local-db] [--with-local-redis] [--php=<php-version>] [--dbname=<dbname>] [--dbuser=<dbuser>] [--dbpass=<dbpass>] [--dbhost=<dbhost>] [--dbprefix=<dbprefix>] [--dbcharset=<dbcharset>] [--dbcollate=<dbcollate>] [--skip-check] [--version=<version>] [--skip-content] [--skip-install] [--skip-status-check] [--ssl=<value>] [--wildcard] [--yes] [--force]
 ~~~
 
 **OPTIONS**
@@ -26,6 +26,12 @@ ee site create --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [
 
 	[--cache]
 		Use redis cache for WordPress.
+
+	[--vip]
+		Create WordPress VIP GO site using your vip repo which contains wp-content dir. Default it will use skeleton repo.
+		---
+		default: https://github.com/Automattic/vip-go-skeleton.git
+		---
 
 	[--mu=<subdir>]
 		WordPress sub-dir Multi-site.
@@ -45,11 +51,24 @@ ee site create --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [
 	[--admin-email=<admin-email>]
 		E-Mail of the administrator.
 
+	[--local-db]
+		Create separate db container instead of using global db.
+
+	[--with-local-redis]
+		Enable cache with local redis container.
+
+	[--php=<php-version>]
+		PHP version for site. Currently only supports PHP 5.6 and latest.
+		---
+		default: latest
+		options:
+			- 5.6
+			- 7.2
+			- latest
+		---
+
 	[--dbname=<dbname>]
 		Set the database name.
-		---
-		default: wordpress
-		---
 
 	[--dbuser=<dbuser>]
 		Set the database user.
@@ -59,9 +78,6 @@ ee site create --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [
 
 	[--dbhost=<dbhost>]
 		Set the database host. Pass value only when remote dbhost is required.
-		---
-		default: db
-		---
 
 	[--dbprefix=<dbprefix>]
 		Set the database table prefix.
@@ -69,7 +85,7 @@ ee site create --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [
 	[--dbcharset=<dbcharset>]
 		Set the database charset.
 		---
-		default: utf8
+		default: utf8mb4
 		---
 
 	[--dbcollate=<dbcollate>]
@@ -96,6 +112,9 @@ ee site create --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [
 	[--wildcard]
 		Gets wildcard SSL .
 
+	[--yes]
+		Do not prompt for confirmation.
+
 	[--force]
 		Resets the remote database if it is not empty.
 
@@ -115,6 +134,9 @@ ee site create --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [
 
     # Create WordPress site with wildcard ssl
     $ ee site create example.com --type=wp --ssl=le --wildcard
+
+    # Create WordPress site with self signed certificate
+    $ ee site create example.com --type=wp --ssl=self
 
     # Create WordPress site with remote database
     $ ee site create example.com --type=wp --dbhost=localhost --dbuser=username --dbpass=password
@@ -147,12 +169,42 @@ ee site delete <site-name> [--yes]
 
 
 
+### ee site update
+
+Supports updating and upgrading site.
+
+~~~
+ee site update [<site-name>] [--ssl=<ssl>] [--wildcard]
+~~~
+
+	[<site-name>]
+		Name of the site.
+
+	[--ssl=<ssl>]
+		Enable ssl on site
+
+	[--wildcard]
+		Enable wildcard SSL on site.
+
+**EXAMPLES**
+
+    # Add SSL to non-ssl site
+    $ ee site update example.com --ssl=le
+
+    # Add SSL to non-ssl site
+    $ ee site update example.com --ssl=le --wildcard
+
+    # Add self-signed SSL to non-ssl site
+    $ ee site update example.com --ssl=self
+
+
+
 ### ee site info --type=wp
 
 Runs the standard WordPress Site installation.
 
 ~~~
-ee site info --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [--title=<title>] [--admin-user=<admin-user>] [--admin-pass=<admin-pass>] [--admin-email=<admin-email>] [--dbname=<dbname>] [--dbuser=<dbuser>] [--dbpass=<dbpass>] [--dbhost=<dbhost>] [--dbprefix=<dbprefix>] [--dbcharset=<dbcharset>] [--dbcollate=<dbcollate>] [--skip-check] [--version=<version>] [--skip-content] [--skip-install] [--skip-status-check] [--ssl=<value>] [--wildcard] [--force]
+ee site info --type=wp <site-name> [--cache] [--vip] [--mu=<subdir>] [--mu=<subdom>] [--title=<title>] [--admin-user=<admin-user>] [--admin-pass=<admin-pass>] [--admin-email=<admin-email>] [--local-db] [--with-local-redis] [--php=<php-version>] [--dbname=<dbname>] [--dbuser=<dbuser>] [--dbpass=<dbpass>] [--dbhost=<dbhost>] [--dbprefix=<dbprefix>] [--dbcharset=<dbcharset>] [--dbcollate=<dbcollate>] [--skip-check] [--version=<version>] [--skip-content] [--skip-install] [--skip-status-check] [--ssl=<value>] [--wildcard] [--yes] [--force]
 ~~~
 
 **OPTIONS**
@@ -162,6 +214,12 @@ ee site info --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [--
 
 	[--cache]
 		Use redis cache for WordPress.
+
+	[--vip]
+		Create WordPress VIP GO site using your vip repo which contains wp-content dir. Default it will use skeleton repo.
+		---
+		default: https://github.com/Automattic/vip-go-skeleton.git
+		---
 
 	[--mu=<subdir>]
 		WordPress sub-dir Multi-site.
@@ -181,11 +239,24 @@ ee site info --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [--
 	[--admin-email=<admin-email>]
 		E-Mail of the administrator.
 
+	[--local-db]
+		Create separate db container instead of using global db.
+
+	[--with-local-redis]
+		Enable cache with local redis container.
+
+	[--php=<php-version>]
+		PHP version for site. Currently only supports PHP 5.6 and latest.
+		---
+		default: latest
+		options:
+			- 5.6
+			- 7.2
+			- latest
+		---
+
 	[--dbname=<dbname>]
 		Set the database name.
-		---
-		default: wordpress
-		---
 
 	[--dbuser=<dbuser>]
 		Set the database user.
@@ -195,9 +266,6 @@ ee site info --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [--
 
 	[--dbhost=<dbhost>]
 		Set the database host. Pass value only when remote dbhost is required.
-		---
-		default: db
-		---
 
 	[--dbprefix=<dbprefix>]
 		Set the database table prefix.
@@ -205,7 +273,7 @@ ee site info --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [--
 	[--dbcharset=<dbcharset>]
 		Set the database charset.
 		---
-		default: utf8
+		default: utf8mb4
 		---
 
 	[--dbcollate=<dbcollate>]
@@ -232,6 +300,9 @@ ee site info --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [--
 	[--wildcard]
 		Gets wildcard SSL .
 
+	[--yes]
+		Do not prompt for confirmation.
+
 	[--force]
 		Resets the remote database if it is not empty.
 
@@ -252,6 +323,9 @@ ee site info --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [--
     # Create WordPress site with wildcard ssl
     $ ee site create example.com --type=wp --ssl=le --wildcard
 
+    # Create WordPress site with self signed certificate
+    $ ee site create example.com --type=wp --ssl=self
+
     # Create WordPress site with remote database
     $ ee site create example.com --type=wp --dbhost=localhost --dbuser=username --dbpass=password
 
@@ -265,7 +339,7 @@ ee site info --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [--
 Enables a website. It will start the docker containers of the website if they are stopped.
 
 ~~~
-ee site enable [<site-name>] [--force]
+ee site enable [<site-name>] [--force] [--verify]
 ~~~
 
 **OPTIONS**
@@ -274,12 +348,22 @@ ee site enable [<site-name>] [--force]
 		Name of website to be enabled.
 
 	[--force]
-		Force execution of site up.
+		Force execution of site enable.
+
+	[--verify]
+		Verify if required global services are working.
 
 **EXAMPLES**
 
     # Enable site
     $ ee site enable example.com
+
+    # Enable site with verification of dependent global services. (Note: This takes longer time to enable the
+    site.)
+    $ ee site enable example.com --verify
+
+    # Force enable a site.
+    $ ee site enable example.com --force
 
 
 
@@ -392,7 +476,7 @@ abstract list
 Runs the standard WordPress Site installation.
 
 ~~~
-ee site reload --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [--title=<title>] [--admin-user=<admin-user>] [--admin-pass=<admin-pass>] [--admin-email=<admin-email>] [--dbname=<dbname>] [--dbuser=<dbuser>] [--dbpass=<dbpass>] [--dbhost=<dbhost>] [--dbprefix=<dbprefix>] [--dbcharset=<dbcharset>] [--dbcollate=<dbcollate>] [--skip-check] [--version=<version>] [--skip-content] [--skip-install] [--skip-status-check] [--ssl=<value>] [--wildcard] [--force]
+ee site reload --type=wp <site-name> [--cache] [--vip] [--mu=<subdir>] [--mu=<subdom>] [--title=<title>] [--admin-user=<admin-user>] [--admin-pass=<admin-pass>] [--admin-email=<admin-email>] [--local-db] [--with-local-redis] [--php=<php-version>] [--dbname=<dbname>] [--dbuser=<dbuser>] [--dbpass=<dbpass>] [--dbhost=<dbhost>] [--dbprefix=<dbprefix>] [--dbcharset=<dbcharset>] [--dbcollate=<dbcollate>] [--skip-check] [--version=<version>] [--skip-content] [--skip-install] [--skip-status-check] [--ssl=<value>] [--wildcard] [--yes] [--force]
 ~~~
 
 **OPTIONS**
@@ -402,6 +486,12 @@ ee site reload --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [
 
 	[--cache]
 		Use redis cache for WordPress.
+
+	[--vip]
+		Create WordPress VIP GO site using your vip repo which contains wp-content dir. Default it will use skeleton repo.
+		---
+		default: https://github.com/Automattic/vip-go-skeleton.git
+		---
 
 	[--mu=<subdir>]
 		WordPress sub-dir Multi-site.
@@ -421,11 +511,24 @@ ee site reload --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [
 	[--admin-email=<admin-email>]
 		E-Mail of the administrator.
 
+	[--local-db]
+		Create separate db container instead of using global db.
+
+	[--with-local-redis]
+		Enable cache with local redis container.
+
+	[--php=<php-version>]
+		PHP version for site. Currently only supports PHP 5.6 and latest.
+		---
+		default: latest
+		options:
+			- 5.6
+			- 7.2
+			- latest
+		---
+
 	[--dbname=<dbname>]
 		Set the database name.
-		---
-		default: wordpress
-		---
 
 	[--dbuser=<dbuser>]
 		Set the database user.
@@ -435,9 +538,6 @@ ee site reload --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [
 
 	[--dbhost=<dbhost>]
 		Set the database host. Pass value only when remote dbhost is required.
-		---
-		default: db
-		---
 
 	[--dbprefix=<dbprefix>]
 		Set the database table prefix.
@@ -445,7 +545,7 @@ ee site reload --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [
 	[--dbcharset=<dbcharset>]
 		Set the database charset.
 		---
-		default: utf8
+		default: utf8mb4
 		---
 
 	[--dbcollate=<dbcollate>]
@@ -472,6 +572,9 @@ ee site reload --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [
 	[--wildcard]
 		Gets wildcard SSL .
 
+	[--yes]
+		Do not prompt for confirmation.
+
 	[--force]
 		Resets the remote database if it is not empty.
 
@@ -491,6 +594,9 @@ ee site reload --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [
 
     # Create WordPress site with wildcard ssl
     $ ee site create example.com --type=wp --ssl=le --wildcard
+
+    # Create WordPress site with self signed certificate
+    $ ee site create example.com --type=wp --ssl=self
 
     # Create WordPress site with remote database
     $ ee site create example.com --type=wp --dbhost=localhost --dbuser=username --dbpass=password
@@ -505,7 +611,7 @@ ee site reload --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [
 Runs the standard WordPress Site installation.
 
 ~~~
-ee site restart --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] [--title=<title>] [--admin-user=<admin-user>] [--admin-pass=<admin-pass>] [--admin-email=<admin-email>] [--dbname=<dbname>] [--dbuser=<dbuser>] [--dbpass=<dbpass>] [--dbhost=<dbhost>] [--dbprefix=<dbprefix>] [--dbcharset=<dbcharset>] [--dbcollate=<dbcollate>] [--skip-check] [--version=<version>] [--skip-content] [--skip-install] [--skip-status-check] [--ssl=<value>] [--wildcard] [--force]
+ee site restart --type=wp <site-name> [--cache] [--vip] [--mu=<subdir>] [--mu=<subdom>] [--title=<title>] [--admin-user=<admin-user>] [--admin-pass=<admin-pass>] [--admin-email=<admin-email>] [--local-db] [--with-local-redis] [--php=<php-version>] [--dbname=<dbname>] [--dbuser=<dbuser>] [--dbpass=<dbpass>] [--dbhost=<dbhost>] [--dbprefix=<dbprefix>] [--dbcharset=<dbcharset>] [--dbcollate=<dbcollate>] [--skip-check] [--version=<version>] [--skip-content] [--skip-install] [--skip-status-check] [--ssl=<value>] [--wildcard] [--yes] [--force]
 ~~~
 
 **OPTIONS**
@@ -515,6 +621,12 @@ ee site restart --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] 
 
 	[--cache]
 		Use redis cache for WordPress.
+
+	[--vip]
+		Create WordPress VIP GO site using your vip repo which contains wp-content dir. Default it will use skeleton repo.
+		---
+		default: https://github.com/Automattic/vip-go-skeleton.git
+		---
 
 	[--mu=<subdir>]
 		WordPress sub-dir Multi-site.
@@ -534,11 +646,24 @@ ee site restart --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] 
 	[--admin-email=<admin-email>]
 		E-Mail of the administrator.
 
+	[--local-db]
+		Create separate db container instead of using global db.
+
+	[--with-local-redis]
+		Enable cache with local redis container.
+
+	[--php=<php-version>]
+		PHP version for site. Currently only supports PHP 5.6 and latest.
+		---
+		default: latest
+		options:
+			- 5.6
+			- 7.2
+			- latest
+		---
+
 	[--dbname=<dbname>]
 		Set the database name.
-		---
-		default: wordpress
-		---
 
 	[--dbuser=<dbuser>]
 		Set the database user.
@@ -548,9 +673,6 @@ ee site restart --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] 
 
 	[--dbhost=<dbhost>]
 		Set the database host. Pass value only when remote dbhost is required.
-		---
-		default: db
-		---
 
 	[--dbprefix=<dbprefix>]
 		Set the database table prefix.
@@ -558,7 +680,7 @@ ee site restart --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] 
 	[--dbcharset=<dbcharset>]
 		Set the database charset.
 		---
-		default: utf8
+		default: utf8mb4
 		---
 
 	[--dbcollate=<dbcollate>]
@@ -585,6 +707,9 @@ ee site restart --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] 
 	[--wildcard]
 		Gets wildcard SSL .
 
+	[--yes]
+		Do not prompt for confirmation.
+
 	[--force]
 		Resets the remote database if it is not empty.
 
@@ -605,18 +730,87 @@ ee site restart --type=wp <site-name> [--cache] [--mu=<subdir>] [--mu=<subdom>] 
     # Create WordPress site with wildcard ssl
     $ ee site create example.com --type=wp --ssl=le --wildcard
 
+    # Create WordPress site with self signed certificate
+    $ ee site create example.com --type=wp --ssl=self
+
     # Create WordPress site with remote database
     $ ee site create example.com --type=wp --dbhost=localhost --dbuser=username --dbpass=password
 
     # Create WordPress site with custom site title, locale, admin user, admin email and admin password
     $ ee site create example.com --type=wp --title=easyengine  --locale=nl_NL --admin-email=easyengine@example.com --admin-user=easyengine --admin-pass=easyengine
 
+
+
+### ee site share
+
+Share a site online using ngrok.
+
+~~~
+ee site share <site-name> [--disable] [--refresh] [--token=<token>]
+~~~
+
+**OPTIONS**
+
+	<site-name>
+		Name of website.
+
+	[--disable]
+		Take online link down.
+
+	[--refresh]
+		Refresh site share if link has expired.
+
+	[--token=<token>]
+		ngrok token.
+
+**EXAMPLES**
+
+    # Share a site online
+    $ ee site share example.com
+
+    # Refresh shareed link if expired
+    $ ee site share example.com --refresh
+
+    # Disable online link
+    $ ee site share example.com --disable
+
+
+
+### ee site clean
+
+Clears Object and Page cache for site.
+
+~~~
+ee site clean [<site-name>] [--page] [--object]
+~~~
+
+**OPTIONS**
+
+	[<site-name>]
+		Name of website to be enabled.
+
+	[--page]
+		Clear page cache.
+
+	[--object]
+		Clear object cache.
+
+**EXAMPLES**
+
+    # Clear Both cache type for site.
+    $ ee site clean example.com
+
+    # Clear Object cache for site.
+    $ ee site clean example.com --object
+
+    # Clear Page cache for site.
+    $ ee site clean example.com --page
+
 ## Contributing
 
 We appreciate you taking the initiative to contribute to this project.
 
 Contributing isn’t limited to just code. We encourage you to contribute in the way that best fits your abilities, by writing tutorials, giving a demo at your local meetup, helping other users with their support questions, or revising our documentation.
-
 
 ### Reporting a bug
 
