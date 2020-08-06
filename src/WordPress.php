@@ -11,7 +11,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use function EE\Site\Utils\auto_site_name;
 use function EE\Site\Utils\get_site_info;
 use function EE\Site\Utils\get_public_dir;
-use function EE\Site\Utils\get_parent_of_alias;
+use function EE\Site\Utils\check_alias_in_db;
 use function EE\Utils\get_flag_value;
 use function EE\Utils\trailingslashit;
 use function EE\Utils\get_value_if_flag_isset;
@@ -103,7 +103,7 @@ class WordPress extends EE_Site_Command {
 	 * : Specify WordPress Multi-site type.
 	 *
 	 * [--alias-domains=<domains>]
-	 * : Comma separated list of alias domains for the site. Currently only supported in WordPress subdom MU site.
+	 * : Comma separated list of alias domains for the site.
 	 *
 	 * [--title=<title>]
 	 * : Title of your site.
@@ -286,11 +286,11 @@ class WordPress extends EE_Site_Command {
 			\EE::error( sprintf( "Site %1\$s already exists. If you want to re-create it please delete the older one using:\n`ee site delete %1\$s`", $this->site_data['site_url'] ) );
 		}
 
-		$parent_site = get_parent_of_alias( $this->site_data['site_url'] );
+		$alias_domains = \EE\Utils\get_flag_value( $assoc_args, 'alias-domains', '' );
 
-		if ( ! empty( $parent_site ) ) {
-			\EE::error( sprintf( "Site %1\$s already exists as an alias domain for site: %2\$s. Please delete it from alias domains of %2\$s if you want to create an independent site for it.", $this->site_data['site_url'], $parent_site ) );
-		}
+		$alias_domain_to_check   = explode( ',', $alias_domains );
+		$alias_domain_to_check[] = $this->site_data['site_url'];
+		check_alias_in_db( $alias_domain_to_check );
 
 		$this->site_data['site_fs_path']       = WEBROOT . $this->site_data['site_url'];
 		$this->cache_type                      = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
@@ -305,7 +305,6 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['db_port']            = '3306';
 		$this->site_data['db_user']            = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
 		$this->site_data['db_password']        = \EE\Utils\get_flag_value( $assoc_args, 'dbpass', \EE\Utils\random_password() );
-		$alias_domains                         = \EE\Utils\get_flag_value( $assoc_args, 'alias-domains', '' );
 		$this->site_data['proxy_cache']        = \EE\Utils\get_flag_value( $assoc_args, 'proxy-cache' );
 		$this->locale                          = \EE\Utils\get_flag_value( $assoc_args, 'locale', \EE::get_config( 'locale' ) );
 		$local_cache                           = \EE\Utils\get_flag_value( $assoc_args, 'with-local-redis' );
@@ -315,10 +314,6 @@ class WordPress extends EE_Site_Command {
 		}
 		if ( $this->cache_type ) {
 			$this->site_data['cache_host'] = $local_cache ? 'redis' : 'global-redis';
-		}
-
-		if ( ! empty( $alias_domains ) && $mu !== 'subdom' ) {
-			\EE::error( "Currently alias domains is only supported with WordPress subdomain MU, i.e., with `--mu=subdom` sites." );
 		}
 
 		if ( empty( $this->site_data['app_admin_password'] ) ) {
@@ -362,9 +357,7 @@ class WordPress extends EE_Site_Command {
 			$comma_seprated_domains = explode( ',', $alias_domains );
 			foreach ( $comma_seprated_domains as $domain ) {
 				$trimmed_domain = trim( $domain );
-				if ( filter_var( $trimmed_domain, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME ) ) {
-					$this->site_data['alias_domains'] .= $trimmed_domain . ',';
-				}
+				$this->site_data['alias_domains'] .= $trimmed_domain . ',';
 			}
 		}
 		$this->site_data['alias_domains'] = substr( $this->site_data['alias_domains'], 0, - 1 );
@@ -568,12 +561,9 @@ class WordPress extends EE_Site_Command {
 			$info[] = [ 'WordPress Username', $this->site_data['app_admin_username'] ];
 			$info[] = [ 'WordPress Password', $this->site_data['app_admin_password'] ];
 		}
-		if ( 'subdom' === $this->site_data['app_sub_type'] ) {
-
-			$alias_domains            = implode( ',', array_diff( explode( ',', $this->site_data['alias_domains'] ), [ $this->site_data['site_url'] ] ) );
-			$info_alias_domains_value = empty( $alias_domains ) ? 'None' : $alias_domains;
-			$info[]                   = [ 'Alias Domains', $info_alias_domains_value ];
-		}
+		$alias_domains            = implode( ',', array_diff( explode( ',', $this->site_data['alias_domains'] ), [ $this->site_data['site_url'] ] ) );
+		$info_alias_domains_value = empty( $alias_domains ) ? 'None' : $alias_domains;
+		$info[]                   = [ 'Alias Domains', $info_alias_domains_value ];
 
 		$info[] = [ 'DB Host', $this->site_data['db_host'] ];
 		if ( ! empty( $this->site_data['db_root_password'] ) ) {
