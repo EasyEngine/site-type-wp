@@ -11,7 +11,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use function EE\Site\Utils\auto_site_name;
 use function EE\Site\Utils\get_site_info;
 use function EE\Site\Utils\get_public_dir;
-use function EE\Site\Utils\get_parent_of_alias;
+use function EE\Site\Utils\check_alias_in_db;
 use function EE\Utils\get_flag_value;
 use function EE\Utils\trailingslashit;
 use function EE\Utils\get_value_if_flag_isset;
@@ -286,11 +286,11 @@ class WordPress extends EE_Site_Command {
 			\EE::error( sprintf( "Site %1\$s already exists. If you want to re-create it please delete the older one using:\n`ee site delete %1\$s`", $this->site_data['site_url'] ) );
 		}
 
-		$parent_site = get_parent_of_alias( $this->site_data['site_url'] );
+		$alias_domains = \EE\Utils\get_flag_value( $assoc_args, 'alias-domains', '' );
 
-		if ( ! empty( $parent_site ) ) {
-			\EE::error( sprintf( "Site %1\$s already exists as an alias domain for site: %2\$s. Please delete it from alias domains of %2\$s if you want to create an independent site for it.", $this->site_data['site_url'], $parent_site ) );
-		}
+		$alias_domain_to_check   = explode( ',', $alias_domains );
+		$alias_domain_to_check[] = $this->site_data['site_url'];
+		check_alias_in_db( $alias_domain_to_check );
 
 		$this->site_data['site_fs_path']       = WEBROOT . $this->site_data['site_url'];
 		$this->cache_type                      = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
@@ -305,7 +305,6 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['db_port']            = '3306';
 		$this->site_data['db_user']            = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
 		$this->site_data['db_password']        = \EE\Utils\get_flag_value( $assoc_args, 'dbpass', \EE\Utils\random_password() );
-		$alias_domains                         = \EE\Utils\get_flag_value( $assoc_args, 'alias-domains', '' );
 		$this->site_data['proxy_cache']        = \EE\Utils\get_flag_value( $assoc_args, 'proxy-cache' );
 		$this->locale                          = \EE\Utils\get_flag_value( $assoc_args, 'locale', \EE::get_config( 'locale' ) );
 		$local_cache                           = \EE\Utils\get_flag_value( $assoc_args, 'with-local-redis' );
