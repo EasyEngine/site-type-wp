@@ -4,6 +4,7 @@ namespace EE\Site\Type;
 
 use function EE\Utils\mustache_render;
 use function EE\Site\Utils\get_ssl_policy;
+use function EE\Site\Utils\sysctl_parameters;
 
 class Site_WP_Docker {
 
@@ -60,6 +61,7 @@ class Site_WP_Docker {
 					[ 'name' => 'MYSQL_PASSWORD' ],
 				],
 			];
+			$db['sysctls']      = sysctl_parameters();
 			$db['networks']     = $network_default;
 		}
 		// PHP configuration.
@@ -100,6 +102,8 @@ class Site_WP_Docker {
 				[ 'name' => 'NEWRELIC_LICENSE_KEY' ],
 			],
 		];
+
+		$php['sysctls']  = sysctl_parameters();
 
 		$php['networks'] = [
 			'net' => [
@@ -160,6 +164,9 @@ class Site_WP_Docker {
 				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
 			],
 		];
+
+		$nginx['sysctls'] = sysctl_parameters();
+
 		$nginx['networks'] = [
 			'net' => [
 				[ 'name' => 'global-frontend-network' ],
@@ -218,6 +225,7 @@ class Site_WP_Docker {
 				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
 			],
 		];
+		$redis['sysctls']      = sysctl_parameters();
 		$redis['networks']     = $network_default;
 
 		$base[] = $php;
