@@ -184,6 +184,15 @@ server {
 	if ($uri ~* "^.+(readme|license|example)\.(txt|html)$") {
 		return 403;
 	}
+	# ee-admin pages
+	location ^~ /ee-admin/ {
+		root /var/www/htdocs ;
+		location ~ \.php$ {
+			try_files $uri =404;
+			include fastcgi_params;
+			fastcgi_pass php;
+		}
+	}
 	# Status pages
 	location = /ee-admin/nginx_status {
 		stub_status on;
