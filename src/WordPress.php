@@ -565,7 +565,7 @@ class WordPress extends EE_Site_Command {
 			$site = (array) Site::find( $this->site_data['site_url'] );
 			$site = reset( $site );
 			EE::log( json_encode( $site ) );
-			exit();
+			return;
 		}
 
 		$ssl    = $this->site_data['site_ssl'] ? 'Enabled' : 'Not Enabled';
