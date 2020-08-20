@@ -542,11 +542,7 @@ class WordPress extends EE_Site_Command {
 	 * default: table
 	 * options:
 	 *   - table
-	 *   - csv
-	 *   - yaml
 	 *   - json
-	 *   - count
-	 *   - text
 	 * ---
 	 *
 	 * ## EXAMPLES
