@@ -1131,10 +1131,10 @@ class WordPress extends EE_Site_Command {
 		}
 
 		// Added wp-config.php debug constants referred from https://codex.wordpress.org/Debugging_in_WordPress.
-		$extra_php = "if ( isset( \$_SERVER[\"HTTP_X_FORWARDED_PROTO\"] ) && \$_SERVER[\"HTTP_X_FORWARDED_PROTO\"] == \"https\" ) {\n	\$_SERVER[\"HTTPS\"] = \"on\";\n}\n\n// Enable WP_DEBUG mode.\ndefine( \"WP_DEBUG\", false );\n\n// Enable Debug logging to the /wp-content/debug.log file\ndefine( \"WP_DEBUG_LOG\", false );\n\n// Disable display of errors and warnings.\ndefine( \"WP_DEBUG_DISPLAY\", false );\n@ini_set( \"display_errors\", 0 );\n\n// Use dev versions of core JS and CSS files (only needed if you are modifying these core files)\ndefine( \"SCRIPT_DEBUG\", false );";
+		$extra_php = 'if ( isset( \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] ) && \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] == \'https\' ) {' . "\n" . '	\$_SERVER[\'HTTPS\'] = \'on\';' . "\n}\n\n" . '// Enable WP_DEBUG mode.' . "\n" . 'define( \'WP_DEBUG\', false );' . "\n\n" . '// Enable Debug logging to the /wp-content/debug.log file' . "\n" . 'define( \'WP_DEBUG_LOG\', false );' . "\n\n" . '// Disable display of errors and warnings.' . "\n" . 'define( \'WP_DEBUG_DISPLAY\', false );' . "\n" . '@ini_set( \'display_errors\', 0 );' . "\n\n" . '// Use dev versions of core JS and CSS files (only needed if you are modifying these core files)' . "\n" . 'define( \'SCRIPT_DEBUG\', false );';
 
 		if ( 'wp' !== $this->site_data['app_sub_type'] ) {
-			$extra_php .= "\n\n// Disable cookie domain.\ndefine( \"COOKIE_DOMAIN\", false );";
+			$extra_php .= "\n\n// Disable cookie domain.\ndefine( 'COOKIE_DOMAIN', false );";
 		}
 
 		if ( $this->is_vip ) {
@@ -1142,7 +1142,7 @@ class WordPress extends EE_Site_Command {
 		}
 
 		$db_host                  = isset( $this->site_data['db_port'] ) ? $this->site_data['db_host'] . ':' . $this->site_data['db_port'] : $this->site_data['db_host'];
-		$wp_config_create_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp config create --dbuser=\'%s\' --dbname=\'%s\' --dbpass=\'%s\' --dbhost=\'%s\' %s --extra-php=\'%s\'', $this->site_data['db_user'], $this->site_data['db_name'], $this->site_data['db_password'], $db_host, $config_arguments, $extra_php );
+		$wp_config_create_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp config create --dbuser=\'%s\' --dbname=\'%s\' --dbpass=\'%s\' --dbhost=\'%s\' %s --extra-php="%s"', $this->site_data['db_user'], $this->site_data['db_name'], $this->site_data['db_password'], $db_host, $config_arguments, $extra_php );
 
 		try {
 			if ( ! \EE::exec( $wp_config_create_command ) ) {
