@@ -1039,7 +1039,8 @@ class WordPress extends EE_Site_Command {
 			}
 		}
 
-		$wp_root_dir = $this->site_data['site_fs_path'] . '/app/htdocs';
+		$public_dir_path = get_public_dir( $assoc_args );
+		$wp_root_dir     = $this->site_data['site_fs_path'] . '/app/htdocs/' . str_replace( '/var/www/htdocs', '', $public_dir_path );
 
 		if ( $this->is_vip && file_exists( $wp_root_dir . '/mu-plugins' ) ) {
 			// Enable VIP MU plugins.
@@ -1047,7 +1048,7 @@ class WordPress extends EE_Site_Command {
 		}
 
 		// Reset wp-content permission which may have been changed during git clone from host machine.
-		EE::exec( "docker-compose exec --user=root php chown -R www-data: /var/www/htdocs/wp-content" );
+		EE::exec( "docker-compose exec --user=root php chown -R www-data: $public_dir_path/wp-content" );
 
 		$this->create_site_db_entry();
 		\EE::log( 'Site entry created.' );
@@ -1276,7 +1277,8 @@ class WordPress extends EE_Site_Command {
 
 		\EE::log( "Setting up VIP Go environment. This may take time based on your repo size, please wait for a while..." );
 
-		$site_wp_root_dir = $this->site_data['site_fs_path'] . '/app/htdocs';
+		$public_dir_path  = get_public_dir( $assoc_args );
+		$site_wp_root_dir = $this->site_data['site_fs_path'] . '/app/htdocs/' . str_replace( '/var/www/htdocs', '', $public_dir_path );
 
 		chdir( $site_wp_root_dir );
 
