@@ -318,27 +318,6 @@ class WordPress extends EE_Site_Command {
 
 		if ( empty( $this->site_data['app_admin_password'] ) ) {
 			$this->site_data['app_admin_password'] = \EE\Utils\random_password( 18 );
-		} else {
-			$pass_error_msg = [];
-			if ( strlen( $this->site_data['app_admin_password'] ) < 8 ) {
-				$pass_error_msg[] = "Password too short! Must be at least 8 characters long.";
-			}
-
-			if ( ! preg_match( "#[0-9]+#", $this->site_data['app_admin_password'] ) ) {
-				$pass_error_msg[] = "Password must include at least one number!";
-			}
-
-			if ( ! preg_match( "#[a-zA-Z]+#", $this->site_data['app_admin_password'] ) ) {
-				$pass_error_msg[] = "Password must include at least one letter!";
-			}
-
-			if ( ! empty( $pass_error_msg ) ) {
-				$final_error_msg = 'Issues found in input password: `' . $this->site_data['app_admin_password'] . "`\n\t";
-				foreach ( $pass_error_msg as $err_msg ) {
-					$final_error_msg .= '* ' . $err_msg . "\n\t";
-				}
-				EE::error( $final_error_msg );
-			}
 		}
 
 		$this->site_data['site_container_fs_path'] = get_public_dir( $assoc_args );
