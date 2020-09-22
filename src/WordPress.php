@@ -536,6 +536,15 @@ class WordPress extends EE_Site_Command {
 	 * [<site-name>]
 	 * : Name of the website whose info is required.
 	 *
+	 * [--format=<format>]
+	 * : Render output in a particular format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Display site info
@@ -543,12 +552,22 @@ class WordPress extends EE_Site_Command {
 	 */
 	public function info( $args, $assoc_args ) {
 
+		$format = \EE\Utils\get_flag_value( $assoc_args, 'format' );
+
 		\EE\Utils\delem_log( 'site info start' );
 		if ( ! isset( $this->site_data['site_url'] ) ) {
 			$args             = auto_site_name( $args, 'wp', __FUNCTION__ );
 			$this->site_data  = get_site_info( $args, false );
 			$this->cache_type = $this->site_data['cache_nginx_fullpage'];
 		}
+
+		if ( 'json' === $format ) {
+			$site = (array) Site::find( $this->site_data['site_url'] );
+			$site = reset( $site );
+			EE::log( json_encode( $site ) );
+			return;
+		}
+
 		$ssl    = $this->site_data['site_ssl'] ? 'Enabled' : 'Not Enabled';
 		$prefix = ( $this->site_data['site_ssl'] ) ? 'https://' : 'http://';
 		$info   = [ [ 'Site', $prefix . $this->site_data['site_url'] ] ];
@@ -1020,7 +1039,8 @@ class WordPress extends EE_Site_Command {
 			}
 		}
 
-		$wp_root_dir = $this->site_data['site_fs_path'] . '/app/htdocs';
+		$public_dir_path = get_public_dir( $assoc_args );
+		$wp_root_dir     = $this->site_data['site_fs_path'] . '/app/htdocs/' . str_replace( '/var/www/htdocs', '', $public_dir_path );
 
 		if ( $this->is_vip && file_exists( $wp_root_dir . '/mu-plugins' ) ) {
 			// Enable VIP MU plugins.
@@ -1028,7 +1048,7 @@ class WordPress extends EE_Site_Command {
 		}
 
 		// Reset wp-content permission which may have been changed during git clone from host machine.
-		EE::exec( "docker-compose exec --user=root php chown -R www-data: /var/www/htdocs/wp-content" );
+		EE::exec( "docker-compose exec --user=root php chown -R www-data: $public_dir_path/wp-content" );
 
 		$this->create_site_db_entry();
 		\EE::log( 'Site entry created.' );
@@ -1112,18 +1132,18 @@ class WordPress extends EE_Site_Command {
 		}
 
 		// Added wp-config.php debug constants referred from https://codex.wordpress.org/Debugging_in_WordPress.
-		$extra_php = "if ( isset( \$_SERVER[\"HTTP_X_FORWARDED_PROTO\"] ) && \$_SERVER[\"HTTP_X_FORWARDED_PROTO\"] == \"https\" ) {\n	\$_SERVER[\"HTTPS\"] = \"on\";\n}\n\n// Enable WP_DEBUG mode.\ndefine( \"WP_DEBUG\", false );\n\n// Enable Debug logging to the /wp-content/debug.log file\ndefine( \"WP_DEBUG_LOG\", false );\n\n// Disable display of errors and warnings.\ndefine( \"WP_DEBUG_DISPLAY\", false );\n@ini_set( \"display_errors\", 0 );\n\n// Use dev versions of core JS and CSS files (only needed if you are modifying these core files)\ndefine( \"SCRIPT_DEBUG\", false );";
+		$extra_php = 'if ( isset( \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] ) && \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] == \'https\' ) {' . "\n" . '	\$_SERVER[\'HTTPS\'] = \'on\';' . "\n}\n\n" . '// Enable WP_DEBUG mode.' . "\n" . 'define( \'WP_DEBUG\', false );' . "\n\n" . '// Enable Debug logging to the /wp-content/debug.log file' . "\n" . 'define( \'WP_DEBUG_LOG\', false );' . "\n\n" . '// Disable display of errors and warnings.' . "\n" . 'define( \'WP_DEBUG_DISPLAY\', false );' . "\n" . '@ini_set( \'display_errors\', 0 );' . "\n\n" . '// Use dev versions of core JS and CSS files (only needed if you are modifying these core files)' . "\n" . 'define( \'SCRIPT_DEBUG\', false );';
 
 		if ( 'wp' !== $this->site_data['app_sub_type'] ) {
-			$extra_php .= "\n\n// Disable cookie domain.\ndefine( \"COOKIE_DOMAIN\", false );";
+			$extra_php .= "\n\n// Disable cookie domain.\ndefine( 'COOKIE_DOMAIN', false );";
 		}
 
 		if ( $this->is_vip ) {
-			$extra_php .= "\n\nif ( file_exists( __DIR__ . \"/htdocs/wp-content/vip-config/vip-config.php\" ) ) {\n		require_once( __DIR__ . \"/htdocs/wp-content/vip-config/vip-config.php\" ); \n}";
+			$extra_php .= "\n\nif ( file_exists( ABSPATH . '/wp-content/vip-config/vip-config.php' ) ) {\n	require_once( ABSPATH . '/wp-content/vip-config/vip-config.php' );\n}";
 		}
 
 		$db_host                  = isset( $this->site_data['db_port'] ) ? $this->site_data['db_host'] . ':' . $this->site_data['db_port'] : $this->site_data['db_host'];
-		$wp_config_create_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp config create --dbuser=\'%s\' --dbname=\'%s\' --dbpass=\'%s\' --dbhost=\'%s\' %s --extra-php=\'%s\'', $this->site_data['db_user'], $this->site_data['db_name'], $this->site_data['db_password'], $db_host, $config_arguments, $extra_php );
+		$wp_config_create_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp config create --dbuser=\'%s\' --dbname=\'%s\' --dbpass=\'%s\' --dbhost=\'%s\' %s --extra-php="%s"', $this->site_data['db_user'], $this->site_data['db_name'], $this->site_data['db_password'], $db_host, $config_arguments, $extra_php );
 
 		try {
 			if ( ! \EE::exec( $wp_config_create_command ) ) {
@@ -1257,7 +1277,8 @@ class WordPress extends EE_Site_Command {
 
 		\EE::log( "Setting up VIP Go environment. This may take time based on your repo size, please wait for a while..." );
 
-		$site_wp_root_dir = $this->site_data['site_fs_path'] . '/app/htdocs';
+		$public_dir_path  = get_public_dir( $assoc_args );
+		$site_wp_root_dir = $this->site_data['site_fs_path'] . '/app/htdocs/' . str_replace( '/var/www/htdocs', '', $public_dir_path );
 
 		chdir( $site_wp_root_dir );
 
