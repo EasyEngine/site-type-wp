@@ -12,6 +12,7 @@ use function EE\Site\Utils\auto_site_name;
 use function EE\Site\Utils\get_site_info;
 use function EE\Site\Utils\get_public_dir;
 use function EE\Site\Utils\check_alias_in_db;
+use function EE\Utils\docker_compose_with_custom;
 use function EE\Utils\get_flag_value;
 use function EE\Utils\trailingslashit;
 use function EE\Utils\get_value_if_flag_isset;
@@ -1417,7 +1418,7 @@ class WordPress extends EE_Site_Command {
 
 		EE::log( 'Running search-replace.' );
 		EE::log( 'Taking database backup before search-replace.' );
-		EE::exec( sprintf( 'docker-compose exec php wp db export %s.db', $this->site_data['site_url'] ) );
+		EE::exec( sprintf( docker_compose_with_custom() . ' exec php wp db export %s.db', $this->site_data['site_url'] ) );
 
 		$db_file         = $this->site_data['site_fs_path'] . '/app/htdocs/' . $this->site_data['site_url'] . '.db';
 		$backup_location = EE_BACKUP_DIR . '/' . $this->site_data['site_url'] . '/' . $this->site_data['site_url'] . '.db';
@@ -1432,7 +1433,7 @@ class WordPress extends EE_Site_Command {
 
 		$extra_flags = '--precise';
 		$extra_flags .= ( 'wp' === $this->site_data['app_sub_type'] ) ? '' : ' --network';
-		EE::exec( sprintf( 'docker-compose exec php wp search-replace http://%1$s https://%1$s %2$s', $this->site_data['site_url'], $extra_flags ), true, true );
+		EE::exec( sprintf( docker_compose_with_custom() . ' exec php wp search-replace http://%1$s https://%1$s %2$s', $this->site_data['site_url'], $extra_flags ), true, true );
 		EE::success( 'Successfully completed search-replace.' );
 
 		if ( $backup_success ) {
