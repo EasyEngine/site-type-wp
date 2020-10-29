@@ -1124,7 +1124,7 @@ class WordPress extends EE_Site_Command {
 			$count           = 0;
 			while ( $mysql_unhealthy ) {
 				$mysql_unhealthy = ! \EE::exec( $health_chk );
-				if ( $count ++ > 30 ) {
+				if ( $count++ > 180 ) {
 					break;
 				}
 				sleep( 1 );
