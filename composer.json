@@ -9,9 +9,11 @@
     "prefer-stable": true,
     "autoload": {
         "psr-4": {
-            "": "src/"
+            "EE\\Site\\Type\\": "src/"
         },
-        "files": [ "site-type-wp.php" ]
+        "files": [
+            "site-type-wp.php"
+        ]
     },
     "require-dev": {
         "wp-cli/mustangostang-spyc": "^0.6.3"
