@@ -198,6 +198,7 @@ server {
 		fastcgi_pass php;
 	}
 	location ~*  \.(css|js)$ {
+		access_log off;
 		expires 1d;
 		add_header Cache-Control "public, must-revalidate";
 	}
