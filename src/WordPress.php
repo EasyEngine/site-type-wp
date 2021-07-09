@@ -343,7 +343,7 @@ class WordPress extends EE_Site_Command {
 		}
 
 		$this->site_data['site_container_fs_path'] = get_public_dir( $assoc_args );
-		$this->site_data['site_ssl']               = get_value_if_flag_isset( $assoc_args, 'ssl', [ 'le', 'self', 'inherit', 'custom' ], 'le' );
+		$this->site_data['site_ssl']               = get_value_if_flag_isset( $assoc_args, 'ssl', 'le' );
 		if ( 'custom' === $this->site_data['site_ssl'] ) {
 			try {
 				$this->validate_site_custom_ssl( get_flag_value( $assoc_args, 'ssl-key' ), get_flag_value( $assoc_args, 'ssl-crt' ) );
