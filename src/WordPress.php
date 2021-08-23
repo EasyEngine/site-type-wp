@@ -260,7 +260,7 @@ class WordPress extends EE_Site_Command {
 		\EE\Utils\delem_log( 'site create start' );
 		$this->logger->debug( 'args:', $args );
 		$this->logger->debug( 'assoc_args:', empty( $assoc_args ) ? array( 'NULL' ) : $assoc_args );
-		$this->site_data['site_url'] = strtolower( \EE\Utils\remove_trailing_slash( $args[0] ) );
+		$this->site_data['site_url']  = strtolower( \EE\Utils\remove_trailing_slash( $args[0] ) );
 		$this->site_data['subnet_ip'] = \EE\Site\Utils\get_subnet_ip();
 
 		$mu = \EE\Utils\get_flag_value( $assoc_args, 'mu' );
