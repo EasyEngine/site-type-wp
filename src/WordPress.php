@@ -261,7 +261,7 @@ class WordPress extends EE_Site_Command {
 		$this->logger->debug( 'args:', $args );
 		$this->logger->debug( 'assoc_args:', empty( $assoc_args ) ? array( 'NULL' ) : $assoc_args );
 		$this->site_data['site_url']  = strtolower( \EE\Utils\remove_trailing_slash( $args[0] ) );
-		$this->site_data['subnet_ip'] = \EE\Site\Utils\get_subnet_ip();
+		$this->site_data['subnet_ip'] = \EE\Site\Utils\get_available_subnet();
 
 		$mu = \EE\Utils\get_flag_value( $assoc_args, 'mu' );
 		$this->site_data['app_sub_type'] = $mu ?? 'wp';
@@ -1441,7 +1441,7 @@ class WordPress extends EE_Site_Command {
 
 		$extra_flags = '--precise';
 		$extra_flags .= ( 'wp' === $this->site_data['app_sub_type'] ) ? '' : ' --network';
-		
+
 		$ssl  = get_flag_value( $assoc_args, 'ssl' );
 		$from = $ssl === 'off' ? 'https' : 'http';
 		$to   = $ssl === 'off' ? 'http' : 'https';
