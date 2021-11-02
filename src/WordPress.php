@@ -257,11 +257,10 @@ class WordPress extends EE_Site_Command {
 	 */
 	public function create( $args, $assoc_args ) {
 
-		$this->check_site_count();
 		\EE\Utils\delem_log( 'site create start' );
 		$this->logger->debug( 'args:', $args );
 		$this->logger->debug( 'assoc_args:', empty( $assoc_args ) ? array( 'NULL' ) : $assoc_args );
-		$this->site_data['site_url'] = strtolower( \EE\Utils\remove_trailing_slash( $args[0] ) );
+		$this->site_data['site_url']  = strtolower( \EE\Utils\remove_trailing_slash( $args[0] ) );
 
 		$mu = \EE\Utils\get_flag_value( $assoc_args, 'mu' );
 		$this->site_data['app_sub_type'] = $mu ?? 'wp';
@@ -343,7 +342,7 @@ class WordPress extends EE_Site_Command {
 		}
 
 		$this->site_data['site_container_fs_path'] = get_public_dir( $assoc_args );
-		$this->site_data['site_ssl']               = get_value_if_flag_isset( $assoc_args, 'ssl', [ 'le', 'self', 'inherit', 'custom' ], 'le' );
+		$this->site_data['site_ssl']               = get_value_if_flag_isset( $assoc_args, 'ssl', 'le' );
 		if ( 'custom' === $this->site_data['site_ssl'] ) {
 			try {
 				$this->validate_site_custom_ssl( get_flag_value( $assoc_args, 'ssl-key' ), get_flag_value( $assoc_args, 'ssl-crt' ) );
@@ -430,6 +429,7 @@ class WordPress extends EE_Site_Command {
 		\EE::log( 'Configuring project.' );
 
 		$this->create_site( $assoc_args );
+
 		\EE\Utils\delem_log( 'site create end' );
 	}
 
@@ -1361,7 +1361,6 @@ class WordPress extends EE_Site_Command {
 	 * Function to save the site configuration entry into database.
 	 */
 	private function create_site_db_entry() {
-		$ssl = null;
 
 		$data = [
 			'site_url'               => $this->site_data['site_url'],
@@ -1439,11 +1438,16 @@ class WordPress extends EE_Site_Command {
 
 		$extra_flags = '--precise';
 		$extra_flags .= ( 'wp' === $this->site_data['app_sub_type'] ) ? '' : ' --network';
-		EE::exec( sprintf( \EE_DOCKER::docker_compose_with_custom() . ' exec php wp search-replace http://%1$s https://%1$s %2$s', $this->site_data['site_url'], $extra_flags ), true, true );
+
+		$ssl  = get_flag_value( $assoc_args, 'ssl' );
+		$from = $ssl === 'off' ? 'https' : 'http';
+		$to   = $ssl === 'off' ? 'http' : 'https';
+
+		EE::exec( sprintf( \EE_DOCKER::docker_compose_with_custom() . ' exec php wp search-replace %2$s://%1$s %3$s://%1$s %4$s', $this->site_data['site_url'], $from, $to, $extra_flags ), true, true );
 		EE::success( 'Successfully completed search-replace.' );
 
 		if ( $backup_success ) {
-			EE::log( "In case something is not working as intended. You can restore your DB from backup file generated before search-replace located at:\n `$backup_location`\nand proceed with search-replace according to your needs." );
+			EE::log( "In case something is not working as intended, you can restore your DB from backup file generated before search-replace located at:\n `$backup_location`\nand proceed with search-replace according to your needs." );
 		}
 	}
 
