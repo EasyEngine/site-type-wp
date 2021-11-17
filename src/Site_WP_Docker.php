@@ -40,20 +40,21 @@ class Site_WP_Docker {
 
 		if ( in_array( 'db', $filters, true ) ) {
 			// db configuration.
-			$db['service_name'] = [ 'name' => 'db' ];
-			$db['image']        = [ 'name' => 'easyengine/mariadb:' . $img_versions['easyengine/mariadb'] ];
-			$db['restart']      = $restart_default;
-			$db['labels']       = [
+			$db['service_name']   = [ 'name' => 'db' ];
+			$db['container_name'] = $filters['site_prefix'] . '_db_1';
+			$db['image']          = [ 'name' => 'easyengine/mariadb:' . $img_versions['easyengine/mariadb'] ];
+			$db['restart']        = $restart_default;
+			$db['labels']         = [
 				'label' => [
 					'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
 				],
 			];
-			$db['volumes']      = [
+			$db['volumes']        = [
 				[
 					'vol' => \EE_DOCKER::get_mounting_volume_array( $volumes['db'] ),
 				],
 			];
-			$db['environment']  = [
+			$db['environment']    = [
 				'env' => [
 					[ 'name' => 'MYSQL_ROOT_PASSWORD' ],
 					[ 'name' => 'MYSQL_DATABASE' ],
@@ -61,14 +62,15 @@ class Site_WP_Docker {
 					[ 'name' => 'MYSQL_PASSWORD' ],
 				],
 			];
-			$db['sysctls']      = sysctl_parameters();
-			$db['networks']     = $network_default;
+			$db['sysctls']        = sysctl_parameters();
+			$db['networks']       = $network_default;
 		}
 		// PHP configuration.
 		$php_image_key = ( 'latest' === $filters['php_version'] ? 'easyengine/php' : 'easyengine/php' . $filters['php_version'] );
 
-		$php['service_name'] = [ 'name' => 'php' ];
-		$php['image']        = [ 'name' => $php_image_key . ':' . $img_versions[ $php_image_key ] ];
+		$php['service_name']   = [ 'name' => 'php' ];
+		$php['container_name'] =  $filters['site_prefix'] . '_php_1';
+		$php['image']          = [ 'name' => $php_image_key . ':' . $img_versions[ $php_image_key ] ];
 
 		if ( in_array( 'db', $filters, true ) ) {
 			$php['depends_on']['dependency'][] = [ 'name' => 'db' ];
@@ -78,18 +80,18 @@ class Site_WP_Docker {
 			$php['depends_on']['dependency'][] = [ 'name' => 'redis' ];
 		}
 
-		$php['restart']     = $restart_default;
-		$php['labels']      = [
+		$php['restart']        = $restart_default;
+		$php['labels']         = [
 			'label' => [
 				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
 			],
 		];
-		$php['volumes']     = [
+		$php['volumes']        = [
 			[
 				'vol' => \EE_DOCKER::get_mounting_volume_array( $volumes['php'] ),
 			],
 		];
-		$php['environment'] = [
+		$php['environment']    = [
 			'env' => [
 				[ 'name' => 'WORDPRESS_DB_HOST' ],
 				[ 'name' => 'WORDPRESS_DB_NAME' ],
@@ -103,9 +105,9 @@ class Site_WP_Docker {
 			],
 		];
 
-		$php['sysctls']  = sysctl_parameters();
+		$php['sysctls']        = sysctl_parameters();
 
-		$php['networks'] = [
+		$php['networks']       = [
 			'net' => [
 				[
 					'name'    => 'site-network',
@@ -126,6 +128,7 @@ class Site_WP_Docker {
 
 		// nginx configuration.
 		$nginx['service_name']               = [ 'name' => 'nginx' ];
+		$nginx['container_name']             = $filters['site_prefix'] . '_nginx_1';
 		$nginx['image']                      = [ 'name' => 'easyengine/nginx:' . $img_versions['easyengine/nginx'] ];
 		$nginx['depends_on']['dependency'][] = [ 'name' => 'php' ];
 		$nginx['restart']                    = $restart_default;
@@ -137,7 +140,7 @@ class Site_WP_Docker {
 			$v_host = in_array( 'subdom', $filters, true ) ? 'VIRTUAL_HOST=${VIRTUAL_HOST},*.${VIRTUAL_HOST}' : 'VIRTUAL_HOST';
 		}
 
-		$nginx['environment'] = [
+		$nginx['environment']                = [
 			'env' => [
 				[ 'name' => $v_host ],
 				[ 'name' => 'VIRTUAL_PATH=/' ],
@@ -156,18 +159,18 @@ class Site_WP_Docker {
 			$nginx['environment']['env'][] = [ 'name' => "SSL_POLICY=$ssl_policy" ];
 		}
 
-		$nginx['volumes']  = [
+		$nginx['volumes']                    = [
 			'vol' => \EE_DOCKER::get_mounting_volume_array( $volumes['nginx'] ),
 		];
-		$nginx['labels']   = [
+		$nginx['labels']                     = [
 			'label' => [
 				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
 			],
 		];
 
-		$nginx['sysctls'] = sysctl_parameters();
+		$nginx['sysctls']                    = sysctl_parameters();
 
-		$nginx['networks'] = [
+		$nginx['networks']                   = [
 			'net' => [
 				[ 'name' => 'global-frontend-network' ],
 				[ 'name' => 'site-network' ],
@@ -179,23 +182,24 @@ class Site_WP_Docker {
 		}
 
 		// mailhog configuration.
-		$mailhog['service_name'] = [ 'name' => 'mailhog' ];
-		$mailhog['image']        = [ 'name' => 'easyengine/mailhog:' . $img_versions['easyengine/mailhog'] ];
-		$mailhog['restart']      = $restart_default;
-		$mailhog['command']      = [ 'name' => '["-invite-jim=false"]' ];
-		$mailhog['environment']  = [
+		$mailhog['service_name']   = [ 'name' => 'mailhog' ];
+		$mailhog['container_name'] =  $filters['site_prefix'] . '_mailhog_1';
+		$mailhog['image']          = [ 'name' => 'easyengine/mailhog:' . $img_versions['easyengine/mailhog'] ];
+		$mailhog['restart']        = $restart_default;
+		$mailhog['command']        = [ 'name' => '["-invite-jim=false"]' ];
+		$mailhog['environment']    = [
 			'env' => [
 				[ 'name' => $v_host ],
 				[ 'name' => 'VIRTUAL_PATH=/ee-admin/mailhog/' ],
 				[ 'name' => 'VIRTUAL_PORT=8025' ],
 			],
 		];
-		$mailhog['labels']       = [
+		$mailhog['labels']         = [
 			'label' => [
 				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
 			],
 		];
-		$mailhog['networks']     = [
+		$mailhog['networks']       = [
 			'net' => [
 				[ 'name' => 'site-network' ],
 				[ 'name' => 'global-frontend-network' ],
@@ -203,24 +207,26 @@ class Site_WP_Docker {
 		];
 
 		// postfix configuration.
-		$postfix['service_name'] = [ 'name' => 'postfix' ];
-		$postfix['image']        = [ 'name' => 'easyengine/postfix:' . $img_versions['easyengine/postfix'] ];
-		$postfix['hostname']     = [ 'name' => '${VIRTUAL_HOST}' ];
-		$postfix['restart']      = $restart_default;
-		$postfix['labels']       = [
+		$postfix['service_name']   = [ 'name' => 'postfix' ];
+		$postfix['container_name'] =  $filters['site_prefix'] . '_postfix_1';
+		$postfix['image']          = [ 'name' => 'easyengine/postfix:' . $img_versions['easyengine/postfix'] ];
+		$postfix['hostname']       = [ 'name' => '${VIRTUAL_HOST}' ];
+		$postfix['restart']        = $restart_default;
+		$postfix['labels']         = [
 			'label' => [
 				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
 			],
 		];
-		$postfix['volumes']      = [
+		$postfix['volumes']        = [
 			'vol' => \EE_DOCKER::get_mounting_volume_array( $volumes['postfix'] ),
 		];
-		$postfix['networks']     = $network_default;
+		$postfix['networks']       = $network_default;
 
 		// redis configuration.
-		$redis['service_name'] = [ 'name' => 'redis' ];
-		$redis['image']        = [ 'name' => 'easyengine/redis:' . $img_versions['easyengine/redis'] ];
-		$redis['labels']       = [
+		$redis['service_name']   = [ 'name' => 'redis' ];
+		$redis['container_name'] =  $filters['site_prefix'] . '_redis_1';
+		$redis['image']          = [ 'name' => 'easyengine/redis:' . $img_versions['easyengine/redis'] ];
+		$redis['labels']         = [
 			'label' => [
 				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
 			],
