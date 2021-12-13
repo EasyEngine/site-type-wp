@@ -111,11 +111,14 @@ class WordPress extends EE_Site_Command {
 	 * [--admin-user=<admin-user>]
 	 * : Username of the administrator.
 	 *
+	 * [--admin-email=<admin-email>]
+	 * : E-Mail of the administrator.
+	 *
 	 * [--admin-pass=<admin-pass>]
 	 * : Password for the the administrator.
 	 *
-	 * [--admin-email=<admin-email>]
-	 * : E-Mail of the administrator.
+	 * [--allow-insecure-pass]
+	 * : Allow insecure password for the the administrator.
 	 *
 	 * [--local-db]
 	 * : Create separate db container instead of using global db.
@@ -292,23 +295,24 @@ class WordPress extends EE_Site_Command {
 		$alias_domain_to_check[] = $this->site_data['site_url'];
 		check_alias_in_db( $alias_domain_to_check );
 
-		$this->site_data['site_fs_path']       = WEBROOT . $this->site_data['site_url'];
-		$this->cache_type                      = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
-		$wildcard_flag                         = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
-		$this->site_data['site_ssl_wildcard']  = 'subdom' === $this->site_data['app_sub_type'] || $wildcard_flag ? true : false;
-		$this->site_data['php_version']        = \EE\Utils\get_flag_value( $assoc_args, 'php', 'latest' );
-		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
-		$this->site_data['app_admin_username'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', \EE\Utils\random_name_generator() );
-		$this->site_data['app_admin_password'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', '' );
-		$this->site_data['db_name']            = \EE\Utils\get_flag_value( $assoc_args, 'dbname', str_replace( [ '.', '-' ], '_', $this->site_data['site_url'] ) );
-		$this->site_data['db_host']            = \EE\Utils\get_flag_value( $assoc_args, 'dbhost', GLOBAL_DB );
-		$this->site_data['db_port']            = '3306';
-		$this->site_data['db_user']            = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
-		$this->site_data['db_password']        = \EE\Utils\get_flag_value( $assoc_args, 'dbpass', \EE\Utils\random_password() );
-		$this->site_data['proxy_cache']        = \EE\Utils\get_flag_value( $assoc_args, 'proxy-cache' );
-		$this->locale                          = \EE\Utils\get_flag_value( $assoc_args, 'locale', \EE::get_config( 'locale' ) );
-		$local_cache                           = \EE\Utils\get_flag_value( $assoc_args, 'with-local-redis' );
-		$this->site_data['cache_host']         = '';
+		$this->site_data['site_fs_path']        = WEBROOT . $this->site_data['site_url'];
+		$this->cache_type                       = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
+		$wildcard_flag                          = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
+		$this->site_data['site_ssl_wildcard']   = 'subdom' === $this->site_data['app_sub_type'] || $wildcard_flag ? true : false;
+		$this->site_data['php_version']         = \EE\Utils\get_flag_value( $assoc_args, 'php', 'latest' );
+		$this->site_data['app_admin_url']       = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
+		$this->site_data['app_admin_username']  = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', \EE\Utils\random_name_generator() );
+		$this->site_data['app_admin_password']  = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', '' );
+		$this->site_data['allow_insecure_pass'] = \EE\Utils\get_flag_value( $assoc_args, 'allow-insecure-pass', false );
+		$this->site_data['db_name']             = \EE\Utils\get_flag_value( $assoc_args, 'dbname', str_replace( [ '.', '-' ], '_', $this->site_data['site_url'] ) );
+		$this->site_data['db_host']             = \EE\Utils\get_flag_value( $assoc_args, 'dbhost', GLOBAL_DB );
+		$this->site_data['db_port']             = '3306';
+		$this->site_data['db_user']             = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
+		$this->site_data['db_password']         = \EE\Utils\get_flag_value( $assoc_args, 'dbpass', \EE\Utils\random_password() );
+		$this->site_data['proxy_cache']         = \EE\Utils\get_flag_value( $assoc_args, 'proxy-cache' );
+		$this->locale                           = \EE\Utils\get_flag_value( $assoc_args, 'locale', \EE::get_config( 'locale' ) );
+		$local_cache                            = \EE\Utils\get_flag_value( $assoc_args, 'with-local-redis' );
+		$this->site_data['cache_host']          = '';
 		if ( 'on' === $this->site_data['proxy_cache'] ) {
 			$this->cache_type = true;
 		}
@@ -318,7 +322,7 @@ class WordPress extends EE_Site_Command {
 
 		if ( empty( $this->site_data['app_admin_password'] ) ) {
 			$this->site_data['app_admin_password'] = \EE\Utils\random_password( 18 );
-		} else {
+		} elseif ( ! $this->site_data['allow_insecure_pass'] ) {
 			$pass_error_msg = [];
 			if ( strlen( $this->site_data['app_admin_password'] ) < 8 ) {
 				$pass_error_msg[] = "Password too short! Must be at least 8 characters long.";
@@ -1204,6 +1208,12 @@ class WordPress extends EE_Site_Command {
 
 		if ( ! $core_install ) {
 			throw new \Exception( 'WordPress install failed. Please check logs.' );
+		}
+
+		$env_type = \EE::get_runner()->config['env'];
+		$env_type = in_array( $env_type, [ 'production', 'staging', 'development', 'local' ] ) ? $env_type : '';
+		if ( ! empty( $env_type ) ) {
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_ENVIRONMENT_TYPE  \'' . $env_type . '\' ' );
 		}
 
 		\EE::success( $prefix . $this->site_data['site_url'] . ' has been created successfully!' );
