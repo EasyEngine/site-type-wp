@@ -1210,6 +1210,12 @@ class WordPress extends EE_Site_Command {
 			throw new \Exception( 'WordPress install failed. Please check logs.' );
 		}
 
+		$env_type = \EE::get_runner()->config['env'];
+		$env_type = in_array( $env_type, [ 'production', 'staging', 'development', 'local' ] ) ? $env_type : '';
+		if ( ! empty( $env_type ) ) {
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_ENVIRONMENT_TYPE  \'' . $env_type . '\' ' );
+		}
+
 		\EE::success( $prefix . $this->site_data['site_url'] . ' has been created successfully!' );
 	}
 
