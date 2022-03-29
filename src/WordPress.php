@@ -130,7 +130,7 @@ class WordPress extends EE_Site_Command {
 	 * : Set custom source directory for site inside htdocs.
 	 *
 	 * [--php=<php-version>]
-	 * : PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4, 8.0 and latest.
+	 * : PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1 and latest.
 	 * ---
 	 * default: latest
 	 * options:
@@ -140,6 +140,7 @@ class WordPress extends EE_Site_Command {
 	 *	- 7.3
 	 *	- 7.4
 	 *	- 8.0
+	 *	- 8.1
 	 *	- latest
 	 * ---
 	 *
@@ -366,7 +367,7 @@ class WordPress extends EE_Site_Command {
 		}
 		$this->site_data['alias_domains'] = substr( $this->site_data['alias_domains'], 0, - 1 );
 
-		$supported_php_versions = [ 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 'latest' ];
+		$supported_php_versions = [ 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1, 'latest' ];
 		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions ) ) {
 			$old_version = $this->site_data['php_version'];
 			$floor       = (int) floor( $this->site_data['php_version'] );
