@@ -1161,6 +1161,7 @@ class WordPress extends EE_Site_Command {
 		}
 
 		if ( $this->is_vip ) {
+			$extra_php .= "\n\nif ( file_exists( ABSPATH . '/wp-content/mu-plugins/000-pre-vip-config/requires.php' ) ) {\n	require_once( ABSPATH . '/wp-content/mu-plugins/000-pre-vip-config/requires.php' );\n}";
 			$extra_php .= "\n\nif ( file_exists( ABSPATH . '/wp-content/vip-config/vip-config.php' ) ) {\n	require_once( ABSPATH . '/wp-content/vip-config/vip-config.php' );\n}";
 		}
 
