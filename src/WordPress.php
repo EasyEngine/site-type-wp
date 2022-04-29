@@ -1070,7 +1070,7 @@ class WordPress extends EE_Site_Command {
 		\EE::runcommand( 'cron create ' . $this->site_data['site_url'] . " --user=www-data --command='wp cron event run --due-now' --schedule='$cron_interval/10 * * * *'" );
 
 		$env_type = \EE::get_runner()->config['env'];
-		if ( ! empty( $env_type ) && in_array( $env_type, [ 'develop', 'development', 'local' ] ) ) {
+		if ( ! empty( $env_type ) && in_array( $env_type, [ 'develop', 'development', 'local', 'staging' ] ) ) {
 			\EE::log( 'Enabling mailhog as this is a ' . $env_type . ' server.' );
 			\EE::runcommand( 'mailhog enable ' . $this->site_data['site_url'] );
 		}
