@@ -1117,7 +1117,7 @@ class WordPress extends EE_Site_Command {
 			$count           = 0;
 			while ( $mysql_unhealthy ) {
 				$mysql_unhealthy = ! \EE_DOCKER::docker_compose_exec( $health_chk, 'php', 'bash', 'root' );
-				if ( $count ++ > 180 ) {
+				if ( $count++ > 180 ) {
 					break;
 				}
 				sleep( 1 );
@@ -1572,14 +1572,14 @@ class WordPress extends EE_Site_Command {
 		EE::log( 'Running additional WordPress configurations.' );
 		chdir( $this->site_data->site_fs_path );
 		if ( $disable ) {
-			\EE_DOCKER::docker_compose_exec( ' wp plugin delete relative-url', 'php', 'bash', 'www-data' );
-			\EE_DOCKER::docker_compose_exec( ' wp config delete WP_SITEURL', 'php', 'bash', 'www-data' );
-			\EE_DOCKER::docker_compose_exec( ' wp config delete WP_HOME', 'php', 'bash', 'www-data' );
+			\EE_DOCKER::docker_compose_exec( 'wp plugin delete relative-url', 'php', 'bash', 'www-data' );
+			\EE_DOCKER::docker_compose_exec( 'wp config delete WP_SITEURL', 'php', 'bash', 'www-data' );
+			\EE_DOCKER::docker_compose_exec( 'wp config delete WP_HOME', 'php', 'bash', 'www-data' );
 		} else {
-			\EE_DOCKER::docker_compose_exec( ' wp plugin install relative-url --activate', 'php', 'bash', 'www-data' );
+			\EE_DOCKER::docker_compose_exec( 'wp plugin install relative-url --activate', 'php', 'bash', 'www-data' );
 			$set_url = 'http://\' . empty( \$_SERVER[\'HTTP_HOST\'] ) ? \'' . $this->site_data->site_url . '\'  : \$_SERVER[\'HTTP_HOST\']';
-			\EE_DOCKER::docker_compose_exec( ' wp config set --type=constant WP_SITEURL \'' . $set_url . '\' --raw', 'php', 'bash', 'www-data' );
-			\EE_DOCKER::docker_compose_exec( ' wp config set --type=constant WP_HOME \'' . $set_url . '\' --raw', 'php', 'bash', 'www-data' );
+			\EE_DOCKER::docker_compose_exec( 'wp config set --type=constant WP_SITEURL \'' . $set_url . '\' --raw', 'php', 'bash', 'www-data' );
+			\EE_DOCKER::docker_compose_exec( 'wp config set --type=constant WP_HOME \'' . $set_url . '\' --raw', 'php', 'bash', 'www-data' );
 		}
 
 		EE::success( 'WordPress configurations updated for publish.' );
