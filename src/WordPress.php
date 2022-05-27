@@ -1200,6 +1200,8 @@ class WordPress extends EE_Site_Command {
 			throw new \Exception( 'WordPress install failed. Please check logs.' );
 		}
 
+		\EE_DOCKER::docker_compose_exec( 'wp rewrite structure "/%year%/%monthnum%/%day%/%postname%/" --hard', 'php', 'bash', 'www-data' );
+
 		$env_type = \EE::get_runner()->config['env'];
 		$env_type = in_array( $env_type, [ 'production', 'staging', 'development', 'local' ] ) ? $env_type : '';
 		if ( ! empty( $env_type ) ) {
