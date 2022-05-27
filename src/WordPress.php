@@ -443,21 +443,18 @@ class WordPress extends EE_Site_Command {
 	 */
 	private function enable_object_cache() {
 
-		$redis_host               = $this->site_data['cache_host'];
-		$redis_plugin_constant    = 'docker-compose exec --user=\'www-data\' php wp config set --type=variable redis_server "array(\'host\'=> \'' . $redis_host . '\',\'port\'=> 6379,)" --raw';
-		$activate_wp_redis_plugin = "docker-compose exec --user='www-data' php wp plugin install wp-redis --activate";
-		$enable_redis_cache       = "docker-compose exec --user='www-data' php wp redis enable";
-
-		$this->docker_compose_exec( $redis_plugin_constant, 'Unable to download or activate wp-redis plugin.' );
-		$this->docker_compose_exec( $activate_wp_redis_plugin, 'Unable to download or activate wp-redis plugin.' );
-		$this->docker_compose_exec( $enable_redis_cache, 'Unable to enable object cache' );
+		$redis_host = $this->site_data['cache_host'];
+		\EE_DOCKER::docker_compose_exec( 'wp config set --type=variable redis_server "array(\'host\'=> \'' . $redis_host . '\',\'port\'=> 6379,)" --raw', 'php', 'bash', 'www-data' );
+		\EE_DOCKER::docker_compose_exec( "wp plugin install wp-redis --activate", 'php', 'bash', 'www-data' );
+		\EE_DOCKER::docker_compose_exec( "wp redis enable", 'php', 'bash', 'www-data' );
 	}
 
 	/**
 	 * Enable page cache.
 	 */
 	private function enable_page_cache() {
-		$activate_nginx_helper = 'docker-compose exec --user=\'www-data\' php wp plugin install nginx-helper --activate';
+
+		$activate_nginx_helper = \EE_DOCKER::docker_compose_exec( 'wp plugin install nginx-helper --activate', 'php', 'bash', 'www-data' );
 		$nginx_helper_fail_msg = 'Unable to download or activate nginx-helper plugin properly.';
 		$page_cache_key_prefix = $this->site_data['site_url'] . '_page:';
 		$obj_cache_key_prefix  = $this->site_data['site_url'] . '_obj:';
@@ -493,35 +490,13 @@ class WordPress extends EE_Site_Command {
 			$page_cache_key_prefix
 		);
 
-		$add_hostname_constant = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_HOSTNAME $redis_host --add=true --type=constant";
-		$add_port_constant     = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PORT 6379 --add=true --type=constant";
-		$add_prefix_constant   = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX $page_cache_key_prefix --add=true --type=constant";
-		$add_cache_key_salt    = "docker-compose exec --user='www-data' php wp config set WP_CACHE_KEY_SALT $obj_cache_key_prefix --add=true --type=constant";
-		$add_redis_maxttl      = "docker-compose exec --user='www-data' php wp config set WP_REDIS_MAXTTL 14400 --add=true --type=constant";
-		$add_plugin_data       = "docker-compose exec --user='www-data' php wp $wp_cli_params rt_wp_nginx_helper_options '$plugin_data' --format=json";
-
-		$this->docker_compose_exec( $add_hostname_constant, $nginx_helper_fail_msg );
-		$this->docker_compose_exec( $add_port_constant, $nginx_helper_fail_msg );
-		$this->docker_compose_exec( $add_prefix_constant, $nginx_helper_fail_msg );
-		$this->docker_compose_exec( $add_cache_key_salt, $nginx_helper_fail_msg );
-		$this->docker_compose_exec( $activate_nginx_helper, $nginx_helper_fail_msg );
-		$this->docker_compose_exec( $add_plugin_data, $nginx_helper_fail_msg );
-		$this->docker_compose_exec( $add_redis_maxttl, $nginx_helper_fail_msg );
-	}
-
-	/**
-	 *  Execute command with fail msg.
-	 *
-	 * @param string $command  Command to execute.
-	 * @param string $fail_msg failure message.
-	 */
-	private function docker_compose_exec( $command, $fail_msg = '' ) {
-		if ( empty( $command ) ) {
-			return;
-		}
-		if ( ! \EE::exec( $command ) ) {
-			\EE::warning( $fail_msg );
-		}
+		\EE_DOCKER::docker_compose_exec( "wp config set RT_WP_NGINX_HELPER_REDIS_HOSTNAME $redis_host --add=true --type=constant", 'php', 'bash', 'www-data' );
+		\EE_DOCKER::docker_compose_exec( "wp config set RT_WP_NGINX_HELPER_REDIS_PORT 6379 --add=true --type=constant", 'php', 'bash', 'www-data' );
+		\EE_DOCKER::docker_compose_exec( "wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX $page_cache_key_prefix --add=true --type=constant", 'php', 'bash', 'www-data' );
+		\EE_DOCKER::docker_compose_exec( "wp config set WP_CACHE_KEY_SALT $obj_cache_key_prefix --add=true --type=constant", 'php', 'bash', 'www-data' );
+		\EE_DOCKER::docker_compose_exec( "wp config set WP_REDIS_MAXTTL 14400 --add=true --type=constant", 'php', 'bash', 'www-data' );
+		\EE_DOCKER::docker_compose_exec( "wp $wp_cli_params rt_wp_nginx_helper_options '$plugin_data' --format=json", 'php', 'bash', 'www-data' );
+ 
 	}
 
 	/**
@@ -532,6 +507,7 @@ class WordPress extends EE_Site_Command {
 	 * @return string Generated db user.
 	 */
 	private function create_site_db_user( string $site_url ): string {
+
 		if ( strlen( $site_url ) > 53 ) {
 			$site_url = substr( $site_url, 0, 53 );
 		}
@@ -998,7 +974,7 @@ class WordPress extends EE_Site_Command {
 	 */
 	private function create_site( $assoc_args ) {
 
-		$this->level                     = 1;
+		$this->level = 1;
 		try {
 			if ( 'inherit' === $this->site_data['site_ssl'] ) {
 				$this->check_parent_site_certs( $this->site_data['site_url'] );
@@ -1060,7 +1036,7 @@ class WordPress extends EE_Site_Command {
 		}
 
 		// Reset wp-content permission which may have been changed during git clone from host machine.
-		EE::exec( "docker-compose exec --user=root php chown -R www-data: $public_dir_path/wp-content" );
+		\EE_DOCKER::docker_compose_exec( "chown -R www-data: $public_dir_path/wp-content", 'php', 'bash', 'root' );
 
 		$this->create_site_db_entry();
 		\EE::log( 'Site entry created.' );
@@ -1123,25 +1099,24 @@ class WordPress extends EE_Site_Command {
 			$wp_cli_data = EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/wp-cli.yml.mustache', [ 'wp_path' => $public_dir_path ] );
 			$this->fs->dumpFile( $this->site_data['site_fs_path'] . '/app/htdocs/wp-cli.yml', $wp_cli_data );
 
-			EE::exec( sprintf( 'docker-compose exec --user=root php mkdir -p %s', $public_dir_path ) );
+			\EE_DOCKER::docker_compose_exec( sprintf( 'mkdir -p %s', $public_dir_path ), 'php', 'bash', 'root' );
 		}
 
-		$chown_command = "docker-compose exec --user=root php chown -R www-data: /var/www/";
-		\EE::exec( $chown_command );
+		\EE_DOCKER::docker_compose_exec( 'chown -R www-data: /var/www/', 'php', 'bash', 'root' );
 
 		$wp_download_path      = $this->site_data['site_container_fs_path'];
-		$core_download_command = "docker-compose exec --user='www-data' php wp core download --path=$wp_download_path --locale='$this->locale' $core_download_arguments";
+		$core_download_command = "wp core download --path=$wp_download_path --locale='$this->locale' $core_download_arguments";
 
-		if ( ! \EE::exec( $core_download_command ) ) {
+		if ( ! \EE_DOCKER::docker_compose_exec( $core_download_command, 'php', 'bash', 'www-data' ) ) {
 			\EE::error( 'Unable to download wp core.', false );
 		}
 
 		if ( 'db' === $this->site_data['db_host'] ) {
 			$mysql_unhealthy = true;
-			$health_chk      = sprintf( "docker-compose exec --user='www-data' php mysql --user='root' --password='%s' --host='db' -e exit", $this->site_data['db_root_password'] );
+			$health_chk      = sprintf( "mysql --user='root' --password='%s' --host='db' -e exit", $this->site_data['db_root_password'] );
 			$count           = 0;
 			while ( $mysql_unhealthy ) {
-				$mysql_unhealthy = ! \EE::exec( $health_chk );
+				$mysql_unhealthy = ! \EE_DOCKER::docker_compose_exec( $health_chk, 'php', 'bash', 'root' );
 				if ( $count++ > 180 ) {
 					break;
 				}
@@ -1161,7 +1136,6 @@ class WordPress extends EE_Site_Command {
 			. '// Use dev versions of core JS and CSS files (only needed if you are modifying these core files)'
 			. "\n" . 'define( \'SCRIPT_DEBUG\', false );';
 
-
 		if ( 'wp' !== $this->site_data['app_sub_type'] ) {
 			$extra_php .= "\n\n// Disable cookie domain.\ndefine( 'COOKIE_DOMAIN', false );";
 		}
@@ -1172,10 +1146,10 @@ class WordPress extends EE_Site_Command {
 		}
 
 		$db_host                  = isset( $this->site_data['db_port'] ) ? $this->site_data['db_host'] . ':' . $this->site_data['db_port'] : $this->site_data['db_host'];
-		$wp_config_create_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp config create --dbuser=\'%s\' --dbname=\'%s\' --dbpass=\'%s\' --dbhost=\'%s\' %s --extra-php="%s"', $this->site_data['db_user'], $this->site_data['db_name'], $this->site_data['db_password'], $db_host, $config_arguments, $extra_php );
+		$wp_config_create_command = sprintf( 'wp config create --dbuser=\'%s\' --dbname=\'%s\' --dbpass=\'%s\' --dbhost=\'%s\' %s --extra-php="%s"', $this->site_data['db_user'], $this->site_data['db_name'], $this->site_data['db_password'], $db_host, $config_arguments, $extra_php );
 
 		try {
-			if ( ! \EE::exec( $wp_config_create_command ) ) {
+			if ( ! \EE_DOCKER::docker_compose_exec( $wp_config_create_command, 'php', 'bash', 'www-data' ) ) {
 				throw new \Exception( sprintf( 'Couldn\'t connect to %s:%s or there was issue in `wp config create`. Please check logs.', $this->site_data['db_host'], $this->site_data['db_port'] ) );
 			}
 
@@ -1183,8 +1157,8 @@ class WordPress extends EE_Site_Command {
 			$level_above_path       = preg_replace( '/[^\/]+$/', '', $this->site_data['site_container_fs_path'] );
 			$new_wp_config_path     = sprintf( '%swp-config.php', $level_above_path );
 
-			$move_wp_config_command = sprintf( 'docker-compose exec php mv %1$s %2$s', $default_wp_config_path, $new_wp_config_path );
-			if ( ! EE::exec( $move_wp_config_command ) ) {
+			$move_wp_config_command = sprintf( 'mv %1$s %2$s', $default_wp_config_path, $new_wp_config_path );
+			if ( ! \EE_DOCKER::docker_compose_exec( $move_wp_config_command, 'php', 'bash', 'www-data' ) ) {
 				throw new \Exception( sprintf( 'Couldn\'t move wp-config.php from %1$s to %2$s', $default_wp_config_path, $new_wp_config_path ) );
 			}
 			EE::log( sprintf( 'Moved %1$s to %2$s successfully', $default_wp_config_path, $new_wp_config_path ) );
@@ -1212,26 +1186,26 @@ class WordPress extends EE_Site_Command {
 		}
 
 		$prefix          = ( $this->site_data['site_ssl'] ) ? 'https://' : 'http://';
-		$install_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp core %s --url=\'%s%s\' --title=\'%s\' --admin_user=\'%s\'', $wp_install_command, $prefix, $this->site_data['site_url'], $this->site_data['app_admin_url'], $this->site_data['app_admin_username'] );
+		$install_command = sprintf( 'wp core %s --url=\'%s%s\' --title=\'%s\' --admin_user=\'%s\'', $wp_install_command, $prefix, $this->site_data['site_url'], $this->site_data['app_admin_url'], $this->site_data['app_admin_username'] );
 		$install_command .= $this->site_data['app_admin_password'] ? sprintf( ' --admin_password=\'%s\'', $this->site_data['app_admin_password'] ) : '';
 		$install_command .= sprintf( ' --admin_email=\'%s\' %s', $this->site_data['app_admin_email'], $maybe_multisite_type );
 
-		$core_install = \EE::exec( $install_command, false, false, [
+		$core_install = \EE_DOCKER::docker_compose_exec( $install_command, 'php', 'bash', 'www-data', '', false, false, [
 			$this->site_data['app_admin_username'],
 			$this->site_data['app_admin_email'],
 			$this->site_data['app_admin_password'],
 		] );
 
-		EE::exec( 'docker-compose exec php wp rewrite structure "/%year%/%monthnum%/%day%/%postname%/" --hard' );
-
 		if ( ! $core_install ) {
 			throw new \Exception( 'WordPress install failed. Please check logs.' );
 		}
 
+		\EE_DOCKER::docker_compose_exec( 'wp rewrite structure "/%year%/%monthnum%/%day%/%postname%/" --hard', 'php', 'bash', 'www-data' );
+
 		$env_type = \EE::get_runner()->config['env'];
 		$env_type = in_array( $env_type, [ 'production', 'staging', 'development', 'local' ] ) ? $env_type : '';
 		if ( ! empty( $env_type ) ) {
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_ENVIRONMENT_TYPE  \'' . $env_type . '\' ' );
+			\EE_DOCKER::docker_compose_exec( 'wp config set --type=constant WP_ENVIRONMENT_TYPE  \'' . $env_type . '\' ', 'php', 'bash', 'www-data' );
 		}
 
 		\EE::success( $prefix . $this->site_data['site_url'] . ' has been created successfully!' );
@@ -1380,7 +1354,7 @@ class WordPress extends EE_Site_Command {
 		chdir( $this->site_data['site_fs_path'] );
 
 		// Reset wp-content permission which may have been changed during git clone from host machine. Making it `/var/www/htdocs/` so that it accomodates the changes of `--public-dir` input if any.
-		EE::exec( "docker-compose exec --user=root php chown -R www-data: /var/www/htdocs/" );
+		\EE_DOCKER::docker_compose_exec( 'chown -R www-data: /var/www/htdocs/', 'php', 'bash', 'root' );
 
 		\EE::log( "VIP Go environment setup completed." );
 	}
@@ -1582,6 +1556,7 @@ class WordPress extends EE_Site_Command {
 	 *
 	 */
 	public function share( $args, $assoc_args ) {
+
 		parent::share( $args, $assoc_args );
 
 		$disable = get_flag_value( $assoc_args, 'disable', false );
@@ -1594,14 +1569,14 @@ class WordPress extends EE_Site_Command {
 		EE::log( 'Running additional WordPress configurations.' );
 		chdir( $this->site_data->site_fs_path );
 		if ( $disable ) {
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp plugin delete relative-url' );
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config delete WP_SITEURL' );
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config delete WP_HOME' );
+			\EE_DOCKER::docker_compose_exec( 'wp plugin delete relative-url', 'php', 'bash', 'www-data' );
+			\EE_DOCKER::docker_compose_exec( 'wp config delete WP_SITEURL', 'php', 'bash', 'www-data' );
+			\EE_DOCKER::docker_compose_exec( 'wp config delete WP_HOME', 'php', 'bash', 'www-data' );
 		} else {
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp plugin install relative-url --activate' );
+			\EE_DOCKER::docker_compose_exec( 'wp plugin install relative-url --activate', 'php', 'bash', 'www-data' );
 			$set_url = 'http://\' . empty( \$_SERVER[\'HTTP_HOST\'] ) ? \'' . $this->site_data->site_url . '\'  : \$_SERVER[\'HTTP_HOST\']';
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_SITEURL \'' . $set_url . '\' --raw' );
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_HOME \'' . $set_url . '\' --raw' );
+			\EE_DOCKER::docker_compose_exec( 'wp config set --type=constant WP_SITEURL \'' . $set_url . '\' --raw', 'php', 'bash', 'www-data' );
+			\EE_DOCKER::docker_compose_exec( 'wp config set --type=constant WP_HOME \'' . $set_url . '\' --raw', 'php', 'bash', 'www-data' );
 		}
 
 		EE::success( 'WordPress configurations updated for publish.' );
