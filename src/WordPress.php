@@ -1185,21 +1185,16 @@ class WordPress extends EE_Site_Command {
 			$maybe_multisite_type = $this->site_data['app_sub_type'] === 'subdom' ? '--subdomains' : '';
 		}
 
-
-		$skip_tty        = \EE::get_runner()->config['skip-tty'];
-		$tty             = empty( $skip_tty ) ? '' : '-T';
 		$prefix          = ( $this->site_data['site_ssl'] ) ? 'https://' : 'http://';
-		$install_command = sprintf( 'docker-compose exec %s --user=\'www-data\' php wp core %s --url=\'%s%s\' --title=\'%s\' --admin_user=\'%s\'', $tty, $wp_install_command, $prefix, $this->site_data['site_url'], $this->site_data['app_admin_url'], $this->site_data['app_admin_username'] );
+		$install_command = sprintf( 'wp core %s --url=\'%s%s\' --title=\'%s\' --admin_user=\'%s\'', $wp_install_command, $prefix, $this->site_data['site_url'], $this->site_data['app_admin_url'], $this->site_data['app_admin_username'] );
 		$install_command .= $this->site_data['app_admin_password'] ? sprintf( ' --admin_password=\'%s\'', $this->site_data['app_admin_password'] ) : '';
 		$install_command .= sprintf( ' --admin_email=\'%s\' %s', $this->site_data['app_admin_email'], $maybe_multisite_type );
 
-		$core_install = \EE::exec( $install_command, false, false, [
+		$core_install = \EE_DOCKER::docker_compose_exec( $install_command, 'php', 'bash', 'www-data', '', false, false, [
 			$this->site_data['app_admin_username'],
 			$this->site_data['app_admin_email'],
 			$this->site_data['app_admin_password'],
 		] );
-
-		\EE_DOCKER::docker_compose_exec( 'wp rewrite structure "/%year%/%monthnum%/%day%/%postname%/" --hard', 'php', 'bash', 'www-data' );
 
 		if ( ! $core_install ) {
 			throw new \Exception( 'WordPress install failed. Please check logs.' );
