@@ -94,7 +94,8 @@ class WordPress extends EE_Site_Command {
 	 * : Use redis cache for WordPress.
 	 *
 	 * [--vip]
-	 * : Create WordPress VIP GO site using your vip repo which contains wp-content dir. Default it will use skeleton repo.
+	 * : Create WordPress VIP GO site using your vip repo which contains wp-content dir. Default it will use skeleton
+	 * repo.
 	 * ---
 	 * default: https://github.com/Automattic/vip-go-skeleton.git
 	 * ---
@@ -266,7 +267,7 @@ class WordPress extends EE_Site_Command {
 		$this->logger->debug( 'assoc_args:', empty( $assoc_args ) ? array( 'NULL' ) : $assoc_args );
 		$this->site_data['site_url']  = strtolower( \EE\Utils\remove_trailing_slash( $args[0] ) );
 
-		$mu = \EE\Utils\get_flag_value( $assoc_args, 'mu' );
+		$mu                              = \EE\Utils\get_flag_value( $assoc_args, 'mu' );
 		$this->site_data['app_sub_type'] = $mu ?? 'wp';
 
 		EE::log( 'Starting site creation.' );
@@ -361,7 +362,7 @@ class WordPress extends EE_Site_Command {
 		if ( ! empty( $alias_domains ) ) {
 			$comma_seprated_domains = explode( ',', $alias_domains );
 			foreach ( $comma_seprated_domains as $domain ) {
-				$trimmed_domain = trim( $domain );
+				$trimmed_domain                   = trim( $domain );
 				$this->site_data['alias_domains'] .= $trimmed_domain . ',';
 			}
 		}
@@ -375,7 +376,7 @@ class WordPress extends EE_Site_Command {
 				$this->site_data['php_version'] = 5.6;
 			} elseif ( 7 === $floor ) {
 				$this->site_data['php_version'] = 7.4;
-				$old_version .= ' yet';
+				$old_version                    .= ' yet';
 			} elseif ( 8 === $floor ) {
 			$this->site_data['php_version'] = 8.0;
 			$old_version .= ' yet';
@@ -550,6 +551,7 @@ class WordPress extends EE_Site_Command {
 			$site = (array) Site::find( $this->site_data['site_url'] );
 			$site = reset( $site );
 			EE::log( json_encode( $site ) );
+
 			return;
 		}
 
