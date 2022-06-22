@@ -112,11 +112,14 @@ class WordPress extends EE_Site_Command {
 	 * [--admin-user=<admin-user>]
 	 * : Username of the administrator.
 	 *
+	 * [--admin-email=<admin-email>]
+	 * : E-Mail of the administrator.
+	 *
 	 * [--admin-pass=<admin-pass>]
 	 * : Password for the the administrator.
 	 *
-	 * [--admin-email=<admin-email>]
-	 * : E-Mail of the administrator.
+	 * [--allow-insecure-pass]
+	 * : Allow insecure password for the the administrator.
 	 *
 	 * [--local-db]
 	 * : Create separate db container instead of using global db.
@@ -128,7 +131,7 @@ class WordPress extends EE_Site_Command {
 	 * : Set custom source directory for site inside htdocs.
 	 *
 	 * [--php=<php-version>]
-	 * : PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4, 8.0 and latest.
+	 * : PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1 and latest.
 	 * ---
 	 * default: latest
 	 * options:
@@ -138,6 +141,7 @@ class WordPress extends EE_Site_Command {
 	 *	- 7.3
 	 *	- 7.4
 	 *	- 8.0
+	 *	- 8.1
 	 *	- latest
 	 * ---
 	 *
@@ -262,7 +266,6 @@ class WordPress extends EE_Site_Command {
 		$this->logger->debug( 'args:', $args );
 		$this->logger->debug( 'assoc_args:', empty( $assoc_args ) ? array( 'NULL' ) : $assoc_args );
 		$this->site_data['site_url']  = strtolower( \EE\Utils\remove_trailing_slash( $args[0] ) );
-		$this->site_data['subnet_ip'] = \EE\Site\Utils\get_available_subnet();
 
 		$mu                              = \EE\Utils\get_flag_value( $assoc_args, 'mu' );
 		$this->site_data['app_sub_type'] = $mu ?? 'wp';
@@ -294,23 +297,24 @@ class WordPress extends EE_Site_Command {
 		$alias_domain_to_check[] = $this->site_data['site_url'];
 		check_alias_in_db( $alias_domain_to_check );
 
-		$this->site_data['site_fs_path']       = WEBROOT . $this->site_data['site_url'];
-		$this->cache_type                      = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
-		$wildcard_flag                         = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
-		$this->site_data['site_ssl_wildcard']  = 'subdom' === $this->site_data['app_sub_type'] || $wildcard_flag ? true : false;
-		$this->site_data['php_version']        = \EE\Utils\get_flag_value( $assoc_args, 'php', 'latest' );
-		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
-		$this->site_data['app_admin_username'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', \EE\Utils\random_name_generator() );
-		$this->site_data['app_admin_password'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', '' );
-		$this->site_data['db_name']            = \EE\Utils\get_flag_value( $assoc_args, 'dbname', str_replace( [ '.', '-' ], '_', $this->site_data['site_url'] ) );
-		$this->site_data['db_host']            = \EE\Utils\get_flag_value( $assoc_args, 'dbhost', GLOBAL_DB );
-		$this->site_data['db_port']            = '3306';
-		$this->site_data['db_user']            = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
-		$this->site_data['db_password']        = \EE\Utils\get_flag_value( $assoc_args, 'dbpass', \EE\Utils\random_password() );
-		$this->site_data['proxy_cache']        = \EE\Utils\get_flag_value( $assoc_args, 'proxy-cache' );
-		$this->locale                          = \EE\Utils\get_flag_value( $assoc_args, 'locale', \EE::get_config( 'locale' ) );
-		$local_cache                           = \EE\Utils\get_flag_value( $assoc_args, 'with-local-redis' );
-		$this->site_data['cache_host']         = '';
+		$this->site_data['site_fs_path']        = WEBROOT . $this->site_data['site_url'];
+		$this->cache_type                       = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
+		$wildcard_flag                          = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
+		$this->site_data['site_ssl_wildcard']   = 'subdom' === $this->site_data['app_sub_type'] || $wildcard_flag ? true : false;
+		$this->site_data['php_version']         = \EE\Utils\get_flag_value( $assoc_args, 'php', 'latest' );
+		$this->site_data['app_admin_url']       = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
+		$this->site_data['app_admin_username']  = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', \EE\Utils\random_name_generator() );
+		$this->site_data['app_admin_password']  = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', '' );
+		$this->site_data['allow_insecure_pass'] = \EE\Utils\get_flag_value( $assoc_args, 'allow-insecure-pass', false );
+		$this->site_data['db_name']             = \EE\Utils\get_flag_value( $assoc_args, 'dbname', str_replace( [ '.', '-' ], '_', $this->site_data['site_url'] ) );
+		$this->site_data['db_host']             = \EE\Utils\get_flag_value( $assoc_args, 'dbhost', GLOBAL_DB );
+		$this->site_data['db_port']             = '3306';
+		$this->site_data['db_user']             = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
+		$this->site_data['db_password']         = \EE\Utils\get_flag_value( $assoc_args, 'dbpass', \EE\Utils\random_password() );
+		$this->site_data['proxy_cache']         = \EE\Utils\get_flag_value( $assoc_args, 'proxy-cache' );
+		$this->locale                           = \EE\Utils\get_flag_value( $assoc_args, 'locale', \EE::get_config( 'locale' ) );
+		$local_cache                            = \EE\Utils\get_flag_value( $assoc_args, 'with-local-redis' );
+		$this->site_data['cache_host']          = '';
 		if ( 'on' === $this->site_data['proxy_cache'] ) {
 			$this->cache_type = true;
 		}
@@ -320,7 +324,7 @@ class WordPress extends EE_Site_Command {
 
 		if ( empty( $this->site_data['app_admin_password'] ) ) {
 			$this->site_data['app_admin_password'] = \EE\Utils\random_password( 18 );
-		} else {
+		} elseif ( ! $this->site_data['allow_insecure_pass'] ) {
 			$pass_error_msg = [];
 			if ( strlen( $this->site_data['app_admin_password'] ) < 8 ) {
 				$pass_error_msg[] = "Password too short! Must be at least 8 characters long.";
@@ -364,7 +368,7 @@ class WordPress extends EE_Site_Command {
 		}
 		$this->site_data['alias_domains'] = substr( $this->site_data['alias_domains'], 0, - 1 );
 
-		$supported_php_versions = [ 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 'latest' ];
+		$supported_php_versions = [ 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1, 'latest' ];
 		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions ) ) {
 			$old_version = $this->site_data['php_version'];
 			$floor       = (int) floor( $this->site_data['php_version'] );
@@ -440,21 +444,18 @@ class WordPress extends EE_Site_Command {
 	 */
 	private function enable_object_cache() {
 
-		$redis_host               = $this->site_data['cache_host'];
-		$redis_plugin_constant    = 'docker-compose exec --user=\'www-data\' php wp config set --type=variable redis_server "array(\'host\'=> \'' . $redis_host . '\',\'port\'=> 6379,)" --raw';
-		$activate_wp_redis_plugin = "docker-compose exec --user='www-data' php wp plugin install wp-redis --activate";
-		$enable_redis_cache       = "docker-compose exec --user='www-data' php wp redis enable";
-
-		$this->docker_compose_exec( $redis_plugin_constant, 'Unable to download or activate wp-redis plugin.' );
-		$this->docker_compose_exec( $activate_wp_redis_plugin, 'Unable to download or activate wp-redis plugin.' );
-		$this->docker_compose_exec( $enable_redis_cache, 'Unable to enable object cache' );
+		$redis_host = $this->site_data['cache_host'];
+		\EE_DOCKER::docker_compose_exec( 'wp config set --type=variable redis_server "array(\'host\'=> \'' . $redis_host . '\',\'port\'=> 6379,)" --raw', 'php', 'bash', 'www-data' );
+		\EE_DOCKER::docker_compose_exec( "wp plugin install wp-redis --activate", 'php', 'bash', 'www-data' );
+		\EE_DOCKER::docker_compose_exec( "wp redis enable", 'php', 'bash', 'www-data' );
 	}
 
 	/**
 	 * Enable page cache.
 	 */
 	private function enable_page_cache() {
-		$activate_nginx_helper = 'docker-compose exec --user=\'www-data\' php wp plugin install nginx-helper --activate';
+
+		$activate_nginx_helper = \EE_DOCKER::docker_compose_exec( 'wp plugin install nginx-helper --activate', 'php', 'bash', 'www-data' );
 		$nginx_helper_fail_msg = 'Unable to download or activate nginx-helper plugin properly.';
 		$page_cache_key_prefix = $this->site_data['site_url'] . '_page:';
 		$obj_cache_key_prefix  = $this->site_data['site_url'] . '_obj:';
@@ -490,35 +491,13 @@ class WordPress extends EE_Site_Command {
 			$page_cache_key_prefix
 		);
 
-		$add_hostname_constant = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_HOSTNAME $redis_host --add=true --type=constant";
-		$add_port_constant     = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PORT 6379 --add=true --type=constant";
-		$add_prefix_constant   = "docker-compose exec --user='www-data' php wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX $page_cache_key_prefix --add=true --type=constant";
-		$add_cache_key_salt    = "docker-compose exec --user='www-data' php wp config set WP_CACHE_KEY_SALT $obj_cache_key_prefix --add=true --type=constant";
-		$add_redis_maxttl      = "docker-compose exec --user='www-data' php wp config set WP_REDIS_MAXTTL 14400 --add=true --type=constant";
-		$add_plugin_data       = "docker-compose exec --user='www-data' php wp $wp_cli_params rt_wp_nginx_helper_options '$plugin_data' --format=json";
-
-		$this->docker_compose_exec( $add_hostname_constant, $nginx_helper_fail_msg );
-		$this->docker_compose_exec( $add_port_constant, $nginx_helper_fail_msg );
-		$this->docker_compose_exec( $add_prefix_constant, $nginx_helper_fail_msg );
-		$this->docker_compose_exec( $add_cache_key_salt, $nginx_helper_fail_msg );
-		$this->docker_compose_exec( $activate_nginx_helper, $nginx_helper_fail_msg );
-		$this->docker_compose_exec( $add_plugin_data, $nginx_helper_fail_msg );
-		$this->docker_compose_exec( $add_redis_maxttl, $nginx_helper_fail_msg );
-	}
-
-	/**
-	 *  Execute command with fail msg.
-	 *
-	 * @param string $command  Command to execute.
-	 * @param string $fail_msg failure message.
-	 */
-	private function docker_compose_exec( $command, $fail_msg = '' ) {
-		if ( empty( $command ) ) {
-			return;
-		}
-		if ( ! \EE::exec( $command ) ) {
-			\EE::warning( $fail_msg );
-		}
+		\EE_DOCKER::docker_compose_exec( "wp config set RT_WP_NGINX_HELPER_REDIS_HOSTNAME $redis_host --add=true --type=constant", 'php', 'bash', 'www-data' );
+		\EE_DOCKER::docker_compose_exec( "wp config set RT_WP_NGINX_HELPER_REDIS_PORT 6379 --add=true --type=constant", 'php', 'bash', 'www-data' );
+		\EE_DOCKER::docker_compose_exec( "wp config set RT_WP_NGINX_HELPER_REDIS_PREFIX $page_cache_key_prefix --add=true --type=constant", 'php', 'bash', 'www-data' );
+		\EE_DOCKER::docker_compose_exec( "wp config set WP_CACHE_KEY_SALT $obj_cache_key_prefix --add=true --type=constant", 'php', 'bash', 'www-data' );
+		\EE_DOCKER::docker_compose_exec( "wp config set WP_REDIS_MAXTTL 14400 --add=true --type=constant", 'php', 'bash', 'www-data' );
+		\EE_DOCKER::docker_compose_exec( "wp $wp_cli_params rt_wp_nginx_helper_options '$plugin_data' --format=json", 'php', 'bash', 'www-data' );
+ 
 	}
 
 	/**
@@ -529,6 +508,7 @@ class WordPress extends EE_Site_Command {
 	 * @return string Generated db user.
 	 */
 	private function create_site_db_user( string $site_url ): string {
+
 		if ( strlen( $site_url ) > 53 ) {
 			$site_url = substr( $site_url, 0, 53 );
 		}
@@ -824,7 +804,6 @@ class WordPress extends EE_Site_Command {
 		$filter['site_prefix']   = \EE_DOCKER::get_docker_style_prefix( $this->site_data['site_url'] );
 		$filter['php_version']   = ( string ) $this->site_data['php_version'];
 		$filter['alias_domains'] = implode( ',', array_diff( explode( ',', $this->site_data['alias_domains'] ), [ $this->site_data['site_url'] ] ) );
-		$filter['subnet_ip']     = $this->site_data['subnet_ip'];
 		$site_docker             = new Site_WP_Docker();
 
 		foreach ( $additional_filters as $key => $addon_filter ) {
@@ -1059,7 +1038,7 @@ class WordPress extends EE_Site_Command {
 		}
 
 		// Reset wp-content permission which may have been changed during git clone from host machine.
-		EE::exec( "docker-compose exec --user=root php chown -R www-data: $public_dir_path/wp-content" );
+		\EE_DOCKER::docker_compose_exec( "chown -R www-data: $public_dir_path/wp-content", 'php', 'bash', 'root' );
 
 		$this->create_site_db_entry();
 		\EE::log( 'Site entry created.' );
@@ -1067,6 +1046,12 @@ class WordPress extends EE_Site_Command {
 		\EE::log( 'Creating cron entry' );
 		$cron_interval = rand( 0, 9 );
 		\EE::runcommand( 'cron create ' . $this->site_data['site_url'] . " --user=www-data --command='wp cron event run --due-now' --schedule='$cron_interval/10 * * * *'" );
+
+		$env_type = \EE::get_runner()->config['env'];
+		if ( ! empty( $env_type ) && in_array( $env_type, [ 'develop', 'development', 'local', 'staging' ] ) ) {
+			\EE::log( 'Enabling mailhog as this is a ' . $env_type . ' server.' );
+			\EE::runcommand( 'mailhog enable ' . $this->site_data['site_url'] );
+		}
 
 		$this->info( [ $this->site_data['site_url'] ], [] );
 	}
@@ -1116,25 +1101,24 @@ class WordPress extends EE_Site_Command {
 			$wp_cli_data = EE\Utils\mustache_render( SITE_WP_TEMPLATE_ROOT . '/wp-cli.yml.mustache', [ 'wp_path' => $public_dir_path ] );
 			$this->fs->dumpFile( $this->site_data['site_fs_path'] . '/app/htdocs/wp-cli.yml', $wp_cli_data );
 
-			EE::exec( sprintf( 'docker-compose exec --user=root php mkdir -p %s', $public_dir_path ) );
+			\EE_DOCKER::docker_compose_exec( sprintf( 'mkdir -p %s', $public_dir_path ), 'php', 'bash', 'root' );
 		}
 
-		$chown_command = "docker-compose exec --user=root php chown -R www-data: /var/www/";
-		\EE::exec( $chown_command );
+		\EE_DOCKER::docker_compose_exec( 'chown -R www-data: /var/www/', 'php', 'bash', 'root' );
 
 		$wp_download_path      = $this->site_data['site_container_fs_path'];
-		$core_download_command = "docker-compose exec --user='www-data' php wp core download --path=$wp_download_path --locale='$this->locale' $core_download_arguments";
+		$core_download_command = "wp core download --path=$wp_download_path --locale='$this->locale' $core_download_arguments";
 
-		if ( ! \EE::exec( $core_download_command ) ) {
+		if ( ! \EE_DOCKER::docker_compose_exec( $core_download_command, 'php', 'bash', 'www-data' ) ) {
 			\EE::error( 'Unable to download wp core.', false );
 		}
 
 		if ( 'db' === $this->site_data['db_host'] ) {
 			$mysql_unhealthy = true;
-			$health_chk      = sprintf( "docker-compose exec --user='www-data' php mysql --user='root' --password='%s' --host='db' -e exit", $this->site_data['db_root_password'] );
+			$health_chk      = sprintf( "mysql --user='root' --password='%s' --host='db' -e exit", $this->site_data['db_root_password'] );
 			$count           = 0;
 			while ( $mysql_unhealthy ) {
-				$mysql_unhealthy = ! \EE::exec( $health_chk );
+				$mysql_unhealthy = ! \EE_DOCKER::docker_compose_exec( $health_chk, 'php', 'bash', 'root' );
 				if ( $count++ > 180 ) {
 					break;
 				}
@@ -1143,21 +1127,31 @@ class WordPress extends EE_Site_Command {
 		}
 
 		// Added wp-config.php debug constants referred from https://codex.wordpress.org/Debugging_in_WordPress.
-		$extra_php = 'if ( isset( \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] ) && \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] == \'https\' ) {' . "\n" . '	\$_SERVER[\'HTTPS\'] = \'on\';' . "\n}\n\n" . '// Enable WP_DEBUG mode.' . "\n" . 'define( \'WP_DEBUG\', false );' . "\n\n" . '// Enable Debug logging to the /wp-content/debug.log file' . "\n" . 'define( \'WP_DEBUG_LOG\', false );' . "\n\n" . '// Disable display of errors and warnings.' . "\n" . 'define( \'WP_DEBUG_DISPLAY\', false );' . "\n" . '@ini_set( \'display_errors\', 0 );' . "\n\n" . '// Use dev versions of core JS and CSS files (only needed if you are modifying these core files)' . "\n" . 'define( \'SCRIPT_DEBUG\', false );';
+		$extra_php = 'if ( isset( \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] ) && \$_SERVER[\'HTTP_X_FORWARDED_PROTO\'] == \'https\' ) {'
+			. "\n" . '	\$_SERVER[\'HTTPS\'] = \'on\';'
+			. "\n}\n\n"
+			. '// Enable Debug logging to the /wp-content/debug.log file'
+			. "\n" . 'define( \'WP_DEBUG_LOG\', false );' . "\n\n"
+			. '// Disable display of errors and warnings.'
+			. "\n" . 'define( \'WP_DEBUG_DISPLAY\', false );'
+			. "\n" . '@ini_set( \'display_errors\', 0 );' . "\n\n"
+			. '// Use dev versions of core JS and CSS files (only needed if you are modifying these core files)'
+			. "\n" . 'define( \'SCRIPT_DEBUG\', false );';
 
 		if ( 'wp' !== $this->site_data['app_sub_type'] ) {
 			$extra_php .= "\n\n// Disable cookie domain.\ndefine( 'COOKIE_DOMAIN', false );";
 		}
 
 		if ( $this->is_vip ) {
+			$extra_php .= "\n\nif ( file_exists( ABSPATH . '/wp-content/mu-plugins/000-pre-vip-config/requires.php' ) ) {\n	require_once( ABSPATH . '/wp-content/mu-plugins/000-pre-vip-config/requires.php' );\n}";
 			$extra_php .= "\n\nif ( file_exists( ABSPATH . '/wp-content/vip-config/vip-config.php' ) ) {\n	require_once( ABSPATH . '/wp-content/vip-config/vip-config.php' );\n}";
 		}
 
 		$db_host                  = isset( $this->site_data['db_port'] ) ? $this->site_data['db_host'] . ':' . $this->site_data['db_port'] : $this->site_data['db_host'];
-		$wp_config_create_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp config create --dbuser=\'%s\' --dbname=\'%s\' --dbpass=\'%s\' --dbhost=\'%s\' %s --extra-php="%s"', $this->site_data['db_user'], $this->site_data['db_name'], $this->site_data['db_password'], $db_host, $config_arguments, $extra_php );
+		$wp_config_create_command = sprintf( 'wp config create --dbuser=\'%s\' --dbname=\'%s\' --dbpass=\'%s\' --dbhost=\'%s\' %s --extra-php="%s"', $this->site_data['db_user'], $this->site_data['db_name'], $this->site_data['db_password'], $db_host, $config_arguments, $extra_php );
 
 		try {
-			if ( ! \EE::exec( $wp_config_create_command ) ) {
+			if ( ! \EE_DOCKER::docker_compose_exec( $wp_config_create_command, 'php', 'bash', 'www-data' ) ) {
 				throw new \Exception( sprintf( 'Couldn\'t connect to %s:%s or there was issue in `wp config create`. Please check logs.', $this->site_data['db_host'], $this->site_data['db_port'] ) );
 			}
 
@@ -1165,8 +1159,8 @@ class WordPress extends EE_Site_Command {
 			$level_above_path       = preg_replace( '/[^\/]+$/', '', $this->site_data['site_container_fs_path'] );
 			$new_wp_config_path     = sprintf( '%swp-config.php', $level_above_path );
 
-			$move_wp_config_command = sprintf( 'docker-compose exec php mv %1$s %2$s', $default_wp_config_path, $new_wp_config_path );
-			if ( ! EE::exec( $move_wp_config_command ) ) {
+			$move_wp_config_command = sprintf( 'mv %1$s %2$s', $default_wp_config_path, $new_wp_config_path );
+			if ( ! \EE_DOCKER::docker_compose_exec( $move_wp_config_command, 'php', 'bash', 'www-data' ) ) {
 				throw new \Exception( sprintf( 'Couldn\'t move wp-config.php from %1$s to %2$s', $default_wp_config_path, $new_wp_config_path ) );
 			}
 			EE::log( sprintf( 'Moved %1$s to %2$s successfully', $default_wp_config_path, $new_wp_config_path ) );
@@ -1194,20 +1188,26 @@ class WordPress extends EE_Site_Command {
 		}
 
 		$prefix          = ( $this->site_data['site_ssl'] ) ? 'https://' : 'http://';
-		$install_command = sprintf( 'docker-compose exec --user=\'www-data\' php wp core %s --url=\'%s%s\' --title=\'%s\' --admin_user=\'%s\'', $wp_install_command, $prefix, $this->site_data['site_url'], $this->site_data['app_admin_url'], $this->site_data['app_admin_username'] );
+		$install_command = sprintf( 'wp core %s --url=\'%s%s\' --title=\'%s\' --admin_user=\'%s\'', $wp_install_command, $prefix, $this->site_data['site_url'], $this->site_data['app_admin_url'], $this->site_data['app_admin_username'] );
 		$install_command .= $this->site_data['app_admin_password'] ? sprintf( ' --admin_password=\'%s\'', $this->site_data['app_admin_password'] ) : '';
 		$install_command .= sprintf( ' --admin_email=\'%s\' %s', $this->site_data['app_admin_email'], $maybe_multisite_type );
 
-		$core_install = \EE::exec( $install_command, false, false, [
+		$core_install = \EE_DOCKER::docker_compose_exec( $install_command, 'php', 'bash', 'www-data', '', false, false, [
 			$this->site_data['app_admin_username'],
 			$this->site_data['app_admin_email'],
 			$this->site_data['app_admin_password'],
 		] );
 
-		EE::exec( 'docker-compose exec php wp rewrite structure "/%year%/%monthnum%/%day%/%postname%/" --hard' );
-
 		if ( ! $core_install ) {
 			throw new \Exception( 'WordPress install failed. Please check logs.' );
+		}
+
+		\EE_DOCKER::docker_compose_exec( 'wp rewrite structure "/%year%/%monthnum%/%day%/%postname%/" --hard', 'php', 'bash', 'www-data' );
+
+		$env_type = \EE::get_runner()->config['env'];
+		$env_type = in_array( $env_type, [ 'production', 'staging', 'development', 'local' ] ) ? $env_type : '';
+		if ( ! empty( $env_type ) ) {
+			\EE_DOCKER::docker_compose_exec( 'wp config set --type=constant WP_ENVIRONMENT_TYPE  \'' . $env_type . '\' ', 'php', 'bash', 'www-data' );
 		}
 
 		\EE::success( $prefix . $this->site_data['site_url'] . ' has been created successfully!' );
@@ -1356,7 +1356,7 @@ class WordPress extends EE_Site_Command {
 		chdir( $this->site_data['site_fs_path'] );
 
 		// Reset wp-content permission which may have been changed during git clone from host machine. Making it `/var/www/htdocs/` so that it accomodates the changes of `--public-dir` input if any.
-		EE::exec( "docker-compose exec --user=root php chown -R www-data: /var/www/htdocs/" );
+		\EE_DOCKER::docker_compose_exec( 'chown -R www-data: /var/www/htdocs/', 'php', 'bash', 'root' );
 
 		\EE::log( "VIP Go environment setup completed." );
 	}
@@ -1368,7 +1368,6 @@ class WordPress extends EE_Site_Command {
 
 		$data = [
 			'site_url'               => $this->site_data['site_url'],
-			'subnet_ip'              => $this->site_data['subnet_ip'],
 			'site_type'              => $this->site_data['site_type'],
 			'app_admin_url'          => $this->site_data['app_admin_url'],
 			'app_admin_email'        => $this->site_data['app_admin_email'],
@@ -1559,6 +1558,7 @@ class WordPress extends EE_Site_Command {
 	 *
 	 */
 	public function share( $args, $assoc_args ) {
+
 		parent::share( $args, $assoc_args );
 
 		$disable = get_flag_value( $assoc_args, 'disable', false );
@@ -1571,14 +1571,14 @@ class WordPress extends EE_Site_Command {
 		EE::log( 'Running additional WordPress configurations.' );
 		chdir( $this->site_data->site_fs_path );
 		if ( $disable ) {
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp plugin delete relative-url' );
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config delete WP_SITEURL' );
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config delete WP_HOME' );
+			\EE_DOCKER::docker_compose_exec( 'wp plugin delete relative-url', 'php', 'bash', 'www-data' );
+			\EE_DOCKER::docker_compose_exec( 'wp config delete WP_SITEURL', 'php', 'bash', 'www-data' );
+			\EE_DOCKER::docker_compose_exec( 'wp config delete WP_HOME', 'php', 'bash', 'www-data' );
 		} else {
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp plugin install relative-url --activate' );
+			\EE_DOCKER::docker_compose_exec( 'wp plugin install relative-url --activate', 'php', 'bash', 'www-data' );
 			$set_url = 'http://\' . empty( \$_SERVER[\'HTTP_HOST\'] ) ? \'' . $this->site_data->site_url . '\'  : \$_SERVER[\'HTTP_HOST\']';
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_SITEURL \'' . $set_url . '\' --raw' );
-			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_HOME \'' . $set_url . '\' --raw' );
+			\EE_DOCKER::docker_compose_exec( 'wp config set --type=constant WP_SITEURL \'' . $set_url . '\' --raw', 'php', 'bash', 'www-data' );
+			\EE_DOCKER::docker_compose_exec( 'wp config set --type=constant WP_HOME \'' . $set_url . '\' --raw', 'php', 'bash', 'www-data' );
 		}
 
 		EE::success( 'WordPress configurations updated for publish.' );
