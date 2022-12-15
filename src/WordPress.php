@@ -497,7 +497,7 @@ class WordPress extends EE_Site_Command {
 		\EE_DOCKER::docker_compose_exec( "wp config set WP_CACHE_KEY_SALT $obj_cache_key_prefix --add=true --type=constant", 'php', 'bash', 'www-data' );
 		\EE_DOCKER::docker_compose_exec( "wp config set WP_REDIS_MAXTTL 14400 --add=true --type=constant", 'php', 'bash', 'www-data' );
 		\EE_DOCKER::docker_compose_exec( "wp $wp_cli_params rt_wp_nginx_helper_options '$plugin_data' --format=json", 'php', 'bash', 'www-data' );
- 
+
 	}
 
 	/**
@@ -1109,8 +1109,18 @@ class WordPress extends EE_Site_Command {
 		$wp_download_path      = $this->site_data['site_container_fs_path'];
 		$core_download_command = "wp core download --path=$wp_download_path --locale='$this->locale' $core_download_arguments";
 
-		if ( ! \EE_DOCKER::docker_compose_exec( $core_download_command, 'php', 'bash', 'www-data' ) ) {
-			\EE::error( 'Unable to download wp core.', false );
+		$retry = 0;
+
+		while ( $retry < 5 ) {
+			if ( ! \EE_DOCKER::docker_compose_exec( $core_download_command, 'php', 'bash', 'www-data' ) ) {
+				if ( $retry++ < 5 ) {
+					\EE::log( 'Unable to download wp core. Retrying...' );
+					continue;
+				}
+				\EE::error( 'Unable to download wp core.', false );
+			} else {
+				break;
+			}
 		}
 
 		if ( 'db' === $this->site_data['db_host'] ) {
