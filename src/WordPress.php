@@ -388,7 +388,7 @@ class WordPress extends EE_Site_Command {
 			\EE::confirm( sprintf( 'EEv4 does not support PHP %s. Continue with PHP %s?', $old_version, $this->site_data['php_version'] ), $assoc_args );
 		}
 
-		$this->site_data['php_version'] = ( 7.4 === (double) $this->site_data['php_version'] ) ? 'latest' : $this->site_data['php_version'];
+		$this->site_data['php_version'] = ( 8.2 === (double) $this->site_data['php_version'] ) ? 'latest' : $this->site_data['php_version'];
 
 		if ( \EE\Utils\get_flag_value( $assoc_args, 'local-db' ) ) {
 			$this->site_data['db_host'] = 'db';
