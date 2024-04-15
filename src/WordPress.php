@@ -133,7 +133,7 @@ class WordPress extends EE_Site_Command {
 	 * [--php=<php-version>]
 	 * : PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.3 and latest.
 	 * ---
-	 * default: 8.2
+	 * default: latest
 	 * options:
 	 *	- 5.6
 	 *	- 7.0
