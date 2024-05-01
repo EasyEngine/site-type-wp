@@ -380,7 +380,7 @@ class WordPress extends EE_Site_Command {
 				$this->site_data['php_version'] = 7.4;
 				$old_version                    .= ' yet';
 			} elseif ( 8 === $floor ) {
-			$this->site_data['php_version'] = 8.0;
+			$this->site_data['php_version'] = 8.2;
 			$old_version .= ' yet';
 		} else {
 				EE::error( 'Unsupported PHP version: ' . $this->site_data['php_version'] );
