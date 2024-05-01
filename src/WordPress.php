@@ -803,6 +803,7 @@ class WordPress extends EE_Site_Command {
 		$filter[]                = $this->site_data['cache_host'];
 		$filter[]                = $this->site_data['db_host'];
 		$filter['is_ssl']        = $this->site_data['site_ssl'];
+		$filter['site_url']      = $this->site_data['site_url'];
 		$filter['site_prefix']   = \EE_DOCKER::get_docker_style_prefix( $this->site_data['site_url'] );
 		$filter['php_version']   = ( string ) $this->site_data['php_version'];
 		$filter['alias_domains'] = implode( ',', array_diff( explode( ',', $this->site_data['alias_domains'] ), [ $this->site_data['site_url'] ] ) );
