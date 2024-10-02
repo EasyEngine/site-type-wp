@@ -1629,7 +1629,7 @@ class WordPress extends EE_Site_Command {
 			$this->delete_site( $this->level, $this->site_data['site_url'], $this->site_data['site_fs_path'], $db_data );
 		}
 		\EE::success( 'Rollback complete. Exiting now.' );
-		exit;
+		exit( 1 );
 	}
 
 }
