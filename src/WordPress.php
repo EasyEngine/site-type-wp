@@ -1108,12 +1108,12 @@ class WordPress extends EE_Site_Command {
 		\EE_DOCKER::docker_compose_exec( 'chown -R www-data: /var/www/', 'php', 'bash', 'root' );
 
 		$wp_download_path      = $this->site_data['site_container_fs_path'];
-		$core_download_command = "wp core download --path=$wp_download_path --locale='$this->locale' $core_download_arguments";
+		$core_download_command = "php -d memory_limit=256M \\$(which wp) core download --path=$wp_download_path --locale='$this->locale' $core_download_arguments";
 
 		$retry = 0;
 
 		while ( $retry < 5 ) {
-			if ( ! \EE_DOCKER::docker_compose_exec( $core_download_command, 'php', 'bash', 'www-data' ) ) {
+			if ( ! \EE_DOCKER::docker_compose_exec( $core_download_command, 'php', 'bash', 'www-data', '', true ) ) {
 				if ( $retry++ < 5 ) {
 					\EE::log( 'Unable to download wp core. Retrying...' );
 					continue;
