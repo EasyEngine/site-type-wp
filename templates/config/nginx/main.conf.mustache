@@ -10,6 +10,14 @@ upstream redis {
 	server {{cache_host}}:6379;
 	keepalive 10;
 }
+types {
+    image/webp  webp;
+    image/jpeg  jpeg jpg;
+    image/png   png;
+}
+index index.php index.html index.htm;
+
+
 {{/include_redis_conf}}
 
 server {
