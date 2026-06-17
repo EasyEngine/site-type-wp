@@ -157,7 +157,7 @@ class WordPress extends EE_Site_Command {
 	 *	- 8.2
 	 *	- 8.3
 	 *	- 8.4
-	 *  - 8.5
+	 *	- 8.5
 	 *	- latest
 	 * ---
 	 *
@@ -385,7 +385,7 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['alias_domains'] = substr( $this->site_data['alias_domains'], 0, - 1 );
 
 		$supported_php_versions = self::SUPPORTED_PHP_VERSIONS;
-		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions ) ) {
+		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions, true ) ) {
 			$old_version = $this->site_data['php_version'];
 			$floor       = (int) floor( $this->site_data['php_version'] );
 			if ( 5 === $floor ) {
