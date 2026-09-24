@@ -13,6 +13,7 @@ use function EE\Site\Utils\get_site_info;
 use function EE\Site\Utils\get_public_dir;
 use function EE\Site\Utils\check_alias_in_db;
 use function EE\Site\Utils\split_alias_domains;
+use function EE\Site\Utils\validate_alias_domains;
 use function EE\Utils\get_flag_value;
 use function EE\Utils\trailingslashit;
 use function EE\Utils\get_value_if_flag_isset;
@@ -297,6 +298,7 @@ class WordPress extends EE_Site_Command {
 		}
 
 		$alias_domains = split_alias_domains( \EE\Utils\get_flag_value( $assoc_args, 'alias-domains', '' ) );
+		validate_alias_domains( $alias_domains );
 
 		$alias_domain_to_check   = $alias_domains;
 		$alias_domain_to_check[] = $this->site_data['site_url'];
