@@ -12,6 +12,7 @@ use function EE\Site\Utils\auto_site_name;
 use function EE\Site\Utils\get_site_info;
 use function EE\Site\Utils\get_public_dir;
 use function EE\Site\Utils\check_alias_in_db;
+use function EE\Site\Utils\split_alias_domains;
 use function EE\Utils\get_flag_value;
 use function EE\Utils\trailingslashit;
 use function EE\Utils\get_value_if_flag_isset;
@@ -295,9 +296,9 @@ class WordPress extends EE_Site_Command {
 			\EE::error( sprintf( "Site %1\$s already exists. If you want to re-create it please delete the older one using:\n`ee site delete %1\$s`", $this->site_data['site_url'] ) );
 		}
 
-		$alias_domains = \EE\Utils\get_flag_value( $assoc_args, 'alias-domains', '' );
+		$alias_domains = split_alias_domains( \EE\Utils\get_flag_value( $assoc_args, 'alias-domains', '' ) );
 
-		$alias_domain_to_check   = explode( ',', $alias_domains );
+		$alias_domain_to_check   = $alias_domains;
 		$alias_domain_to_check[] = $this->site_data['site_url'];
 		check_alias_in_db( $alias_domain_to_check );
 
@@ -361,16 +362,8 @@ class WordPress extends EE_Site_Command {
 			}
 		}
 
-		$this->site_data['alias_domains'] = ( 'subdom' === $this->site_data['app_sub_type'] ) ? $this->site_data['site_url'] . ',*.' . $this->site_data['site_url'] : $this->site_data['site_url'];
-		$this->site_data['alias_domains'] .= ',';
-		if ( ! empty( $alias_domains ) ) {
-			$comma_seprated_domains = explode( ',', $alias_domains );
-			foreach ( $comma_seprated_domains as $domain ) {
-				$trimmed_domain                   = trim( $domain );
-				$this->site_data['alias_domains'] .= $trimmed_domain . ',';
-			}
-		}
-		$this->site_data['alias_domains'] = substr( $this->site_data['alias_domains'], 0, - 1 );
+		$site_domains                     = ( 'subdom' === $this->site_data['app_sub_type'] ) ? [ $this->site_data['site_url'], '*.' . $this->site_data['site_url'] ] : [ $this->site_data['site_url'] ];
+		$this->site_data['alias_domains'] = implode( ',', array_merge( $site_domains, $alias_domains ) );
 
 		$supported_php_versions = [ 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5, 'latest' ];
 		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions ) ) {
