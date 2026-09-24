@@ -12,6 +12,7 @@ use function EE\Site\Utils\auto_site_name;
 use function EE\Site\Utils\get_site_info;
 use function EE\Site\Utils\get_public_dir;
 use function EE\Site\Utils\check_alias_in_db;
+use function EE\Site\Utils\get_parent_of_alias;
 use function EE\Site\Utils\split_alias_domains;
 use function EE\Site\Utils\validate_alias_domains;
 use function EE\Utils\get_flag_value;
@@ -303,6 +304,14 @@ class WordPress extends EE_Site_Command {
 		$alias_domain_to_check   = $alias_domains;
 		$alias_domain_to_check[] = $this->site_data['site_url'];
 		check_alias_in_db( $alias_domain_to_check );
+
+		// A subdomain multisite also serves `*.<site>`, which must not already belong to another site.
+		if ( 'subdom' === $this->site_data['app_sub_type'] ) {
+			$wildcard_parent = get_parent_of_alias( '*.' . $this->site_data['site_url'] );
+			if ( ! empty( $wildcard_parent ) ) {
+				\EE::error( sprintf( 'Cannot create a subdomain multisite for %1$s: *.%1$s is already an alias domain of site %2$s. Please delete it from the alias domains of %2$s first.', $this->site_data['site_url'], $wildcard_parent ) );
+			}
+		}
 
 		$this->site_data['site_fs_path']        = WEBROOT . $this->site_data['site_url'];
 		$this->cache_type                       = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
