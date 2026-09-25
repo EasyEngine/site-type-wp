@@ -27,6 +27,19 @@ use function EE\Utils\get_value_if_flag_isset;
 class WordPress extends EE_Site_Command {
 
 	/**
+	 * Default PHP version for new sites. Single source of truth: this is also
+	 * the version the `latest` image tag resolves to and the 8.x fallback for
+	 * unsupported requests. Change this one constant to move the default.
+	 */
+	const DEFAULT_PHP_VERSION = '8.4';
+
+	/**
+	 * All PHP versions EasyEngine ships images for. Keep in sync with the
+	 * `--php` options list in the create() docblock.
+	 */
+	const SUPPORTED_PHP_VERSIONS = [ '5.6', '7.0', '7.2', '7.3', '7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5', 'latest' ];
+
+	/**
 	 * @var string $cache_type Type of caching being used.
 	 */
 	private $cache_type;
@@ -136,7 +149,6 @@ class WordPress extends EE_Site_Command {
 	 * [--php=<php-version>]
 	 * : PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5 and latest.
 	 * ---
-	 * default: 8.4
 	 * options:
 	 *	- 5.6
 	 *	- 7.0
@@ -148,7 +160,7 @@ class WordPress extends EE_Site_Command {
 	 *	- 8.2
 	 *	- 8.3
 	 *	- 8.4
-	 *  - 8.5
+	 *	- 8.5
 	 *	- latest
 	 * ---
 	 *
@@ -317,7 +329,7 @@ class WordPress extends EE_Site_Command {
 		$this->cache_type                       = \EE\Utils\get_flag_value( $assoc_args, 'cache' );
 		$wildcard_flag                          = \EE\Utils\get_flag_value( $assoc_args, 'wildcard' );
 		$this->site_data['site_ssl_wildcard']   = 'subdom' === $this->site_data['app_sub_type'] || $wildcard_flag ? true : false;
-		$this->site_data['php_version']         = \EE\Utils\get_flag_value( $assoc_args, 'php' );
+		$this->site_data['php_version']         = \EE\Utils\get_flag_value( $assoc_args, 'php', self::DEFAULT_PHP_VERSION );
 		$this->site_data['app_admin_url']       = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
 		$this->site_data['app_admin_username']  = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', \EE\Utils\random_name_generator() );
 		$this->site_data['app_admin_password']  = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', '' );
@@ -376,8 +388,8 @@ class WordPress extends EE_Site_Command {
 		$site_domains                     = ( 'subdom' === $this->site_data['app_sub_type'] ) ? [ $this->site_data['site_url'], '*.' . $this->site_data['site_url'] ] : [ $this->site_data['site_url'] ];
 		$this->site_data['alias_domains'] = implode( ',', array_merge( $site_domains, $alias_domains ) );
 
-		$supported_php_versions = [ 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5, 'latest' ];
-		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions ) ) {
+		$supported_php_versions = self::SUPPORTED_PHP_VERSIONS;
+		if ( ! in_array( $this->site_data['php_version'], $supported_php_versions, true ) ) {
 			$old_version = $this->site_data['php_version'];
 			$floor       = (int) floor( $this->site_data['php_version'] );
 			if ( 5 === $floor ) {
@@ -386,9 +398,9 @@ class WordPress extends EE_Site_Command {
 				$this->site_data['php_version'] = 7.4;
 				$old_version                    .= ' yet';
 			} elseif ( 8 === $floor ) {
-			$this->site_data['php_version'] = 8.4;
-			$old_version .= ' yet';
-		} else {
+				$this->site_data['php_version'] = self::DEFAULT_PHP_VERSION;
+				$old_version                    .= ' yet';
+			} else {
 				EE::error( 'Unsupported PHP version: ' . $this->site_data['php_version'] );
 			}
 			\EE::confirm( sprintf( 'EEv4 does not support PHP %s. Continue with PHP %s?', $old_version, $this->site_data['php_version'] ), $assoc_args );
