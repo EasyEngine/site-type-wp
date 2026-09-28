@@ -420,11 +420,11 @@ class WordPress extends EE_Site_Command {
 			\EE\Service\Utils\init_global_container( GLOBAL_DB );
 			$this->site_data['db_name'] = \EE\Site\Utils\reserve_global_db_names( $this->site_data['db_name'], $this->site_data['db_user'], ! empty( $assoc_args['dbname'] ) );
 			try {
-				$user_data = \EE\Site\Utils\create_user_in_db( GLOBAL_DB, $this->site_data['db_name'], $this->site_data['db_user'], $this->site_data['db_password'] );
-				if ( ! $user_data ) {
+				// One statement: a signal is only handled after it, so rollback() always sees a created database.
+				$this->created_global_db = false !== ( $user_data = \EE\Site\Utils\create_user_in_db( GLOBAL_DB, $this->site_data['db_name'], $this->site_data['db_user'], $this->site_data['db_password'] ) );
+				if ( ! $this->created_global_db ) {
 					throw new \Exception( sprintf( 'Could not create user %s. Please check logs.', $this->site_data['db_user'] ) );
 				}
-				$this->created_global_db = true;
 			} catch ( \Exception $e ) {
 				$this->catch_clean( $e );
 			}
@@ -997,6 +997,8 @@ class WordPress extends EE_Site_Command {
 				$this->check_parent_site_certs( $this->site_data['site_url'] );
 			}
 
+			// Raised before the call: a signal during it is only handled once it returns.
+			$this->level = 1;
 			\EE\Site\Utils\create_site_root( $this->site_data['site_fs_path'], $this->site_data['site_url'] );
 			$this->level = 2;
 			$this->maybe_verify_remote_db_connection();
