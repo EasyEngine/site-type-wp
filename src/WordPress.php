@@ -1074,6 +1074,66 @@ class WordPress extends EE_Site_Command {
 	}
 
 	/**
+	 * Download WordPress core into the site, retrying transient failures.
+	 *
+	 * @param array $assoc_args Associative arguments passed during site creation.
+	 *
+	 * @throws \Exception When core can't be downloaded or doesn't verify against checksums.
+	 */
+	private function download_wp_core( $assoc_args ) {
+
+		// An undefined function would throw an \Error, which create_site()'s catch misses.
+		if ( ! function_exists( '\EE\Site\Utils\get_wp_core_download_command' ) ) {
+			throw new \Exception( 'Unable to download WordPress core: site-command is too old for this site-type-wp.' );
+		}
+
+		$download_args = [
+			'version'      => \EE\Utils\get_flag_value( $assoc_args, 'version', '' ),
+			'locale'       => (string) $this->locale,
+			'skip-content' => (bool) \EE\Utils\get_flag_value( $assoc_args, 'skip-content', false ),
+		];
+		// Errors that retrying can't fix.
+		$fatal_errors = [ 'Release not found', 'was not found', 'Nightly builds are only available', "doesn't verify against checksums" ];
+		$max_attempts = 5;
+
+		for ( $attempt = 1; $attempt <= $max_attempts; $attempt++ ) {
+			// A failed attempt may have left files behind, which a download without force refuses to overwrite.
+			$download_args['force'] = $attempt > 1;
+
+			$command = \EE\Site\Utils\get_wp_core_download_command( $this->site_data['site_container_fs_path'], $download_args );
+			// -T keeps WP-CLI's stderr separate so the reason can be reported.
+			$result = \EE::launch( \EE_DOCKER::docker_compose_with_custom() . " exec -T --user='www-data' php bash -c \"$command\"" );
+			if ( 0 === $result->return_code ) {
+				// Printed when WordPress.org's checksums can't be fetched.
+				foreach ( preg_grep( '/^Warning: Could not verify WordPress core checksums/', explode( "\n", $result->stderr ) ) as $warning ) {
+					\EE::warning( substr( $warning, strlen( 'Warning: ' ) ) );
+				}
+
+				return;
+			}
+
+			$lines  = array_filter( array_map( 'trim', explode( "\n", $result->stderr ) ) );
+			$errors = preg_grep( '/^Error: /', $lines );
+			if ( ! empty( $errors ) ) {
+				$reason = preg_replace( '/^Error: /', '', end( $errors ) );
+			} else {
+				$reason = empty( $lines ) ? "exit code $result->return_code" : end( $lines );
+			}
+
+			foreach ( $fatal_errors as $fatal_error ) {
+				if ( false !== strpos( $reason, $fatal_error ) ) {
+					break 2;
+				}
+			}
+			if ( $attempt < $max_attempts ) {
+				\EE::log( "Unable to download WordPress core ($reason). Retrying..." );
+			}
+		}
+
+		throw new \Exception( "Unable to download WordPress core: $reason" );
+	}
+
+	/**
 	 * Download and configure WordPress according to the user passed parameters.
 	 *
 	 * @param array $assoc_args Associative arguments passed during site creation.
@@ -1083,24 +1143,12 @@ class WordPress extends EE_Site_Command {
 	 */
 	private function wp_download_and_config( $assoc_args ) {
 
-		$core_download_args = [
-			'version',
-			'skip-content',
-		];
-
 		$config_args = [
 			'dbprefix',
 			'dbcharset',
 			'dbcollate',
 			'skip-check',
 		];
-
-		$core_download_arguments = '';
-		if ( ! empty( $assoc_args ) ) {
-			foreach ( $assoc_args as $key => $value ) {
-				$core_download_arguments .= in_array( $key, $core_download_args, true ) ? ' --' . $key . '=' . $value : '';
-			}
-		}
 
 		$config_arguments = '';
 		if ( ! empty( $assoc_args ) ) {
@@ -1123,22 +1171,7 @@ class WordPress extends EE_Site_Command {
 
 		\EE_DOCKER::docker_compose_exec( 'chown -R www-data: /var/www/', 'php', 'bash', 'root' );
 
-		$wp_download_path      = $this->site_data['site_container_fs_path'];
-		$core_download_command = "php -d memory_limit=256M \\$(which wp) core download --path=$wp_download_path --locale='$this->locale' $core_download_arguments";
-
-		$retry = 0;
-
-		while ( $retry < 5 ) {
-			if ( ! \EE_DOCKER::docker_compose_exec( $core_download_command, 'php', 'bash', 'www-data', '', true ) ) {
-				if ( $retry++ < 5 ) {
-					\EE::log( 'Unable to download wp core. Retrying...' );
-					continue;
-				}
-				\EE::error( 'Unable to download wp core.', false );
-			} else {
-				break;
-			}
-		}
+		$this->download_wp_core( $assoc_args );
 
 		if ( 'db' === $this->site_data['db_host'] ) {
 			$mysql_unhealthy = true;
