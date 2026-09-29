@@ -9,7 +9,7 @@ use EE\Model\Site;
 /**
  * Repair WordPress 7.x core files truncated by `wp core download` with WP-CLI <= 2.12 (wp-cli/wp-cli#6320).
  *
- * Only wp-includes/php-ai-client/ is affected. Never fails the upgrade: sites that can't be checked or repaired get a warning.
+ * Only en_US packages are affected, and only wp-includes/php-ai-client/ is repaired: the truncated default-theme files under wp-content aren't covered by verify-checksums. Never fails the upgrade: sites that can't be checked or repaired get a warning.
  */
 class RepairTruncatedCoreFiles extends Base {
 
@@ -27,21 +27,28 @@ class RepairTruncatedCoreFiles extends Base {
 		$this->sites = array_filter(
 			Site::all() ?: [],
 			function ( $site ) {
-				return 'wp' === $site->site_type && $site->site_enabled;
+				return 'wp' === $site->site_type;
 			}
 		);
-		if ( empty( $this->sites ) || ! function_exists( '\EE\Site\Utils\get_wp_core_shell_functions' ) ) {
+		if ( empty( $this->sites ) ) {
 			$this->skip_this_migration = true;
 		}
 	}
 
 	/**
-	 * Check every enabled WordPress site and repair the affected ones.
+	 * Check every WordPress site and repair the affected ones.
 	 */
 	public function up() {
 
 		if ( $this->skip_this_migration ) {
 			EE::debug( 'Skipping repair-truncated-core-files migration as it is not needed.' );
+
+			return;
+		}
+
+		// Throwing would block the upgrade, and the migration is recorded either way.
+		if ( ! function_exists( '\EE\Site\Utils\get_wp_core_shell_functions' ) ) {
+			EE::warning( "Skipped checking WordPress core files for truncated names: site-command is too old. Check each WordPress site with: ee shell <site> --command='wp core verify-checksums'" );
 
 			return;
 		}
@@ -56,6 +63,8 @@ class RepairTruncatedCoreFiles extends Base {
 	}
 
 	/**
+	 * Check one site and repair it if needed.
+	 *
 	 * @param Site $site Site to check.
 	 */
 	private function repair_site( $site ) {
@@ -64,6 +73,12 @@ class RepairTruncatedCoreFiles extends Base {
 		// Only WordPress >= 7.0 ships this directory.
 		if ( ! is_dir( $wp_root . '/wp-includes/php-ai-client' ) ) {
 			EE::debug( "$site->site_url: no wp-includes/php-ai-client, skipping core repair." );
+
+			return;
+		}
+
+		if ( ! $site->site_enabled ) {
+			EE::warning( "Skipped checking WordPress core files of $site->site_url: the site is disabled. After enabling it, check with: ee shell $site->site_url --command='wp core verify-checksums'" );
 
 			return;
 		}
@@ -78,14 +93,14 @@ class RepairTruncatedCoreFiles extends Base {
 		$command = self::get_repair_command( $site->site_container_fs_path );
 		$result  = EE::launch( \EE_DOCKER::docker_compose_with_custom() . " exec -T --user='www-data' php bash -c \"$command\"" );
 		$status  = preg_match( '/^Status: (\S+)(.*)$/m', $result->stdout, $matches ) ? $matches[1] : '';
+		$details = str_replace( "\n", ' ', trim( preg_replace( '/^Status: .*$/m', '', $result->stdout ) ) );
 
 		if ( 0 === $result->return_code && 'repaired' === $status ) {
-			$details = trim( preg_replace( '/^Status: .*$/m', '', $result->stdout ) );
-			EE::log( "Repaired truncated WordPress core files of $site->site_url. " . str_replace( "\n", ' ', $details ) );
+			EE::log( rtrim( "Repaired truncated WordPress core files of $site->site_url. $details" ) );
 		} elseif ( 0 === $result->return_code && 'not-affected' === $status ) {
 			EE::debug( "$site->site_url: core files not affected." );
 		} elseif ( 0 === $result->return_code && 'unverified' === $status ) {
-			EE::warning( "Could not check WordPress core files of $site->site_url (" . trim( $matches[2] ) . "). Check later with: ee shell $site->site_url --command='wp core verify-checksums'" );
+			EE::warning( "Could not check WordPress core files of $site->site_url (" . trim( $matches[2] ) . '). ' . ( '' === $details ? '' : "$details " ) . "Check later with: ee shell $site->site_url --command='wp core verify-checksums'" );
 		} else {
 			$lines  = array_filter( array_map( 'trim', explode( "\n", $result->stdout . "\n" . $result->stderr ) ) );
 			$reason = empty( $lines ) ? "exit code $result->return_code" : end( $lines );
@@ -107,12 +122,14 @@ prefix=wp-includes/php-ai-client/
 rc=0
 out=$(wp_cli core verify-checksums --path="$root" 2>&1) || rc=$?
 missing=$(printf '%s\n' "$out" | grep -c "File doesn't exist: $prefix" || true)
-extra=$(printf '%s\n' "$out" | sed -n "s#^.*File should not exist: \($prefix.*\)\$#\1#p")
+# Truncated names are exactly 90 characters (100 with "wordpress/") and never end in .php; other extra files aren't ours.
+leftovers() { printf '%s\n' "$1" | sed -n "s#^.*File should not exist: \($prefix.*\)\$#\1#p" | awk 'length($0) == 90 && $0 !~ /\.php$/'; }
+extra=$(leftovers "$out")
 if [ "$missing" -eq 0 ] && [ -z "$extra" ]; then
 	# Other modified core files aren't ours to fix.
 	case "$rc:$out" in
 		0:* | *"File doesn't exist:"* | *"File doesn't verify against checksum:"*) echo 'Status: not-affected' ;;
-		*) echo "Status: unverified $(printf '%s\n' "$out" | tail -n 1)" ;;
+		*) echo "Status: unverified $(printf '%s\n' "$out" | grep -m 1 '^Error:' || echo "exit code $rc")" ;;
 	esac
 	exit 0
 fi
@@ -122,25 +139,36 @@ if [ "$missing" -gt 0 ]; then
 	locale=${locale:-en_US}
 	tmp=$(mktemp -d)
 	trap 'rm -rf "$tmp"' EXIT
-	pkg=$(ee_wp_fetch "$tmp" --version="$version" --locale="$locale")
-	ee_wp_extract "$pkg" "$root" "${prefix%/}"
+	mkdir "$tmp/dl"
+	pkg=$(ee_wp_fetch "$tmp/dl" --version="$version" --locale="$locale")
+	# Extract aside, so a bad package can't damage the site. A cached package isn't md5-checked again, so fetch a fresh copy once.
+	if ! ee_wp_extract "$pkg" "$tmp/wp" "${prefix%/}"; then
+		rm -rf "$tmp/dl" "$tmp/wp"
+		mkdir "$tmp/dl"
+		pkg=$(WP_CLI_CACHE_DIR="$tmp/cache" ee_wp_fetch "$tmp/dl" --version="$version" --locale="$locale")
+		ee_wp_extract "$pkg" "$tmp/wp" "${prefix%/}"
+	fi
+	cp -R "$tmp/wp/$prefix." "$root/$prefix"
 	echo "Restored $prefix from WordPress $version ($locale)."
 fi
 removed=0
 while IFS= read -r file; do
-	# Truncated names are exactly 90 characters (100 with "wordpress/") and never end in .php.
-	if [ "${#file}" -eq 90 ] && [ "${file%.php}" = "$file" ] && [ -f "$root/$file" ]; then
+	if [ -n "$file" ] && [ -f "$root/$file" ]; then
 		rm -f -- "$root/$file"
 		removed=$((removed + 1))
 	fi
 done <<< "$extra"
 [ "$removed" -eq 0 ] || echo "Removed $removed truncated leftover files."
-out=$(wp_cli core verify-checksums --path="$root" 2>&1) || true
-if printf '%s\n' "$out" | grep -e "File doesn't exist: $prefix" -e "File should not exist: $prefix" >&2; then
+rc=0
+out=$(wp_cli core verify-checksums --path="$root" 2>&1) || rc=$?
+if printf '%s\n' "$out" | grep -e "File doesn't exist: $prefix" -e "File doesn't verify against checksum: $prefix" >&2 || leftovers "$out" | grep . >&2; then
 	echo 'Status: failed'
 	exit 1
 fi
-echo 'Status: repaired'
+case "$rc:$out" in
+	0:* | *"File doesn't exist:"* | *"File doesn't verify against checksum:"*) echo 'Status: repaired' ;;
+	*) echo "Status: unverified $(printf '%s\n' "$out" | grep -m 1 '^Error:' || echo "exit code $rc")" ;;
+esac
 
 BASH;
 
