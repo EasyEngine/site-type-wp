@@ -76,6 +76,11 @@ class WordPress extends EE_Site_Command {
 	 */
 	private $is_vip = false;
 
+	/**
+	 * @var bool $created_global_db Whether this run created the site's database and user on the global db.
+	 */
+	private $created_global_db = false;
+
 	public function __construct() {
 
 		parent::__construct();
@@ -322,7 +327,7 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['app_admin_username']  = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', \EE\Utils\random_name_generator() );
 		$this->site_data['app_admin_password']  = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', '' );
 		$this->site_data['allow_insecure_pass'] = \EE\Utils\get_flag_value( $assoc_args, 'allow-insecure-pass', false );
-		$this->site_data['db_name']             = \EE\Utils\get_flag_value( $assoc_args, 'dbname', str_replace( [ '.', '-' ], '_', $this->site_data['site_url'] ) );
+		$this->site_data['db_name']             = \EE\Utils\get_flag_value( $assoc_args, 'dbname', \EE\Site\Utils\get_default_db_name( $this->site_data['site_url'] ) );
 		$this->site_data['db_host']             = \EE\Utils\get_flag_value( $assoc_args, 'dbhost', GLOBAL_DB );
 		$this->site_data['db_port']             = '3306';
 		$this->site_data['db_user']             = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
@@ -399,6 +404,12 @@ class WordPress extends EE_Site_Command {
 		}
 		$this->site_data['db_root_password'] = ( 'db' === $this->site_data['db_host'] ) ? \EE\Utils\random_password() : '';
 
+		// Checked before the database is created, so a refused create leaves nothing behind.
+		if ( 'inherit' === $this->site_data['site_ssl'] && ( 'subdom' === $mu || $this->site_data['site_ssl_wildcard'] ) ) {
+			\EE::error( '--wildcard or --mu=subdom flag can not be passed together with --ssl=inherit flag.' );
+		}
+		\EE\Site\Utils\check_site_name_conflicts( $this->site_data['site_url'], $this->site_data['site_fs_path'] );
+
 		\EE\Service\Utils\nginx_proxy_check();
 
 		if ( $this->cache_type && ! $local_cache ) {
@@ -407,9 +418,11 @@ class WordPress extends EE_Site_Command {
 
 		if ( GLOBAL_DB === $this->site_data['db_host'] ) {
 			\EE\Service\Utils\init_global_container( GLOBAL_DB );
+			$this->site_data['db_name'] = \EE\Site\Utils\reserve_global_db_names( $this->site_data['db_name'], $this->site_data['db_user'], ! empty( $assoc_args['dbname'] ) );
 			try {
-				$user_data = \EE\Site\Utils\create_user_in_db( GLOBAL_DB, $this->site_data['db_name'], $this->site_data['db_user'], $this->site_data['db_password'] );
-				if ( ! $user_data ) {
+				// One statement: a signal is only handled after it, so rollback() always sees a created database.
+				$this->created_global_db = false !== ( $user_data = \EE\Site\Utils\create_user_in_db( GLOBAL_DB, $this->site_data['db_name'], $this->site_data['db_user'], $this->site_data['db_password'] ) );
+				if ( ! $this->created_global_db ) {
 					throw new \Exception( sprintf( 'Could not create user %s. Please check logs.', $this->site_data['db_user'] ) );
 				}
 			} catch ( \Exception $e ) {
@@ -433,10 +446,6 @@ class WordPress extends EE_Site_Command {
 		$this->skip_install                 = \EE\Utils\get_flag_value( $assoc_args, 'skip-install' );
 		$this->skip_status_check            = \EE\Utils\get_flag_value( $assoc_args, 'skip-status-check' );
 		$this->force                        = \EE\Utils\get_flag_value( $assoc_args, 'force' );
-
-		if ( 'inherit' === $this->site_data['site_ssl'] && ( 'subdom' === $mu || $this->site_data['site_ssl_wildcard'] ) ) {
-			\EE::error( '--wildcard or --mu=subdom flag can not be passed together with --ssl=inherit flag.' );
-		}
 
 		\EE::log( 'Configuring project.' );
 
@@ -983,12 +992,13 @@ class WordPress extends EE_Site_Command {
 	 */
 	private function create_site( $assoc_args ) {
 
-		$this->level = 1;
 		try {
 			if ( 'inherit' === $this->site_data['site_ssl'] ) {
 				$this->check_parent_site_certs( $this->site_data['site_url'] );
 			}
 
+			// Raised before the call: a signal during it is only handled once it returns.
+			$this->level = 1;
 			\EE\Site\Utils\create_site_root( $this->site_data['site_fs_path'], $this->site_data['site_url'] );
 			$this->level = 2;
 			$this->maybe_verify_remote_db_connection();
@@ -1064,6 +1074,66 @@ class WordPress extends EE_Site_Command {
 	}
 
 	/**
+	 * Download WordPress core into the site, retrying transient failures.
+	 *
+	 * @param array $assoc_args Associative arguments passed during site creation.
+	 *
+	 * @throws \Exception When core can't be downloaded or doesn't verify against checksums.
+	 */
+	private function download_wp_core( $assoc_args ) {
+
+		// An undefined function would throw an \Error, which create_site()'s catch misses.
+		if ( ! function_exists( '\EE\Site\Utils\get_wp_core_download_command' ) ) {
+			throw new \Exception( 'Unable to download WordPress core: site-command is too old for this site-type-wp.' );
+		}
+
+		$download_args = [
+			'version'      => \EE\Utils\get_flag_value( $assoc_args, 'version', '' ),
+			'locale'       => (string) $this->locale,
+			'skip-content' => (bool) \EE\Utils\get_flag_value( $assoc_args, 'skip-content', false ),
+		];
+		// Errors that retrying can't fix.
+		$fatal_errors = [ 'Release not found', 'was not found', 'Nightly builds are only available', "doesn't verify against checksums" ];
+		$max_attempts = 5;
+
+		for ( $attempt = 1; $attempt <= $max_attempts; $attempt++ ) {
+			// A failed attempt may have left files behind, which a download without force refuses to overwrite.
+			$download_args['force'] = $attempt > 1;
+
+			$command = \EE\Site\Utils\get_wp_core_download_command( $this->site_data['site_container_fs_path'], $download_args );
+			// -T keeps WP-CLI's stderr separate so the reason can be reported.
+			$result = \EE::launch( \EE_DOCKER::docker_compose_with_custom() . " exec -T --user='www-data' php bash -c \"$command\"" );
+			if ( 0 === $result->return_code ) {
+				// Printed when WordPress.org's checksums can't be fetched.
+				foreach ( preg_grep( '/^Warning: Could not verify WordPress core checksums/', explode( "\n", $result->stderr ) ) as $warning ) {
+					\EE::warning( substr( $warning, strlen( 'Warning: ' ) ) );
+				}
+
+				return;
+			}
+
+			$lines  = array_filter( array_map( 'trim', explode( "\n", $result->stderr ) ) );
+			$errors = preg_grep( '/^Error: /', $lines );
+			if ( ! empty( $errors ) ) {
+				$reason = preg_replace( '/^Error: /', '', end( $errors ) );
+			} else {
+				$reason = empty( $lines ) ? "exit code $result->return_code" : end( $lines );
+			}
+
+			foreach ( $fatal_errors as $fatal_error ) {
+				if ( false !== strpos( $reason, $fatal_error ) ) {
+					break 2;
+				}
+			}
+			if ( $attempt < $max_attempts ) {
+				\EE::log( "Unable to download WordPress core ($reason). Retrying..." );
+			}
+		}
+
+		throw new \Exception( "Unable to download WordPress core: $reason" );
+	}
+
+	/**
 	 * Download and configure WordPress according to the user passed parameters.
 	 *
 	 * @param array $assoc_args Associative arguments passed during site creation.
@@ -1073,24 +1143,12 @@ class WordPress extends EE_Site_Command {
 	 */
 	private function wp_download_and_config( $assoc_args ) {
 
-		$core_download_args = [
-			'version',
-			'skip-content',
-		];
-
 		$config_args = [
 			'dbprefix',
 			'dbcharset',
 			'dbcollate',
 			'skip-check',
 		];
-
-		$core_download_arguments = '';
-		if ( ! empty( $assoc_args ) ) {
-			foreach ( $assoc_args as $key => $value ) {
-				$core_download_arguments .= in_array( $key, $core_download_args, true ) ? ' --' . $key . '=' . $value : '';
-			}
-		}
 
 		$config_arguments = '';
 		if ( ! empty( $assoc_args ) ) {
@@ -1113,22 +1171,7 @@ class WordPress extends EE_Site_Command {
 
 		\EE_DOCKER::docker_compose_exec( 'chown -R www-data: /var/www/', 'php', 'bash', 'root' );
 
-		$wp_download_path      = $this->site_data['site_container_fs_path'];
-		$core_download_command = "php -d memory_limit=256M \\$(which wp) core download --path=$wp_download_path --locale='$this->locale' $core_download_arguments";
-
-		$retry = 0;
-
-		while ( $retry < 5 ) {
-			if ( ! \EE_DOCKER::docker_compose_exec( $core_download_command, 'php', 'bash', 'www-data', '', true ) ) {
-				if ( $retry++ < 5 ) {
-					\EE::log( 'Unable to download wp core. Retrying...' );
-					continue;
-				}
-				\EE::error( 'Unable to download wp core.', false );
-			} else {
-				break;
-			}
-		}
+		$this->download_wp_core( $assoc_args );
 
 		if ( 'db' === $this->site_data['db_host'] ) {
 			$mysql_unhealthy = true;
@@ -1602,6 +1645,24 @@ class WordPress extends EE_Site_Command {
 	}
 
 	/**
+	 * Database and user a failed create may drop: only the ones this run created.
+	 *
+	 * @return array
+	 */
+	private function get_rollback_db_data() {
+
+		if ( ! $this->created_global_db ) {
+			return [];
+		}
+
+		return [
+			'db_host' => $this->site_data['db_host'],
+			'db_user' => $this->site_data['db_user'],
+			'db_name' => $this->site_data['db_name'],
+		];
+	}
+
+	/**
 	 * Catch and clean exceptions.
 	 *
 	 * @param \Exception $e
@@ -1610,12 +1671,7 @@ class WordPress extends EE_Site_Command {
 		\EE\Utils\delem_log( 'site cleanup start' );
 		\EE::warning( $e->getMessage() );
 		\EE::warning( 'Initiating clean-up.' );
-		$db_data = ( empty( $this->site_data['db_host'] ) || 'db' === $this->site_data['db_host'] ) ? [] : [
-			'db_host' => $this->site_data['db_host'],
-			'db_user' => $this->site_data['db_user'],
-			'db_name' => $this->site_data['db_name'],
-		];
-		$this->delete_site( $this->level, $this->site_data['site_url'], $this->site_data['site_fs_path'], $db_data );
+		$this->delete_site( $this->level, $this->site_data['site_url'], $this->site_data['site_fs_path'], $this->get_rollback_db_data() );
 		\EE\Utils\delem_log( 'site cleanup end' );
 		\EE::log( 'Report bugs here: https://github.com/EasyEngine/site-type-wp' );
 		exit( 1 );
@@ -1626,13 +1682,8 @@ class WordPress extends EE_Site_Command {
 	 */
 	protected function rollback() {
 		\EE::warning( 'Exiting gracefully after rolling back. This may take some time.' );
-		if ( $this->level > 0 ) {
-			$db_data = ( empty( $this->site_data['db_host'] ) || 'db' === $this->site_data['db_host'] ) ? [] : [
-				'db_host' => $this->site_data['db_host'],
-				'db_user' => $this->site_data['db_user'],
-				'db_name' => $this->site_data['db_name'],
-			];
-			$this->delete_site( $this->level, $this->site_data['site_url'], $this->site_data['site_fs_path'], $db_data );
+		if ( $this->level > 0 || $this->created_global_db ) {
+			$this->delete_site( $this->level, $this->site_data['site_url'], $this->site_data['site_fs_path'], $this->get_rollback_db_data() );
 		}
 		\EE::success( 'Rollback complete. Exiting now.' );
 		exit( 1 );
