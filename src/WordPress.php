@@ -1082,6 +1082,11 @@ class WordPress extends EE_Site_Command {
 	 */
 	private function download_wp_core( $assoc_args ) {
 
+		// An undefined function would throw an \Error, which create_site()'s catch misses.
+		if ( ! function_exists( '\EE\Site\Utils\get_wp_core_download_command' ) ) {
+			throw new \Exception( 'Unable to download WordPress core: site-command is too old for this site-type-wp.' );
+		}
+
 		$download_args = [
 			'version'      => \EE\Utils\get_flag_value( $assoc_args, 'version', '' ),
 			'locale'       => (string) $this->locale,
@@ -1092,20 +1097,25 @@ class WordPress extends EE_Site_Command {
 		$max_attempts = 5;
 
 		for ( $attempt = 1; $attempt <= $max_attempts; $attempt++ ) {
-			// A failed attempt may have left files behind in the direct (--skip-content/nightly) path.
+			// A failed attempt may have left files behind, which a download without force refuses to overwrite.
 			$download_args['force'] = $attempt > 1;
 
 			$command = \EE\Site\Utils\get_wp_core_download_command( $this->site_data['site_container_fs_path'], $download_args );
 			// -T keeps WP-CLI's stderr separate so the reason can be reported.
 			$result = \EE::launch( \EE_DOCKER::docker_compose_with_custom() . " exec -T --user='www-data' php bash -c \"$command\"" );
 			if ( 0 === $result->return_code ) {
+				// Printed when WordPress.org's checksums can't be fetched.
+				foreach ( preg_grep( '/^Warning: Could not verify WordPress core checksums/', explode( "\n", $result->stderr ) ) as $warning ) {
+					\EE::warning( substr( $warning, strlen( 'Warning: ' ) ) );
+				}
+
 				return;
 			}
 
 			$lines  = array_filter( array_map( 'trim', explode( "\n", $result->stderr ) ) );
 			$errors = preg_grep( '/^Error: /', $lines );
 			if ( ! empty( $errors ) ) {
-				$reason = end( $errors );
+				$reason = preg_replace( '/^Error: /', '', end( $errors ) );
 			} else {
 				$reason = empty( $lines ) ? "exit code $result->return_code" : end( $lines );
 			}
