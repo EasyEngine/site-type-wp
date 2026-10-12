@@ -364,7 +364,7 @@ class WordPress extends EE_Site_Command {
 			}
 
 			if ( ! empty( $pass_error_msg ) ) {
-				$final_error_msg = 'Issues found in input password: `' . $this->site_data['app_admin_password'] . "`\n\t";
+				$final_error_msg = "Issues found in the admin password:\n\t";
 				foreach ( $pass_error_msg as $err_msg ) {
 					$final_error_msg .= '* ' . $err_msg . "\n\t";
 				}
@@ -407,6 +407,10 @@ class WordPress extends EE_Site_Command {
 			$this->site_data['db_host'] = 'db';
 		}
 		$this->site_data['db_root_password'] = ( 'db' === $this->site_data['db_host'] ) ? \EE\Utils\random_password() : '';
+		// Keeps the generated credentials out of the logged commands and their output.
+		if ( method_exists( 'EE', 'obfuscate' ) ) {
+			EE::obfuscate( [ $this->site_data['db_password'], $this->site_data['db_root_password'], $this->site_data['app_admin_password'] ] );
+		}
 
 		// Checked before the database is created, so a refused create leaves nothing behind.
 		if ( 'inherit' === $this->site_data['site_ssl'] && ( 'subdom' === $mu || $this->site_data['site_ssl_wildcard'] ) ) {
@@ -569,7 +573,8 @@ class WordPress extends EE_Site_Command {
 		if ( 'json' === $format ) {
 			$site = (array) Site::find( $this->site_data['site_url'] );
 			$site = reset( $site );
-			EE::log( json_encode( $site ) );
+			// Printed for the user only: it holds the site's credentials.
+			EE::line( json_encode( $site ) );
 
 			return;
 		}
