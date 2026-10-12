@@ -1225,11 +1225,12 @@ class WordPress extends EE_Site_Command {
 		$install_command .= $this->site_data['app_admin_password'] ? ' --admin_password=' . escapeshellarg( $this->site_data['app_admin_password'] ) : '';
 		$install_command .= sprintf( ' --admin_email=%s %s', escapeshellarg( $this->site_data['app_admin_email'] ), $maybe_multisite_type );
 
-		$core_install = \EE_DOCKER::docker_compose_exec( $install_command, 'php', 'bash', 'www-data', '', false, false, [
-			$this->site_data['app_admin_username'],
-			$this->site_data['app_admin_email'],
-			$this->site_data['app_admin_password'],
-		] );
+		$secrets = array_filter( [ $this->site_data['app_admin_username'], $this->site_data['app_admin_email'], $this->site_data['app_admin_password'] ], function ( $value ) {
+			return '' !== (string) $value;
+		} );
+		// The command holds the escaped forms, which differ from the raw values when they contain a quote; mask those first.
+		$obfuscate    = array_merge( array_map( 'escapeshellarg', $secrets ), $secrets );
+		$core_install = \EE_DOCKER::docker_compose_exec( $install_command, 'php', 'bash', 'www-data', '', false, false, $obfuscate );
 
 		if ( ! $core_install ) {
 			throw new \Exception( 'WordPress install failed. Please check logs.' );
