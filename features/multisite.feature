@@ -89,14 +89,14 @@ Feature: WordPress multisite (--mu=subdir|subdom)
     And the site 'bh-site-type-wp-muinh.test' should not exist
     And the directory '{SITES_DIR}/bh-site-type-wp-muinh.test' should not exist
 
-  # WPT-8: the inherit/wildcard check runs before the database step, so nothing is created.
+  # The inherit/wildcard check runs before the database step, so nothing is created.
   Scenario: A rejected inherit + subdom create leaves nothing in the global database
     When I run 'bin/ee site create bh-site-type-wp-muinh2.test --type=wp --mu=subdom --ssl=inherit'
     Then the command should fail
     And the global database should not have a database named 'bh_site_type_wp_muinh2_test'
     And the global database should not have users starting with 'bh-site-type-wp-muinh2.test-'
 
-  # AUTH-5 regression: subdom create didn't check its implicit *.site against existing aliases (fixed by site-type-wp #239).
+  # Regression check: subdom create didn't check its implicit *.site against existing aliases (fixed by EasyEngine/site-type-wp#239).
   Scenario: Subdomain multisite whose wildcard is already an alias of another site is rejected
     Given a WordPress site 'bh-site-type-wp-auth5owner.test' exists created with "--skip-install --alias-domains='*.bh-site-type-wp-auth5.test'"
     When I run 'bin/ee site create bh-site-type-wp-auth5.test --type=wp --mu=subdom --skip-install'

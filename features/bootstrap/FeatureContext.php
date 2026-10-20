@@ -1158,7 +1158,7 @@ class FeatureContext implements Context
 	}
 
 	/**
-	 * Alias updates return before the proxy serves the new name (PRX-7), so poll.
+	 * Alias updates return before the proxy serves the new name, so poll.
 	 *
 	 * @Then a GET request to :url should not return :code within :seconds seconds
 	 */
@@ -1650,7 +1650,7 @@ class FeatureContext implements Context
 			}
 		}
 
-		// Proxy certs and ACME state: `--ssl=off` and LE deletes leave them behind (WPT-12, SSL-5, SSL-9).
+		// Proxy certs and ACME state: `--ssl=off` and LE deletes leave them behind.
 		$proxy_dir = EE_ROOT_DIR . '/services/nginx-proxy';
 		foreach ( [ 'certs', 'acme-conf/certs', 'acme-conf/var' ] as $sub ) {
 			foreach ( glob( "$proxy_dir/$sub/*" . self::TEST_PREFIX . '*', GLOB_NOSORT ) ?: [] as $path ) {

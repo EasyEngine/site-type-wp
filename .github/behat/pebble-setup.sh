@@ -14,7 +14,7 @@
 set -euo pipefail
 
 PEBBLE_DIR=${PEBBLE_DIR:-/tmp/ee-pebble}
-# 2.10+ also offers the token-less draft dns-persist-01 challenge, which EE's acmephp 1.3 client can't parse (SSL-10).
+# 2.10+ also offers the token-less draft dns-persist-01 challenge, which EE's acmephp 1.3 client can't parse.
 PEBBLE_VERSION=${PEBBLE_VERSION:-2.9.0}
 PEBBLE_NET=${PEBBLE_NET:-ee-pebble}
 PEBBLE_BRIDGE=${PEBBLE_BRIDGE:-ee-pebble0}

@@ -113,7 +113,7 @@ Feature: SSL of WordPress sites (--ssl=self|custom|inherit|le and ssl updates)
       """
     And the site 'bh-site-type-wp-custom2.test' should not exist
 
-  # WPT-13: create's `[--ssl]` is a flag, so the value is only rejected in init_ssl(), after the site was provisioned.
+  # Create's `[--ssl]` is a flag, so the value is only rejected in init_ssl(), after the site was provisioned.
   Scenario: An unknown --ssl value rolls the whole create back
     When I run 'bin/ee site create bh-site-type-wp-sslbad.test --type=wp --ssl=bogus'
     Then the command should fail
@@ -179,7 +179,7 @@ Feature: SSL of WordPress sites (--ssl=self|custom|inherit|le and ssl updates)
       SSL is already disabled on bh-site-type-wp-sslupd.test
       """
 
-  # PHPT-10 / SC-3 (fixed in site-command fix/proxy-cache-rollback-and-le-alias): update refused `--ssl=off` for self-signed creates, which store site_ssl_wildcard=1.
+  # Regression check (fixed by EasyEngine/site-command#505): update refused `--ssl=off` for self-signed creates, which store site_ssl_wildcard=1.
   Scenario: SSL of a site created with --ssl=self can be turned off
     Given a WordPress site 'bh-site-type-wp-selfoff.test' exists created with '--ssl=self --skip-install'
     When I run 'bin/ee site update bh-site-type-wp-selfoff.test --ssl=off'
@@ -196,7 +196,7 @@ Feature: SSL of WordPress sites (--ssl=self|custom|inherit|le and ssl updates)
       """
       Invalid value specified for 'ssl'
       """
-    # A site that never had SSL: sslupd had --ssl=self above, which keeps site_ssl_wildcard=1 after --ssl=off (site-command#505), so it would request a wildcard certificate.
+    # A site that never had SSL: sslupd had --ssl=self above, which keeps site_ssl_wildcard=1 after --ssl=off (EasyEngine/site-command#505), so it would request a wildcard certificate.
     Given a WordPress site 'bh-site-type-wp-nossl.test' exists created with '--skip-install'
     When I run 'bin/ee site update bh-site-type-wp-nossl.test --ssl=le --wildcard'
     Then the command should fail
@@ -216,7 +216,7 @@ Feature: SSL of WordPress sites (--ssl=self|custom|inherit|le and ssl updates)
       | site_ssl_wildcard | 0     |
     And the file '{EE_ROOT_DIR}/services/nginx-proxy/certs/bh-site-type-wp-le1.ee4-test.rt.gw.crt' should exist
     And the hosts file should not contain 'bh-site-type-wp-le1.ee4-test.rt.gw'
-    # The proxy reload is asynchronous (PRX-5): right after create the old workers can still answer, or drop the TLS connection.
+    # The proxy reload is asynchronous: right after create the old workers can still answer, or drop the TLS connection.
     When I wait until "curl -sS -o /dev/null https://bh-site-type-wp-le1.ee4-test.rt.gw/" succeeds within 60 seconds
     And I run 'curl -sS -o /dev/null -w "%{http_code} %{ssl_verify_result}" https://bh-site-type-wp-le1.ee4-test.rt.gw/'
     Then STDOUT should contain:
@@ -238,7 +238,7 @@ Feature: SSL of WordPress sites (--ssl=self|custom|inherit|le and ssl updates)
     And the file '{EE_ROOT_DIR}/services/nginx-proxy/certs/bh-site-type-wp-le1.ee4-test.rt.gw.crt' should not exist
     And the directory '{EE_ROOT_DIR}/services/nginx-proxy/acme-conf/certs/bh-site-type-wp-le1.ee4-test.rt.gw' should not exist
 
-  # SSL-5 / SSL-9 (fixed in site-command fix/proxy-cache-rollback-and-le-alias): deleting an LE site left acme-conf/var entries for www. Checks the leftovers of the scenario above (no new issuance).
+  # Regression check (fixed by EasyEngine/site-command#505): deleting an LE site left acme-conf/var entries for www. Checks the leftovers of the scenario above (no new issuance).
   @le
   Scenario: Deleting a Let's Encrypt site leaves no ACME leftovers
     Given the site 'bh-site-type-wp-le1.ee4-test.rt.gw' was deleted earlier in this feature

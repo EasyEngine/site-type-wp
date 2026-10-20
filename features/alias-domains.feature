@@ -124,13 +124,13 @@ Feature: Alias domains of WordPress sites (--alias-domains, --add/--delete-alias
       """
     And a GET request to 'http://foo.bh-site-type-wp-aliasmu-x.test/' should not return 503
 
-  # AUTH-1 regression: an alias like `_wildcard.<site>` could clobber the site's `_wildcard` proxy files (fixed by site-command #502 / site-type-wp #239).
+  # Regression check: an alias like `_wildcard.<site>` could clobber the site's `_wildcard` proxy files (fixed by EasyEngine/site-command#502 and EasyEngine/site-type-wp#239).
   Scenario: Reserved alias names are rejected on create
     When I run "bin/ee site create bh-site-type-wp-auth1.test --type=wp --skip-install --alias-domains='_wildcard.bh-site-type-wp-auth1.test'"
     Then the command should fail
     And the site 'bh-site-type-wp-auth1.test' should not exist
 
-  # Regression (fixed by site-type-wp #239): a trailing comma stored an empty alias and a dangling `,` in VIRTUAL_HOST.
+  # Regression check (fixed by EasyEngine/site-type-wp#239): a trailing comma stored an empty alias and a dangling `,` in VIRTUAL_HOST.
   Scenario: Blank alias domains are dropped on create
     When I run "bin/ee site create bh-site-type-wp-blank.test --type=wp --skip-install --alias-domains='bh-site-type-wp-blank-a.test,'"
     Then the command should succeed
@@ -138,7 +138,7 @@ Feature: Alias domains of WordPress sites (--alias-domains, --add/--delete-alias
       | field         | value                                                    |
       | alias_domains | bh-site-type-wp-blank.test,bh-site-type-wp-blank-a.test  |
 
-  # WPT-2 (fixed in site-command fix/proxy-cache-rollback-and-le-alias): update_alias_domains() dumped docker-compose.yml without HTTPS_METHOD=nohttps for a site without SSL, until the next refresh.
+  # Regression check (fixed by EasyEngine/site-command#505): update_alias_domains() dumped docker-compose.yml without HTTPS_METHOD=nohttps for a site without SSL, until the next refresh.
   Scenario: Alias changes keep HTTPS disabled on a site without SSL
     Given a WordPress site 'bh-site-type-wp-aliasnossl.test' exists created with '--skip-install'
     When I run 'bin/ee site update bh-site-type-wp-aliasnossl.test --add-alias-domains=bh-site-type-wp-aliasnossl-a.test'
@@ -154,7 +154,7 @@ Feature: Alias domains of WordPress sites (--alias-domains, --add/--delete-alias
       HTTPS_METHOD=nohttps
       """
 
-  # WPT-2 + WPT-12 (fixed in site-command fix/proxy-cache-rollback-and-le-alias): `--ssl=off` kept <site>.crt, and with aliases CERT_NAME=${VIRTUAL_HOST} picked it up, so without nohttps nginx-proxy redirected HTTP to HTTPS again.
+  # Regression check (fixed by EasyEngine/site-command#505): `--ssl=off` kept <site>.crt, and with aliases CERT_NAME=${VIRTUAL_HOST} picked it up, so without nohttps nginx-proxy redirected HTTP to HTTPS again.
   Scenario: A site whose SSL was turned off keeps serving HTTP after an alias change
     Given a WordPress site 'bh-site-type-wp-aliasoff.test' exists
     When I run 'bin/ee site update bh-site-type-wp-aliasoff.test --ssl=self'

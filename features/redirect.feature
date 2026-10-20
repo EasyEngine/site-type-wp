@@ -1,7 +1,7 @@
 Feature: www / non-www redirection of WordPress sites
 
   # The www check curls the other host name from the host, so it needs a hosts entry before the site is created.
-  # Full installs: with --skip-install nothing waits for the proxy to load the vhost before the www check (WPT-17).
+  # Full installs: with --skip-install nothing waits for the proxy to load the vhost before the www check.
   Scenario: no_www-no_ssl redirection works properly
     Given I add a hosts entry for 'www.bh-site-type-wp-redir.test'
     When I run 'bin/ee site create bh-site-type-wp-redir.test --type=wp'
@@ -36,7 +36,7 @@ Feature: www / non-www redirection of WordPress sites
     Then the command should succeed
     And the file '{EE_ROOT_DIR}/services/nginx-proxy/conf.d/bh-site-type-wp-redir.test-redirect.conf' should not exist
 
-  # SC-19 (fixed in site-command fix/proxy-cache-rollback-and-le-alias): delete removed the redirect file without reloading nginx-proxy, so www kept redirecting to the deleted site.
+  # Regression check (fixed by EasyEngine/site-command#505): delete removed the redirect file without reloading nginx-proxy, so www kept redirecting to the deleted site.
   Scenario: Deleting the site stops the www redirect
     Given I add a hosts entry for 'www.bh-site-type-wp-redir4.test'
     And a WordPress site 'bh-site-type-wp-redir4.test' exists

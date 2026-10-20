@@ -82,7 +82,7 @@ Feature: Proxy cache of WordPress sites (--proxy-cache)
     And the file '{EE_ROOT_DIR}/services/nginx-proxy/conf.d/bh-site-type-wp-proxyupd.test.conf' should not exist
     And the file '{EE_ROOT_DIR}/services/nginx-proxy/vhost.d/bh-site-type-wp-proxyupd.test_location' should not exist
 
-  # CACHE-1 (fixed in v4.13.2, site-command 276d118), regression check: the proxy purge also uses `docker exec -it`, so the files stay while "Proxy cache cleared" is printed.
+  # Regression check (fixed in v4.13.2 by EasyEngine/site-command#510): the proxy purge also uses `docker exec -it`, so the files stay while "Proxy cache cleared" is printed.
   @destructive
   Scenario: ee site clean --proxy empties the proxy cache directory
     Given a WordPress site 'bh-site-type-wp-proxyclean.test' exists created with '--proxy-cache=on --skip-install'
