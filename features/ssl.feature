@@ -195,8 +195,7 @@ Feature: SSL of WordPress sites (--ssl=self|custom|inherit|le and ssl updates)
       SSL is already disabled on bh-site-type-wp-sslupd.test
       """
 
-  # PHPT-10 (site-command): init_ssl() stores site_ssl_wildcard=1 for self-signed creates, so update refuses `--ssl=off` ("wildcard to normal SSL") and `--ssl=off --wildcard`.
-  @known-bug
+  # PHPT-10 / SC-3 (fixed in site-command fix/proxy-cache-rollback-and-le-alias): update refused `--ssl=off` for self-signed creates, which store site_ssl_wildcard=1.
   Scenario: SSL of a site created with --ssl=self can be turned off
     Given a WordPress site 'bh-site-type-wp-selfoff.test' exists created with '--ssl=self --skip-install'
     When I run 'bin/ee site update bh-site-type-wp-selfoff.test --ssl=off'
@@ -253,8 +252,8 @@ Feature: SSL of WordPress sites (--ssl=self|custom|inherit|le and ssl updates)
     And the file '{EE_ROOT_DIR}/services/nginx-proxy/certs/bh-site-type-wp-le1.ee4-test.rt.gw.crt' should not exist
     And the directory '{EE_ROOT_DIR}/services/nginx-proxy/acme-conf/certs/bh-site-type-wp-le1.ee4-test.rt.gw' should not exist
 
-  # SSL-5 / SSL-9: deleting an LE site leaves acme-conf/var entries for www. Checks the leftovers of the scenario above (no new issuance).
-  @le @known-bug
+  # SSL-5 / SSL-9 (fixed in site-command fix/proxy-cache-rollback-and-le-alias): deleting an LE site left acme-conf/var entries for www. Checks the leftovers of the scenario above (no new issuance).
+  @le
   Scenario: Deleting a Let's Encrypt site leaves no ACME leftovers
     Given the site 'bh-site-type-wp-le1.ee4-test.rt.gw' was deleted earlier in this feature
     Then the directory '{EE_ROOT_DIR}/services/nginx-proxy/acme-conf/var/bh-site-type-wp-le1.ee4-test.rt.gw' should not exist

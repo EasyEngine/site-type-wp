@@ -36,8 +36,7 @@ Feature: www / non-www redirection of WordPress sites
     Then the command should succeed
     And the file '{EE_ROOT_DIR}/services/nginx-proxy/conf.d/bh-site-type-wp-redir.test-redirect.conf' should not exist
 
-  # SC-19: delete removes the redirect file without reloading nginx-proxy, so www keeps redirecting to the deleted site.
-  @known-bug
+  # SC-19 (fixed in site-command fix/proxy-cache-rollback-and-le-alias): delete removed the redirect file without reloading nginx-proxy, so www kept redirecting to the deleted site.
   Scenario: Deleting the site stops the www redirect
     Given I add a hosts entry for 'www.bh-site-type-wp-redir4.test'
     And a WordPress site 'bh-site-type-wp-redir4.test' exists

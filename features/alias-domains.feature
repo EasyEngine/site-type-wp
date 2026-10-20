@@ -146,8 +146,7 @@ Feature: Alias domains of WordPress sites (--alias-domains, --add/--delete-alias
       | field         | value                                                    |
       | alias_domains | bh-site-type-wp-blank.test,bh-site-type-wp-blank-a.test  |
 
-  # WPT-2 (pre-existing, not from #488: the flag was already false for sites without SSL): update_alias_domains() dumps docker-compose.yml without HTTPS_METHOD=nohttps for a site without SSL, until the next refresh.
-  @known-bug
+  # WPT-2 (fixed in site-command fix/proxy-cache-rollback-and-le-alias): update_alias_domains() dumped docker-compose.yml without HTTPS_METHOD=nohttps for a site without SSL, until the next refresh.
   Scenario: Alias changes keep HTTPS disabled on a site without SSL
     Given a WordPress site 'bh-site-type-wp-aliasnossl.test' exists created with '--skip-install'
     When I run 'bin/ee site update bh-site-type-wp-aliasnossl.test --add-alias-domains=bh-site-type-wp-aliasnossl-a.test'
@@ -163,8 +162,7 @@ Feature: Alias domains of WordPress sites (--alias-domains, --add/--delete-alias
       HTTPS_METHOD=nohttps
       """
 
-  # WPT-2 + WPT-12: `--ssl=off` keeps <site>.crt, and with aliases CERT_NAME=${VIRTUAL_HOST} picks it up, so without nohttps nginx-proxy redirects HTTP to HTTPS again.
-  @known-bug
+  # WPT-2 + WPT-12 (fixed in site-command fix/proxy-cache-rollback-and-le-alias): `--ssl=off` kept <site>.crt, and with aliases CERT_NAME=${VIRTUAL_HOST} picked it up, so without nohttps nginx-proxy redirected HTTP to HTTPS again.
   Scenario: A site whose SSL was turned off keeps serving HTTP after an alias change
     Given a WordPress site 'bh-site-type-wp-aliasoff.test' exists
     When I run 'bin/ee site update bh-site-type-wp-aliasoff.test --ssl=self'

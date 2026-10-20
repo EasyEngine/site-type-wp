@@ -32,10 +32,10 @@ Legend: file names are under `features/`; "KB" = `@known-bug` scenario that docu
 | `--skip-content` | install-options: Install WordPress without the default themes and plugins |
 | `--skip-install` | install-options: Skip the WordPress install; used as a fast fixture in many scenarios |
 | `--skip-status-check` | install-options: Insecure password allowed, status check skipped… |
-| `--ssl=self` | ssl: Create a site with a self-signed certificate; turning it off again: ssl KB (PHPT-10) |
+| `--ssl=self` | ssl: Create a site with a self-signed certificate; turning it off again: ssl (PHPT-10, fixed) |
 | `--ssl=custom`, `--ssl-key`, `--ssl-crt` | ssl: Create a site with a custom certificate; missing flags; missing files; rollback dropping another site's DB: database (WPT-1) |
 | `--ssl=inherit` | ssl: A subdomain site inherits…, Inherit without a parent site rolls back, parent without SSL (KB), with `--wildcard` |
-| `--ssl=le` | ssl: Create a WordPress site with a Let's Encrypt certificate (`@le`); leftovers after delete: ssl KB (SSL-5/SSL-9) |
+| `--ssl=le` | ssl: Create a WordPress site with a Let's Encrypt certificate (`@le`); leftovers after delete: ssl (SSL-5/SSL-9, fixed) |
 | unknown `--ssl` value | ssl: An unknown --ssl value rolls the whole create back (late rejection, WPT-13) |
 | `--ssl` without value (= le) | not covered: same code path as `--ssl=le`, LE budget |
 | `--wildcard` | ssl: Inherit together with --wildcard is rejected; update `--ssl=le --wildcard` rejection; `--ssl=le --wildcard` itself not covered (needs Cloudflare DNS-01 credentials) |
@@ -59,10 +59,10 @@ Legend: file names are under `features/`; "KB" = `@known-bug` scenario that docu
 | `reload [--all] [--nginx] [--php]` | site: Restart and reload…; disabled site refused |
 | `share --disable` (no share) / SSL site | site: Share without an active share…; ssl: self-signed scenario |
 | `share` with ngrok, `--refresh`, `--token` | not covered: needs the external ngrok service and a token |
-| `update --ssl=self\|off` (WP search-replace + DB backup) | ssl: Enabling and disabling SSL… ; invalid/`--wildcard`: Invalid SSL updates are rejected; off after a self-signed create: ssl KB (PHPT-10) |
+| `update --ssl=self\|off` (WP search-replace + DB backup) | ssl: Enabling and disabling SSL… ; invalid/`--wildcard`: Invalid SSL updates are rejected; off after a self-signed create: ssl (PHPT-10, fixed) |
 | `update --php` | php-version: Default PHP version and update…, same version, unsupported version |
 | `update --proxy-cache[=on\|off]`, `--proxy-cache-max-*`, `--proxy-cache-key-zone-size` | proxy-cache: Proxy cache can be turned off…, Enable proxy cache on an existing site with update; invalid value: KB |
-| `update --add-alias-domains` / `--delete-alias-domains` | alias-domains: Add and delete alias domains…, Another site cannot be added as an alias; nohttps dropped on sites without SSL: KB ×2 (WPT-2) |
+| `update --add-alias-domains` / `--delete-alias-domains` | alias-domains: Add and delete alias domains…, Another site cannot be added as an alias; nohttps kept on sites without SSL: ×2 (WPT-2, fixed) |
 | `update` of unknown / disabled site | site: Update of an unknown site fails, Disable and enable… |
 | `enable` / `disable` / `refresh` | site: Disable and enable…, Refresh regenerates docker-compose.yml…; local-db: database |
 | `delete` (+ confirmation prompt) | site: Delete removes every trace… (incl. the random DB user), Declining the delete confirmation…, Deleting a missing site fails; redirect/proxy/alias/local-db/custom-cert/LE cleanup in their features |
@@ -94,37 +94,32 @@ Estimated coverage: 61 of 67 inventory rows above are covered (about 90%; `--wil
 
 ## Known bugs exposed (`@known-bug`)
 
-AUTH-1, AUTH-5 and the blank-alias scenario passed on develop after the 2026-09-25 merges of site-command #502 and site-type-wp #239 (https://github.com/mrrobot47/site-type-wp/actions/runs/36099148649) and are regular regression scenarios since. The WPT-1 and WPT-8 scenarios (database: name collision, user collision, failed custom-SSL create, existing webroot; multisite: rejected inherit + subdom) are regular since the fixes on the `fix/site-name-collisions` branches of site-command, site-type-wp and site-type-php (2026-09-26, local): they fail on develop until those are merged. The WPT-2 + WPT-12 alias-change scenario passed there too, but only because the alias update now returns before docker-gen has the recreated container; it now waits for the new alias to be served before checking.
+AUTH-1, AUTH-5 and the blank-alias scenario passed on develop after the 2026-09-25 merges of site-command #502 and site-type-wp #239 (https://github.com/mrrobot47/site-type-wp/actions/runs/36099148649) and are regular regression scenarios since. The WPT-1 and WPT-8 scenarios (database: name collision, user collision, failed custom-SSL create, existing webroot; multisite: rejected inherit + subdom) are regular since the fixes on the `fix/site-name-collisions` branches of site-command, site-type-wp and site-type-php (2026-09-26, local): they fail on develop until those are merged. The WPT-2 + WPT-12 alias-change scenario passed there too, but only because the alias update now returns before docker-gen has the recreated container; it now waits for the new alias to be served before checking. The WPT-2 ×2, SC-19, PHPT-10 and SSL-5/SSL-9 scenarios are regular since the fixes on site-command `fix/proxy-cache-rollback-and-le-alias` (2026-09-27, local); they fail on develop until that is merged.
 
 | Scenario | Bug |
 |---|---|
 | install-options: Shell metacharacters in the site name are rejected | SEC-1 |
 | alias-domains: An existing site cannot be reused as an alias on create | PHPT-7 |
-| redirect: Deleting the site stops the www redirect | SC-19 (site-command) |
 | install-options: The latest WordPress download passes its checksums | WP-1 |
 | cache: The local redis container restarts with the site | MIG-16 |
 | cache: ee site clean purges…; proxy-cache: ee site clean --proxy empties… | CACHE-1 |
-| ssl: Deleting a Let's Encrypt site leaves no ACME leftovers | SSL-5, SSL-9 |
 | multisite: --mu without a value is rejected | WPT-6 |
 | cache: --with-local-redis without --cache enables the local redis cache | WPT-6 |
 | proxy-cache: Invalid proxy-cache value on update / on create is rejected | WPT-3: YAML `on`/`off` parsed as booleans |
 | proxy-cache: A new site stores proxy_cache off… | WPT-3: default stored as `''` |
 | php-version: Loosely matching PHP version <php> is rejected | WPT-4: loose `in_array` |
 | ssl: Inherit from a parent without SSL fails with a clean message | WPT-7: `var_dump()` in the error |
-| ssl: SSL of a site created with --ssl=self can be turned off | PHPT-10 (site-command) |
 | install-options: --public-dir without a value keeps the default webroot | WPT-6 |
 | install-options: A site title with an apostrophe | WPT-5: unescaped shell quoting |
-| alias-domains: Alias changes keep HTTPS disabled on a site without SSL | WPT-2 (pre-existing, not a #488 regression) |
-| alias-domains: A site whose SSL was turned off keeps serving HTTP after an alias change | WPT-2 + WPT-12: user-visible redirect to HTTPS |
 
 ## Tags and runtime
 
 | Tag | Scenarios | Meaning |
 |---|---|---|
 | (all) | 128 | including outline examples |
-| `@known-bug` | 24 | expected to fail until the bug is fixed; exclude with `--tags='~@known-bug'` |
+| `@known-bug` | 19 | expected to fail until the bug is fixed; exclude with `--tags='~@known-bug'` |
 | `@destructive` | 6 | proxy-cache enable/disable restarts the global nginx-proxy (all sites blip) |
-| `@le` | 2 | one real Let's Encrypt issuance (`bh-site-type-wp-le1.ee4-test.rt.gw`); the second scenario only inspects its leftovers and refuses to run without the first. On CI both run against Pebble (`behat/ci/pebble-setup.sh`); the create passes, the leftovers one is `@known-bug` (SSL-5/SSL-9) |
+| `@le` | 2 | one real Let's Encrypt issuance (`bh-site-type-wp-le1.ee4-test.rt.gw`); the second scenario only inspects its leftovers and refuses to run without the first. On CI both run against Pebble (`behat/ci/pebble-setup.sh`); both regular (the leftovers one fails on develop until site-command `fix/proxy-cache-rollback-and-le-alias`, SSL-5/SSL-9, is merged) |
 | `@le-real` | 0 | needs the public LE service itself; none, both `@le` scenarios work on Pebble |
 | `@slow` | 7 | legacy PHP images (5.6–8.1), pulled on first use |
 | `@external-db` | 3 | throwaway MariaDB on the host network bound to the docker bridge gateway (read from `docker network inspect bridge`, 10.0.0.1 on this host); reachability from the default bridge and from a user-defined network was checked with a throwaway listener |
