@@ -3,10 +3,11 @@
 # scenarios run without public DNS or real certificates. Test-only: no product code changes.
 #
 #   pebble-setup.sh setup      start Pebble + DNS, redirect and trust, block real LE, then run `verify`
+#   pebble-setup.sh block      lanes without Pebble: point the LE host at a blackhole and block real LE
 #   pebble-setup.sh verify     prove EE's HTTP stack reaches Pebble (and cannot reach real LE)
 #   pebble-setup.sh reach      after the EE proxy is up: prove Pebble's VA can fetch http://<target>/ (HTTP-01 path)
 #   pebble-setup.sh logs       print the Pebble, proxy and DNS logs
-#   pebble-setup.sh teardown   undo everything setup did
+#   pebble-setup.sh teardown   undo everything setup or block did
 #
 # Needs root, docker, openssl, curl, php, iptables and systemd-resolved (GitHub's ubuntu runners have all of them).
 # Pebble's root is trusted system-wide while it runs, so never leave it set up on a machine used for anything else.
@@ -31,6 +32,8 @@ PEBBLE_DOMAIN=${PEBBLE_DOMAIN:-ee4-test.rt.gw}
 PEBBLE_TARGET_IP=${PEBBLE_TARGET_IP:-$PEBBLE_GATEWAY}
 ACME_HOST=acme-v02.api.letsencrypt.org
 TOS_MARKER='Do%20what%20thou%20wilt'
+# TEST-NET-1: never routed, and rejected locally so a request fails at once instead of timing out.
+BLACKHOLE_IP=${BLACKHOLE_IP:-192.0.2.1}
 PUBLIC_PROBE=api.wordpress.org
 MARK='# ee-pebble'
 RESOLVED_DROPIN=/etc/systemd/resolved.conf.d/ee-pebble.conf
@@ -326,6 +329,34 @@ cmd_verify() {
 	log "verified: $ACME_HOST -> Pebble $PEBBLE_IP (system trust), *.$PEBBLE_DOMAIN -> $PEBBLE_TARGET_IP, real LE blocked"
 }
 
+cmd_block() {
+	need_root
+	[[ ! -e $STATE ]] || die "$STATE exists; run teardown first"
+	mkdir -p "$PEBBLE_DIR"
+	: >"$STATE"
+
+	local ip resolved
+	for ip in $(public_ips ahostsv4 "$ACME_HOST") $(public_ips ahostsv6 "$ACME_HOST") "$BLACKHOLE_IP"; do
+		block_ip "$ip"
+	done
+	printf '%s\t%s %s\n' "$BLACKHOLE_IP" "$ACME_HOST" "$MARK" >>/etc/hosts
+	remember "sed -i '/ $MARK\$/d' /etc/hosts"
+
+	resolved=$(getent ahosts "$ACME_HOST" | awk 'NR==1{print $1}')
+	[[ $resolved == "$BLACKHOLE_IP" ]] || die "$ACME_HOST resolves to '$resolved', not the blackhole $BLACKHOLE_IP"
+	if curl -sS --connect-timeout 5 -o /dev/null "https://$ACME_HOST/directory" 2>/dev/null; then
+		die "$ACME_HOST is still reachable"
+	fi
+	while read -r _ ip; do
+		[[ $ip == "$BLACKHOLE_IP" ]] && continue
+		[[ $ip == *:* ]] && ip="[$ip]"
+		if curl -sS --connect-timeout 5 --resolve "$ACME_HOST:443:$ip" -o /dev/null "https://$ACME_HOST/directory" 2>/dev/null; then
+			die "real Let's Encrypt at $ip is still reachable"
+		fi
+	done < <(grep -E '^(ip6?tables) -D OUTPUT' "$STATE" | awk '{print $1, $5}')
+	log "verified: $ACME_HOST -> $BLACKHOLE_IP (rejected), real LE blocked"
+}
+
 cmd_reach() {
 	local code
 	code=$(docker run --rm --network "$PEBBLE_NET" "curlimages/curl:8.11.1" -sS -o /dev/null -w '%{http_code}' \
@@ -357,12 +388,13 @@ cmd_teardown() {
 
 case ${1:-} in
 	setup) cmd_setup ;;
+	block) cmd_block ;;
 	verify) cmd_verify ;;
 	reach) cmd_reach ;;
 	logs) cmd_logs ;;
 	teardown) cmd_teardown ;;
 	*)
-		sed -n '2,12p' "$0" >&2
+		sed -n '2,13p' "$0" >&2
 		exit 2
 		;;
 esac

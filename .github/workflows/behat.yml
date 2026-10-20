@@ -1,4 +1,5 @@
 # Behat suite of an EasyEngine package, run inside a fresh core checkout on a throwaway runner.
+# The main lane's job is named "Behat Tests - PHP <version>" to match the required checks; update those with the matrix.
 name: Behat
 
 on:
@@ -6,6 +7,7 @@ on:
   push:
     branches:
       - develop
+      - master
   workflow_dispatch:
 
 permissions:
@@ -32,7 +34,7 @@ env:
 
 jobs:
   behat:
-    name: Behat ${{ matrix.lane }} (PHP ${{ matrix.php }})
+    name: ${{ matrix.lane == 'main' && format('Behat Tests - PHP {0}', matrix.php) || format('Behat {0} (PHP {1})', matrix.lane, matrix.php) }}
     runs-on: ubuntu-latest
     timeout-minutes: 150
     # Known bugs are expected to fail; they're reported, not gating.
@@ -103,6 +105,11 @@ jobs:
             sudo -E rclone listremotes
           fi
 
+      # Every lane without Pebble points EE's hardcoded Let's Encrypt host at a blackhole, so no scenario can reach the real service.
+      - name: Block the real Let's Encrypt
+        if: ${{ !startsWith(matrix.lane, 'le') }}
+        run: sudo -E pkg/.github/behat/pebble-setup.sh block
+
       - name: Set up EasyEngine core
         run: |
           git clone -q --depth 1 -b "$CORE_REF" https://github.com/EasyEngine/easyengine.git easyengine
@@ -144,6 +151,15 @@ jobs:
             docker-compose version
           fi
 
+      # The suites run bin/ee; this keeps the release build (no dev autoloading) covered.
+      - name: Build the phar
+        if: matrix.lane == 'main'
+        working-directory: easyengine
+        run: |
+          composer dump-autoload --no-dev -q
+          php -dphar.readonly=0 utils/make-phar.php easyengine.phar --quiet
+          composer dump-autoload -q
+          sudo php easyengine.phar cli version
 
       - name: Start Pebble and redirect Let's Encrypt to it
         if: startsWith(matrix.lane, 'le')
@@ -198,8 +214,8 @@ jobs:
           PY
           head -c 20000 "$out/failures.txt"
 
-      - name: Tear down Pebble
-        if: always() && startsWith(matrix.lane, 'le')
+      - name: Tear down Pebble and the Let's Encrypt block
+        if: always()
         run: sudo pkg/.github/behat/pebble-setup.sh teardown
 
       - name: Upload results
