@@ -231,7 +231,9 @@ Feature: SSL of WordPress sites (--ssl=self|custom|inherit|le and ssl updates)
       | site_ssl_wildcard | 0     |
     And the file '{EE_ROOT_DIR}/services/nginx-proxy/certs/bh-site-type-wp-le1.ee4-test.rt.gw.crt' should exist
     And the hosts file should not contain 'bh-site-type-wp-le1.ee4-test.rt.gw'
-    When I run 'curl -sS -o /dev/null -w "%{http_code} %{ssl_verify_result}" https://bh-site-type-wp-le1.ee4-test.rt.gw/'
+    # The proxy reload is asynchronous (PRX-5): right after create the old workers can still answer, or drop the TLS connection.
+    When I wait until "curl -sS -o /dev/null https://bh-site-type-wp-le1.ee4-test.rt.gw/" succeeds within 60 seconds
+    And I run 'curl -sS -o /dev/null -w "%{http_code} %{ssl_verify_result}" https://bh-site-type-wp-le1.ee4-test.rt.gw/'
     Then STDOUT should contain:
       """
       200 0
