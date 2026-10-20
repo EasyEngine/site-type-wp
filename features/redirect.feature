@@ -30,8 +30,18 @@ Feature: www / non-www redirection of WordPress sites
 
   Scenario: Deleting the site removes its redirect config
     Given I add a hosts entry for 'www.bh-site-type-wp-redir.test'
-    And a WordPress site 'bh-site-type-wp-redir.test' exists created with '--skip-install'
+    And a WordPress site 'bh-site-type-wp-redir.test' exists
+    And the file '{EE_ROOT_DIR}/services/nginx-proxy/conf.d/bh-site-type-wp-redir.test-redirect.conf' should exist
     When I run 'bin/ee site delete bh-site-type-wp-redir.test --yes'
     Then the command should succeed
     And the file '{EE_ROOT_DIR}/services/nginx-proxy/conf.d/bh-site-type-wp-redir.test-redirect.conf' should not exist
-    And a GET request to 'http://www.bh-site-type-wp-redir.test/' should return 503 within 30 seconds
+
+  # SC-19: delete removes the redirect file without reloading nginx-proxy, so www keeps redirecting to the deleted site.
+  @known-bug
+  Scenario: Deleting the site stops the www redirect
+    Given I add a hosts entry for 'www.bh-site-type-wp-redir4.test'
+    And a WordPress site 'bh-site-type-wp-redir4.test' exists
+    And a GET request to 'http://www.bh-site-type-wp-redir4.test/' should return 301 within 30 seconds
+    When I run 'bin/ee site delete bh-site-type-wp-redir4.test --yes'
+    Then the command should succeed
+    And a GET request to 'http://www.bh-site-type-wp-redir4.test/' should return 503 within 30 seconds

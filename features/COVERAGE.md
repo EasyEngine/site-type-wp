@@ -100,6 +100,7 @@ Estimated coverage: 61 of 67 inventory rows above are covered (about 90%; `--wil
 | multisite: Subdomain multisite whose wildcard is already an alias… | AUTH-5 |
 | alias-domains: Reserved alias names are rejected on create | AUTH-1 |
 | alias-domains: An existing site cannot be reused as an alias on create | PHPT-7 |
+| redirect: Deleting the site stops the www redirect | SC-19 (site-command) |
 | alias-domains: Blank alias domains are dropped on create | fixed in site-type-wp #239 (not on develop) |
 | install-options: The latest WordPress download passes its checksums | WP-1 |
 | cache: The local redis container restarts with the site | MIG-16 |
@@ -126,8 +127,8 @@ Estimated coverage: 61 of 67 inventory rows above are covered (about 90%; `--wil
 
 | Tag | Scenarios | Meaning |
 |---|---|---|
-| (all) | 127 | including outline examples |
-| `@known-bug` | 28 | expected to fail until the bug is fixed; exclude with `--tags='~@known-bug'` |
+| (all) | 128 | including outline examples |
+| `@known-bug` | 29 | expected to fail until the bug is fixed; exclude with `--tags='~@known-bug'` |
 | `@destructive` | 6 | proxy-cache enable/disable restarts the global nginx-proxy (all sites blip) |
 | `@le` | 2 | one real Let's Encrypt issuance (`bh-site-type-wp-le1.ee4-test.rt.gw`); the second scenario only inspects its leftovers and refuses to run without the first. On CI both run against Pebble (`behat/ci/pebble-setup.sh`); the create passes, the leftovers one is `@known-bug` (SSL-5/SSL-9) |
 | `@le-real` | 0 | needs the public LE service itself; none, both `@le` scenarios work on Pebble |
