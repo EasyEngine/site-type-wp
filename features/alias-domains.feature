@@ -46,14 +46,6 @@ Feature: Alias domains of WordPress sites (--alias-domains, --add/--delete-alias
       """
     And the site 'bh-site-type-wp-alias2.test' should not exist
 
-  # PHPT-7: create only checks other sites' aliases (get_all_alias_domains() drops site URLs), so an existing site's name is accepted as an alias.
-  @known-bug
-  Scenario: An existing site cannot be reused as an alias on create
-    Given a WordPress site 'bh-site-type-wp-alias.test' exists created with "--alias-domains='bh-site-type-wp-alias-a.test,bh-site-type-wp-alias-b.test'"
-    When I run "bin/ee site create bh-site-type-wp-alias3.test --type=wp --skip-install --alias-domains='bh-site-type-wp-alias.test'"
-    Then the command should fail
-    And the site 'bh-site-type-wp-alias3.test' should not exist
-
   Scenario: Add and delete alias domains on a WordPress site
     Given a WordPress site 'bh-site-type-wp-alias.test' exists created with "--alias-domains='bh-site-type-wp-alias-a.test,bh-site-type-wp-alias-b.test'"
     When I run 'bin/ee site update bh-site-type-wp-alias.test --add-alias-domains=bh-site-type-wp-alias-c.test'

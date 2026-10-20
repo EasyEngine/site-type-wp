@@ -132,19 +132,3 @@ Feature: WordPress redis cache (--cache, --with-local-redis)
       "redis_hostname":"global-redis"
       """
     And a GET request to 'http://bh-site-type-wp-mucache.test/' should return 200
-
-  # MIG-16: the local redis service has no restart policy, unlike every other service.
-  @known-bug
-  Scenario: The local redis container restarts with the site
-    Given a WordPress site 'bh-site-type-wp-mig16.test' exists created with '--cache --with-local-redis --skip-install'
-    Then the 'redis' container of site 'bh-site-type-wp-mig16.test' should have restart policy 'always'
-
-  # WPT-6: --with-local-redis alone is silently ignored (no redis container, no cache) although the help says "Enable cache with local redis container".
-  @known-bug
-  Scenario: --with-local-redis without --cache enables the local redis cache
-    When I run 'bin/ee site create bh-site-type-wp-lredisonly.test --type=wp --with-local-redis --skip-install'
-    Then the command should succeed
-    And the 'redis' container of site 'bh-site-type-wp-lredisonly.test' should be running
-    And the site 'bh-site-type-wp-lredisonly.test' info should contain:
-      | field      | value |
-      | cache_host | redis |

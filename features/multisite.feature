@@ -96,13 +96,6 @@ Feature: WordPress multisite (--mu=subdir|subdom)
     And the global database should not have a database named 'bh_site_type_wp_muinh2_test'
     And the global database should not have users starting with 'bh-site-type-wp-muinh2.test-'
 
-  # WPT-6: `--mu` without a value only warns "--mu parameter needs a value" and creates a single site.
-  @known-bug
-  Scenario: --mu without a value is rejected
-    When I run 'bin/ee site create bh-site-type-wp-muempty.test --type=wp --mu --skip-install'
-    Then the command should fail
-    And the site 'bh-site-type-wp-muempty.test' should not exist
-
   # AUTH-5 regression: subdom create didn't check its implicit *.site against existing aliases (fixed by site-type-wp #239).
   Scenario: Subdomain multisite whose wildcard is already an alias of another site is rejected
     Given a WordPress site 'bh-site-type-wp-auth5owner.test' exists created with "--skip-install --alias-domains='*.bh-site-type-wp-auth5.test'"

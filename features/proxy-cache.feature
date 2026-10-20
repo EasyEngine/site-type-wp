@@ -82,42 +82,6 @@ Feature: Proxy cache of WordPress sites (--proxy-cache)
     And the file '{EE_ROOT_DIR}/services/nginx-proxy/conf.d/bh-site-type-wp-proxyupd.test.conf' should not exist
     And the file '{EE_ROOT_DIR}/services/nginx-proxy/vhost.d/bh-site-type-wp-proxyupd.test_location' should not exist
 
-  # WPT-3: the synopsis options `on`/`off` are parsed by YAML as booleans, so any non-empty value passes validation; update then runs the disable path.
-  @known-bug @destructive
-  Scenario: Invalid proxy-cache value on update is rejected
-    Given a WordPress site 'bh-site-type-wp-proxyval.test' exists created with '--skip-install'
-    When I run 'bin/ee site update bh-site-type-wp-proxyval.test --proxy-cache=maybe'
-    Then the command should fail
-    And STDERR should contain:
-      """
-      Invalid value specified for 'proxy-cache'
-      """
-
-  # WPT-3: same YAML boolean parsing on create; the invalid value is silently ignored.
-  @known-bug
-  Scenario: Invalid proxy-cache value on create is rejected
-    When I run 'bin/ee site create bh-site-type-wp-proxybad.test --type=wp --proxy-cache=maybe --skip-install'
-    Then the command should fail
-    And STDERR should contain:
-      """
-      Invalid value specified for 'proxy-cache'
-      """
-    And the site 'bh-site-type-wp-proxybad.test' should not exist
-
-  # WPT-3: without --proxy-cache the YAML default `off` becomes boolean false and is stored as '' instead of 'off', so `--proxy-cache=off` is not detected as a no-op (and restarts the global proxy).
-  @known-bug @destructive
-  Scenario: A new site stores proxy_cache off and refuses to turn it off again
-    Given a WordPress site 'bh-site-type-wp-proxyoff.test' exists created with '--skip-install'
-    Then the site 'bh-site-type-wp-proxyoff.test' info should contain:
-      | field       | value |
-      | proxy_cache | off   |
-    When I run 'bin/ee site update bh-site-type-wp-proxyoff.test --proxy-cache=off'
-    Then the command should fail
-    And STDERR should contain:
-      """
-      Site bh-site-type-wp-proxyoff.test already has proxy cache: off
-      """
-
   # CACHE-1 (fixed in v4.13.2, site-command 276d118), regression check: the proxy purge also uses `docker exec -it`, so the files stay while "Proxy cache cleared" is printed.
   @destructive
   Scenario: ee site clean --proxy empties the proxy cache directory

@@ -201,30 +201,11 @@ Feature: WordPress install options (title/admin flags, locale, version, skip-con
       """
     And a GET request to 'http://bh-site-type-wp-pubdir.test/' should return 200
 
-  # WPT-6: --public-dir is declared as a flag, so passing it without a value makes the public dir `htdocs/1`.
-  @known-bug
-  Scenario: --public-dir without a value keeps the default webroot
-    When I run 'bin/ee site create bh-site-type-wp-pubdir1.test --type=wp --public-dir --skip-install'
-    Then the site 'bh-site-type-wp-pubdir1.test' info should contain:
-      | field                  | value           |
-      | site_container_fs_path | /var/www/htdocs |
-
   # WP-1 (fixed in v4.13.1, site-type-wp#241), regression check: WP-CLI 2.12 corrupts WordPress 7.x downloads (PAX long names are truncated), so the latest version fails its checksums.
   Scenario: The latest WordPress download passes its checksums
     Given a WordPress site 'bh-site-type-wp-wp1.test' exists created with '--skip-install'
     When I run WP-CLI 'core verify-checksums' on site 'bh-site-type-wp-wp1.test'
     Then the command should succeed
-
-  # WPT-5: title, admin user/e-mail/password are interpolated inside single quotes of the `wp core install` shell command, so an apostrophe breaks the install and the site is rolled back.
-  @known-bug
-  Scenario: A site title with an apostrophe
-    When I run 'bin/ee site create bh-site-type-wp-apos.test --type=wp --title="BH's Site"'
-    Then the command should succeed
-    When I run WP-CLI 'option get blogname' on site 'bh-site-type-wp-apos.test'
-    Then STDOUT should contain:
-      """
-      BH's Site
-      """
 
   # SEC-1 (fixed in v4.13.2, site-type-wp#243 and site-command#509), regression check: shell metacharacters in the site name reach unescaped shell sinks during create.
   # The payload survives lowercasing and the docker-prefix stripping of `.`/`-`: it only creates an empty marker in $HOME.

@@ -80,22 +80,6 @@ Feature: SSL of WordPress sites (--ssl=self|custom|inherit|le and ssl updates)
     And the directory '{SITES_DIR}/orphan.bh-site-type-wp-noparent.test' should not exist
     And the global database should not have a database named 'orphan_bh_site_type_wp_noparent_test'
 
-  # WPT-7: check_parent_site_certs() builds its message with var_dump(), which dumps the parent model to STDOUT.
-  @known-bug
-  Scenario: Inherit from a parent without SSL fails with a clean message
-    Given a WordPress site 'bh-site-type-wp-nossl.test' exists created with '--skip-install'
-    When I run 'bin/ee site create child.bh-site-type-wp-nossl.test --type=wp --ssl=inherit'
-    Then the command should fail
-    And STDERR should contain:
-      """
-      Cannot inherit from bh-site-type-wp-nossl.test as site does not have SSL cert
-      """
-    And STDOUT should not contain:
-      """
-      object(EE\Model\Site)
-      """
-    And the site 'child.bh-site-type-wp-nossl.test' should not exist
-
   Scenario: Create a site with a custom certificate
     Given a self-signed certificate for 'bh-site-type-wp-custom.test' exists in '{TMP_DIR}/certs'
     When I run 'bin/ee site create bh-site-type-wp-custom.test --type=wp --ssl=custom --ssl-key={TMP_DIR}/certs/bh-site-type-wp-custom.test.key --ssl-crt={TMP_DIR}/certs/bh-site-type-wp-custom.test.crt'

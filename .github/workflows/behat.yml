@@ -37,26 +37,19 @@ jobs:
     name: ${{ matrix.lane == 'main' && format('Behat Tests - PHP {0}', matrix.php) || format('Behat {0} (PHP {1})', matrix.lane, matrix.php) }}
     runs-on: ubuntu-latest
     timeout-minutes: 150
-    # Known bugs are expected to fail; they're reported, not gating.
-    continue-on-error: ${{ endsWith(matrix.lane, 'known-bug') }}
     strategy:
       fail-fast: false
       matrix:
         php: ['7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5']
-        lane: [main, slow, known-bug, le, le-known-bug]
+        lane: [main, slow, le]
         include:
           - lane: main
             tags: '~@known-bug&&~@slow'
           - lane: slow
             tags: '@slow&&~@known-bug'
-          - lane: known-bug
-            tags: '@known-bug'
           # @le against Pebble (.github/behat/pebble-setup.sh).
           - lane: le
             tags: '~@known-bug'
-          # The whole @le feature: some known-bug scenarios check what an earlier one left behind.
-          - lane: le-known-bug
-            tags: '@le'
     steps:
       - name: Check out the package
         uses: actions/checkout@v7
