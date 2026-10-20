@@ -232,8 +232,7 @@ class FeatureContext implements Context
 	{
 		$command_output = $output_stream === "STDOUT" ? $this->commands[0]->stdout : $this->commands[0]->stderr;
 
-		$expected_out = isset($expected_output->getStrings()[0]) ? $expected_output->getStrings()[0] : '';
-		if (strpos($command_output, $expected_out) === false) {
+		if (strpos($command_output, $expected_output->getRaw()) === false) {
 			throw new Exception("Actual output is:\n" . $command_output);
 		}
 	}
@@ -245,8 +244,7 @@ class FeatureContext implements Context
 	{
 		$command_output = $output_stream === "STDOUT" ? $this->commands[ $index - 1 ]->stdout : $this->commands[ $index - 1 ]->stderr;
 
-		$expected_out = isset($expected_output->getStrings()[0]) ? $expected_output->getStrings()[0] : '';
-		if (strpos($command_output, $expected_out) === false) {
+		if (strpos($command_output, $expected_output->getRaw()) === false) {
 			throw new Exception("Actual output is:\n" . $command_output);
 		}
 	}
