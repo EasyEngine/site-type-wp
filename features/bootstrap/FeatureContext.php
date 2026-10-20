@@ -98,6 +98,9 @@ class FeatureContext implements Context
 	/** @var array Container start times noted by the current scenario, keyed by "site/service". */
 	private $noted_start_times = [];
 
+	/** @var array Sites removed by a successful `bin/ee site delete` in the current feature. */
+	private static $deleted_sites = [];
+
 	/**
 	 * Initializes context.
 	 */
@@ -149,7 +152,11 @@ class FeatureContext implements Context
 	 */
 	public function iRun($command)
 	{
-		$this->commands[] = EE::launch( $this->replace_placeholders( $command ), false, true );
+		$result           = EE::launch( $this->replace_placeholders( $command ), false, true );
+		$this->commands[] = $result;
+		if ( 0 === $result->return_code && preg_match( '#^bin/ee site delete (\S+)#', $command, $matches ) ) {
+			self::$deleted_sites[] = $matches[1];
+		}
 	}
 
 	/**
@@ -396,6 +403,7 @@ class FeatureContext implements Context
 	 */
 	public static function prepareFeature(BeforeFeatureScope $scope)
 	{
+		self::$deleted_sites = [];
 		self::cleanup_test_artifacts();
 	}
 
@@ -990,6 +998,33 @@ class FeatureContext implements Context
 	}
 
 	/**
+	 * Site DB users are `<site>-<random>`, so a deleted site's user can only be matched by prefix.
+	 *
+	 * @Then the global database should not have users starting with :prefix
+	 */
+	public function theGlobalDatabaseShouldNotHaveUsersStartingWith( $prefix )
+	{
+		$users = array_filter( $this->global_db_lines( 'SELECT User FROM mysql.user' ), function ( $user ) use ( $prefix ) {
+			return 0 === strpos( $user, $prefix );
+		} );
+		if ( $users ) {
+			throw new Exception( "The global database still has users starting with $prefix: " . implode( ', ', $users ) );
+		}
+	}
+
+	/**
+	 * Guards scenarios that inspect what an earlier scenario left behind, so they can't pass when run alone.
+	 *
+	 * @Given the site :site was deleted earlier in this feature
+	 */
+	public function theSiteWasDeletedEarlierInThisFeature( $site )
+	{
+		if ( ! in_array( $site, self::$deleted_sites, true ) ) {
+			throw new Exception( "$site was not deleted by an earlier scenario of this feature; run the whole feature." );
+		}
+	}
+
+	/**
 	 * The DB user of a site is random unless --dbuser was passed, so it is read from the EE database.
 	 *
 	 * @Then the global database should have the user of site :site
@@ -1545,6 +1580,14 @@ class FeatureContext implements Context
 			} );
 			if ( count( $kept ) !== count( $hosts ) ) {
 				file_put_contents( '/etc/hosts', implode( PHP_EOL, $kept ) . PHP_EOL );
+			}
+		}
+
+		// Proxy certs and ACME state: `--ssl=off` and LE deletes leave them behind (WPT-12, SSL-5, SSL-9).
+		$proxy_dir = EE_ROOT_DIR . '/services/nginx-proxy';
+		foreach ( [ 'certs', 'acme-conf/certs', 'acme-conf/var' ] as $sub ) {
+			foreach ( glob( "$proxy_dir/$sub/*" . self::TEST_PREFIX . '*', GLOB_NOSORT ) ?: [] as $path ) {
+				EE::launch( 'rm -rf ' . escapeshellarg( $path ), false, true );
 			}
 		}
 
