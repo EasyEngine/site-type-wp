@@ -87,11 +87,12 @@ Feature: Proxy cache of WordPress sites (--proxy-cache)
   Scenario: ee site clean --proxy empties the proxy cache directory
     Given a WordPress site 'bh-site-type-wp-proxyclean.test' exists created with '--proxy-cache=on --skip-install'
     And I run 'docker exec services_global-nginx-proxy_1 sh -c "mkdir -p /var/cache/nginx/bh-site-type-wp-proxyclean.test/x && touch /var/cache/nginx/bh-site-type-wp-proxyclean.test/x/entry"'
+    And the command should succeed
     When I run 'bin/ee site clean bh-site-type-wp-proxyclean.test --proxy'
     Then the command should succeed
     And STDOUT should contain:
       """
       Proxy cache cleared for bh-site-type-wp-proxyclean.test
       """
-    When I run 'docker exec services_global-nginx-proxy_1 test -e /var/cache/nginx/bh-site-type-wp-proxyclean.test/x/entry'
-    Then the command should fail
+    When I run 'docker exec services_global-nginx-proxy_1 test ! -e /var/cache/nginx/bh-site-type-wp-proxyclean.test/x/entry'
+    Then the command should succeed

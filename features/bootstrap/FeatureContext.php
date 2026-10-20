@@ -1152,8 +1152,9 @@ class FeatureContext implements Context
 	public function aGetRequestToShouldNotReturn( $url, $code )
 	{
 		$response = $this->http_request( $this->replace_placeholders( $url ), null, true );
-		if ( (int) $code === $response['code'] ) {
-			throw new Exception( "GET $url returned $code.\n" . $response['headers'] );
+		// Code 0 is a transport error (no HTTP response), never a pass.
+		if ( 0 === $response['code'] || (int) $code === $response['code'] ) {
+			throw new Exception( "GET $url returned {$response['code']}.\n" . $response['headers'] );
 		}
 	}
 
@@ -1168,13 +1169,14 @@ class FeatureContext implements Context
 		$deadline = time() + (int) $seconds;
 		do {
 			$response = $this->http_request( $url, null, true );
-			if ( (int) $code !== $response['code'] ) {
+			// Keep polling on a transport error (code 0), e.g. during a proxy reload.
+			if ( 0 !== $response['code'] && (int) $code !== $response['code'] ) {
 				return;
 			}
 			sleep( 2 );
 		} while ( time() < $deadline );
 
-		throw new Exception( "GET $url still returned $code after $seconds seconds.\n" . $response['headers'] );
+		throw new Exception( "GET $url still returned {$response['code']} after $seconds seconds.\n" . $response['headers'] );
 	}
 
 	/**
