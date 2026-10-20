@@ -60,8 +60,7 @@ Feature: WordPress redis cache (--cache, --with-local-redis)
     When I send a GET request to 'http://bh-site-type-wp-cache.test/?bh=1'
     Then the response should have header 'X-SRCache-Fetch-Status: BYPASS'
 
-  # CACHE-1: clean_site_cache() runs `docker exec -it`, which fails without a TTY (and can hang under nested ptys), yet `ee site clean` still prints Success.
-  @known-bug
+  # CACHE-1 (fixed in v4.13.2, site-command 5c5abb9), regression check: clean_site_cache() runs `docker exec -it`, which fails without a TTY (and can hang under nested ptys), yet `ee site clean` still prints Success.
   Scenario: ee site clean purges the page and object cache keys
     Given a WordPress site 'bh-site-type-wp-cacheclean.test' exists created with '--cache --skip-install'
     And I store the key 'bh-site-type-wp-cacheclean.test_page:httpGET/bh' in the global redis

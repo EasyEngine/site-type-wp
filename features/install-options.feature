@@ -37,13 +37,21 @@ Feature: WordPress install options (title/admin flags, locale, version, skip-con
       BhPass1234
       """
 
+  # The message no longer echoes the password (site-type-wp#244, v4.13.2).
   Scenario Outline: Weak administrator password <pass> is rejected before anything is created
     When I run 'bin/ee site create bh-site-type-wp-weakpass.test --type=wp --admin-pass=<pass>'
     Then the command should fail
     And STDERR should contain:
       """
-      Issues found in input password: `<pass>`
+      Issues found in the admin password:
+      """
+    And STDERR should contain:
+      """
       <message>
+      """
+    And STDERR should not contain:
+      """
+      <pass>
       """
     And the site 'bh-site-type-wp-weakpass.test' should not exist
     And the global database should not have a database named 'bh_site_type_wp_weakpass_test'
@@ -201,8 +209,7 @@ Feature: WordPress install options (title/admin flags, locale, version, skip-con
       | field                  | value           |
       | site_container_fs_path | /var/www/htdocs |
 
-  # WP-1: WP-CLI 2.12 corrupts WordPress 7.x downloads (PAX long names are truncated), so the latest version fails its checksums.
-  @known-bug
+  # WP-1 (fixed in v4.13.1, site-type-wp#241), regression check: WP-CLI 2.12 corrupts WordPress 7.x downloads (PAX long names are truncated), so the latest version fails its checksums.
   Scenario: The latest WordPress download passes its checksums
     Given a WordPress site 'bh-site-type-wp-wp1.test' exists created with '--skip-install'
     When I run WP-CLI 'core verify-checksums' on site 'bh-site-type-wp-wp1.test'
@@ -219,9 +226,8 @@ Feature: WordPress install options (title/admin flags, locale, version, skip-con
       BH's Site
       """
 
-  # SEC-1: shell metacharacters in the site name reach unescaped shell sinks during create (fixed locally, not on develop).
+  # SEC-1 (fixed in v4.13.2, site-type-wp#243 and site-command#509), regression check: shell metacharacters in the site name reach unescaped shell sinks during create.
   # The payload survives lowercasing and the docker-prefix stripping of `.`/`-`: it only creates an empty marker in $HOME.
-  @known-bug
   Scenario: Shell metacharacters in the site name are rejected
     When I run "bin/ee site create 'bh-site-type-wp-sec1$(cd;>bhsitetypewpsec1pwned).test' --type=wp --skip-install"
     Then the command should fail

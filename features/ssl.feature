@@ -212,7 +212,9 @@ Feature: SSL of WordPress sites (--ssl=self|custom|inherit|le and ssl updates)
       """
       Invalid value specified for 'ssl'
       """
-    When I run 'bin/ee site update bh-site-type-wp-sslupd.test --ssl=le --wildcard'
+    # A site that never had SSL: sslupd had --ssl=self above, which keeps site_ssl_wildcard=1 after --ssl=off (site-command#505), so it would request a wildcard certificate.
+    Given a WordPress site 'bh-site-type-wp-nossl.test' exists created with '--skip-install'
+    When I run 'bin/ee site update bh-site-type-wp-nossl.test --ssl=le --wildcard'
     Then the command should fail
     And STDERR should contain:
       """

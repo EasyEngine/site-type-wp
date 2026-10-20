@@ -1122,6 +1122,26 @@ class FeatureContext implements Context
 	}
 
 	/**
+	 * Alias updates return before the proxy serves the new name (PRX-7), so poll.
+	 *
+	 * @Then a GET request to :url should not return :code within :seconds seconds
+	 */
+	public function aGetRequestToShouldNotReturnWithin( $url, $code, $seconds )
+	{
+		$url      = $this->replace_placeholders( $url );
+		$deadline = time() + (int) $seconds;
+		do {
+			$response = $this->http_request( $url, null, true );
+			if ( (int) $code !== $response['code'] ) {
+				return;
+			}
+			sleep( 2 );
+		} while ( time() < $deadline );
+
+		throw new Exception( "GET $url still returned $code after $seconds seconds.\n" . $response['headers'] );
+	}
+
+	/**
 	 * Polls until a response carries the header line, e.g. `X-SRCache-Fetch-Status: HIT`.
 	 *
 	 * @Then a GET request to :url should have header :header within :seconds seconds

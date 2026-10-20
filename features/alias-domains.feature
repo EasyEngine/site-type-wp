@@ -69,7 +69,7 @@ Feature: Alias domains of WordPress sites (--alias-domains, --add/--delete-alias
       """
       bh-site-type-wp-alias-c.test
       """
-    And a GET request to 'http://bh-site-type-wp-alias-c.test/' should not return 503
+    And a GET request to 'http://bh-site-type-wp-alias-c.test/' should not return 503 within 30 seconds
     When I run 'bin/ee site update bh-site-type-wp-alias.test --add-alias-domains=bh-site-type-wp-alias-c.test'
     Then the command should fail
     And STDERR should contain:

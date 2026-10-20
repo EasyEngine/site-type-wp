@@ -67,7 +67,7 @@ Legend: file names are under `features/`; "KB" = `@known-bug` scenario that docu
 | `enable` / `disable` / `refresh` | site: Disable and enable…, Refresh regenerates docker-compose.yml…; local-db: database |
 | `delete` (+ confirmation prompt) | site: Delete removes every trace… (incl. the random DB user), Declining the delete confirmation…, Deleting a missing site fails; redirect/proxy/alias/local-db/custom-cert/LE cleanup in their features |
 | `list [--format] [--enabled] [--disabled]` | site: List shows the site in every format; disabled: site: Disable and enable… |
-| `clean [--page] [--object] [--proxy]` | cache KB (CACHE-1), proxy-cache KB (CACHE-1); errors: site: Cache clean on a site without cache fails, cache: Cache clean without proxy cache… |
+| `clean [--page] [--object] [--proxy]` | cache and proxy-cache (CACHE-1, regular since the v4.13.2 fix); errors: site: Cache clean on a site without cache fails, cache: Cache clean without proxy cache… |
 
 ### Behaviours and side effects
 
@@ -98,11 +98,11 @@ AUTH-1, AUTH-5 and the blank-alias scenario passed on develop after the 2026-09-
 
 | Scenario | Bug |
 |---|---|
-| install-options: Shell metacharacters in the site name are rejected | SEC-1 |
+| install-options: Shell metacharacters in the site name are rejected | SEC-1 (fixed in v4.13.2, regular since Behat r2) |
 | alias-domains: An existing site cannot be reused as an alias on create | PHPT-7 |
-| install-options: The latest WordPress download passes its checksums | WP-1 |
+| install-options: The latest WordPress download passes its checksums | WP-1 (fixed in v4.13.1, regular since Behat r2) |
 | cache: The local redis container restarts with the site | MIG-16 |
-| cache: ee site clean purges…; proxy-cache: ee site clean --proxy empties… | CACHE-1 |
+| cache: ee site clean purges…; proxy-cache: ee site clean --proxy empties… | CACHE-1 (fixed in v4.13.2, regular since Behat r2) |
 | multisite: --mu without a value is rejected | WPT-6 |
 | cache: --with-local-redis without --cache enables the local redis cache | WPT-6 |
 | proxy-cache: Invalid proxy-cache value on update / on create is rejected | WPT-3: YAML `on`/`off` parsed as booleans |
