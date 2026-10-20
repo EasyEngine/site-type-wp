@@ -128,7 +128,8 @@ Estimated coverage: 61 of 67 inventory rows above are covered (about 90%; `--wil
 | (all) | 126 | including outline examples |
 | `@known-bug` | 27 | expected to fail until the bug is fixed; exclude with `--tags='~@known-bug'` |
 | `@destructive` | 6 | proxy-cache enable/disable restarts the global nginx-proxy (all sites blip) |
-| `@le` | 2 | one real Let's Encrypt issuance (`bh-site-type-wp-le1.ee4-test.rt.gw`); the second scenario only inspects its leftovers and refuses to run without the first |
+| `@le` | 2 | one real Let's Encrypt issuance (`bh-site-type-wp-le1.ee4-test.rt.gw`); the second scenario only inspects its leftovers and refuses to run without the first. On CI both run against Pebble (`behat/ci/pebble-setup.sh`); the create passes, the leftovers one is `@known-bug` (SSL-5/SSL-9) |
+| `@le-real` | 0 | needs the public LE service itself; none, both `@le` scenarios work on Pebble |
 | `@slow` | 7 | legacy PHP images (5.6–8.1), pulled on first use |
 | `@external-db` | 3 | throwaway MariaDB on the host network bound to the docker bridge gateway (read from `docker network inspect bridge`, 10.0.0.1 on this host); reachability from the default bridge and from a user-defined network was checked with a throwaway listener |
 | `@network` | 2 | VIP: clones from github.com |
