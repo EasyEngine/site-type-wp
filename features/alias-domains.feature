@@ -142,7 +142,7 @@ Feature: Alias domains of WordPress sites (--alias-domains, --add/--delete-alias
       | field         | value                                                    |
       | alias_domains | bh-site-type-wp-blank.test,bh-site-type-wp-blank-a.test  |
 
-  # Suspected bug (new, since #488): update_alias_domains() dumps docker-compose.yml with nohttps only for LE sites, so a site without SSL loses HTTPS_METHOD=nohttps until the next refresh.
+  # WPT-2 (pre-existing, not from #488: the flag was already false for sites without SSL): update_alias_domains() dumps docker-compose.yml without HTTPS_METHOD=nohttps for a site without SSL, until the next refresh.
   @known-bug
   Scenario: Alias changes keep HTTPS disabled on a site without SSL
     Given a WordPress site 'bh-site-type-wp-aliasnossl.test' exists created with '--skip-install'
@@ -152,3 +152,22 @@ Feature: Alias domains of WordPress sites (--alias-domains, --add/--delete-alias
       """
       HTTPS_METHOD=nohttps
       """
+    When I run 'bin/ee site update bh-site-type-wp-aliasnossl.test --delete-alias-domains=bh-site-type-wp-aliasnossl-a.test'
+    Then the command should succeed
+    And the file '{SITES_DIR}/bh-site-type-wp-aliasnossl.test/docker-compose.yml' should contain:
+      """
+      HTTPS_METHOD=nohttps
+      """
+
+  # WPT-2 + WPT-12: `--ssl=off` keeps <site>.crt, and with aliases CERT_NAME=${VIRTUAL_HOST} picks it up, so without nohttps nginx-proxy redirects HTTP to HTTPS again.
+  @known-bug
+  Scenario: A site whose SSL was turned off keeps serving HTTP after an alias change
+    Given a WordPress site 'bh-site-type-wp-aliasoff.test' exists
+    When I run 'bin/ee site update bh-site-type-wp-aliasoff.test --ssl=self'
+    Then the command should succeed
+    When I run 'bin/ee site update bh-site-type-wp-aliasoff.test --ssl=off'
+    Then the command should succeed
+    And a GET request to 'http://bh-site-type-wp-aliasoff.test/' should return 200 within 30 seconds
+    When I run 'bin/ee site update bh-site-type-wp-aliasoff.test --add-alias-domains=bh-site-type-wp-aliasoff-a.test'
+    Then the command should succeed
+    And a GET request to 'http://bh-site-type-wp-aliasoff.test/' should return 200 within 30 seconds

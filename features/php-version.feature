@@ -123,7 +123,7 @@ Feature: PHP versions of WordPress sites (--php on create and update)
       | 9.9 |
       | foo |
 
-  # Suspected bug (new): options are compared loosely, so `--php=8` passes validation ("8" == "8.0") and create builds the image name `easyengine/php8:` (unknown version).
+  # WPT-4: options are compared loosely, so `--php=8` passes validation ("8" == "8.0") and create builds the image name `easyengine/php8:` (unknown version).
   @known-bug
   Scenario Outline: Loosely matching PHP version <php> is rejected
     When I run 'bin/ee site create bh-site-type-wp-phploose.test --type=wp --php=<php> --skip-install'

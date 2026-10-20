@@ -80,7 +80,7 @@ Feature: SSL of WordPress sites (--ssl=self|custom|inherit|le and ssl updates)
     And the directory '{SITES_DIR}/orphan.bh-site-type-wp-noparent.test' should not exist
     And the global database should not have a database named 'orphan_bh_site_type_wp_noparent_test'
 
-  # Suspected bug (new): check_parent_site_certs() builds its message with var_dump(), which dumps the parent model to STDOUT.
+  # WPT-7: check_parent_site_certs() builds its message with var_dump(), which dumps the parent model to STDOUT.
   @known-bug
   Scenario: Inherit from a parent without SSL fails with a clean message
     Given a WordPress site 'bh-site-type-wp-nossl.test' exists created with '--skip-install'
@@ -129,6 +129,7 @@ Feature: SSL of WordPress sites (--ssl=self|custom|inherit|le and ssl updates)
       """
     And the site 'bh-site-type-wp-custom2.test' should not exist
 
+  # WPT-13: create's `[--ssl]` is a flag, so the value is only rejected in init_ssl(), after the site was provisioned.
   Scenario: An unknown --ssl value rolls the whole create back
     When I run 'bin/ee site create bh-site-type-wp-sslbad.test --type=wp --ssl=bogus'
     Then the command should fail
@@ -194,6 +195,16 @@ Feature: SSL of WordPress sites (--ssl=self|custom|inherit|le and ssl updates)
       SSL is already disabled on bh-site-type-wp-sslupd.test
       """
 
+  # PHPT-10 (site-command): init_ssl() stores site_ssl_wildcard=1 for self-signed creates, so update refuses `--ssl=off` ("wildcard to normal SSL") and `--ssl=off --wildcard`.
+  @known-bug
+  Scenario: SSL of a site created with --ssl=self can be turned off
+    Given a WordPress site 'bh-site-type-wp-selfoff.test' exists created with '--ssl=self --skip-install'
+    When I run 'bin/ee site update bh-site-type-wp-selfoff.test --ssl=off'
+    Then the command should succeed
+    And the site 'bh-site-type-wp-selfoff.test' info should contain:
+      | field    | value   |
+      | site_ssl | <empty> |
+
   Scenario: Invalid SSL updates are rejected
     Given a WordPress site 'bh-site-type-wp-sslupd.test' exists
     When I run 'bin/ee site update bh-site-type-wp-sslupd.test --ssl=bogus'
@@ -243,5 +254,6 @@ Feature: SSL of WordPress sites (--ssl=self|custom|inherit|le and ssl updates)
   # SSL-5 / SSL-9: deleting an LE site leaves acme-conf/var entries for www. Checks the leftovers of the scenario above (no new issuance).
   @le @known-bug
   Scenario: Deleting a Let's Encrypt site leaves no ACME leftovers
+    Given the site 'bh-site-type-wp-le1.ee4-test.rt.gw' was deleted earlier in this feature
     Then the directory '{EE_ROOT_DIR}/services/nginx-proxy/acme-conf/var/bh-site-type-wp-le1.ee4-test.rt.gw' should not exist
     And the directory '{EE_ROOT_DIR}/services/nginx-proxy/acme-conf/var/www.bh-site-type-wp-le1.ee4-test.rt.gw' should not exist

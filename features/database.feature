@@ -25,10 +25,7 @@ Feature: Database options of WordPress sites (global DB flags, --local-db)
       bhp_
       """
     When I run WP-CLI 'config get DB_CHARSET' on site 'bh-site-type-wp-dbopts.test'
-    Then STDOUT should contain:
-      """
-      utf8
-      """
+    Then STDOUT should match '/^utf8$/m'
     When I run WP-CLI 'config get DB_COLLATE' on site 'bh-site-type-wp-dbopts.test'
     Then STDOUT should contain:
       """
@@ -132,7 +129,7 @@ Feature: Database options of WordPress sites (global DB flags, --local-db)
     And the site 'bh-site-type-wp-remote.test' should not exist
     And the directory '{SITES_DIR}/bh-site-type-wp-remote.test' should not exist
 
-  # Suspected bug (new, data loss): when CREATE DATABASE fails because the name is taken, catch_clean() runs cleanup_db() and DROPs the other site's database.
+  # WPT-1 (data loss): when CREATE DATABASE fails because the name is taken, catch_clean() runs cleanup_db() and DROPs the other site's database.
   # `a-b.test` and `a.b.test` both map to the default name `a_b_test`, so no flag is needed to hit it.
   @known-bug
   Scenario: A database name collision does not drop the other site's database
@@ -143,7 +140,7 @@ Feature: Database options of WordPress sites (global DB flags, --local-db)
     And the site 'bh-site-type-wp-db.c.test' should not exist
     And the global database should have a database named 'bh_site_type_wp_db_c_test'
 
-  # Suspected bug (new, data loss): same rollback with --dbuser of another site DROPs that site's DB user.
+  # WPT-1 (data loss): same rollback with --dbuser of another site DROPs that site's DB user.
   @known-bug
   Scenario: A database user collision does not drop the other site's user
     Given a WordPress site 'bh-site-type-wp-dbuser.test' exists created with '--dbuser=bh_site_type_wp_shareduser --dbpass=BhDbPass123 --skip-install'
@@ -153,7 +150,7 @@ Feature: Database options of WordPress sites (global DB flags, --local-db)
     And the global database should have a user named 'bh_site_type_wp_shareduser'
     And the global database should have a database named 'bh_site_type_wp_dbuser_test'
 
-  # Suspected bug (new): create_site_root() exits via EE::error() after create_user_in_db() already ran, so the global DB and user leak.
+  # WPT-8: create_site_root() exits via EE::error() after create_user_in_db() already ran, so the global DB and user leak.
   @known-bug
   Scenario: An existing webroot aborts the create without leaking database objects
     Given I run 'mkdir -p {SITES_DIR}/bh-site-type-wp-stale.test'
@@ -167,3 +164,18 @@ Feature: Database options of WordPress sites (global DB flags, --local-db)
     And the file '{SITES_DIR}/bh-site-type-wp-stale.test/keep-me' should exist
     And the site 'bh-site-type-wp-stale.test' should not exist
     And the global database should not have a database named 'bh_site_type_wp_stale_test'
+    And the global database should not have users starting with 'bh-site-type-wp-stale.test-'
+
+  # WPT-1 (data loss): a failed --ssl=custom validation rolls back before any DB work, yet catch_clean() still DROPs the default-named database of the colliding site.
+  @known-bug
+  Scenario: A failed custom-SSL create does not drop another site's database
+    Given a WordPress site 'bh-site-type-wp-db-s.test' exists created with '--skip-install'
+    And the global database should have a database named 'bh_site_type_wp_db_s_test'
+    When I run 'bin/ee site create bh-site-type-wp-db.s.test --type=wp --ssl=custom --ssl-key=/nonexistent/bh.key --ssl-crt=/nonexistent/bh.crt'
+    Then the command should fail
+    And STDERR should contain:
+      """
+      ssl-key OR ssl-crt path does not exist
+      """
+    And the site 'bh-site-type-wp-db.s.test' should not exist
+    And the global database should have a database named 'bh_site_type_wp_db_s_test'

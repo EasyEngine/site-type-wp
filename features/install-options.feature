@@ -84,6 +84,11 @@ Feature: WordPress install options (title/admin flags, locale, version, skip-con
   Scenario: Removed EasyEngine v3 cache flags are rejected
     When I run 'bin/ee site create bh-site-type-wp-w3tc.test --type=wp --w3tc'
     Then the command should fail
+    # The dedicated "no longer supported in EE v4" message is unreachable (WPT-14).
+    And STDERR should contain:
+      """
+      unknown --w3tc parameter
+      """
     And the site 'bh-site-type-wp-w3tc.test' should not exist
 
   Scenario: Localized install on a staging server enables mailhog
@@ -187,7 +192,7 @@ Feature: WordPress install options (title/admin flags, locale, version, skip-con
       """
     And a GET request to 'http://bh-site-type-wp-pubdir.test/' should return 200
 
-  # Suspected bug (new): --public-dir is declared as a flag, so passing it without a value makes the public dir `htdocs/1`.
+  # WPT-6: --public-dir is declared as a flag, so passing it without a value makes the public dir `htdocs/1`.
   @known-bug
   Scenario: --public-dir without a value keeps the default webroot
     When I run 'bin/ee site create bh-site-type-wp-pubdir1.test --type=wp --public-dir --skip-install'
@@ -202,7 +207,7 @@ Feature: WordPress install options (title/admin flags, locale, version, skip-con
     When I run WP-CLI 'core verify-checksums' on site 'bh-site-type-wp-wp1.test'
     Then the command should succeed
 
-  # Suspected bug (new): title, admin user/e-mail/password are interpolated inside single quotes of the `wp core install` shell command, so an apostrophe breaks the install and the site is rolled back.
+  # WPT-5: title, admin user/e-mail/password are interpolated inside single quotes of the `wp core install` shell command, so an apostrophe breaks the install and the site is rolled back.
   @known-bug
   Scenario: A site title with an apostrophe
     When I run 'bin/ee site create bh-site-type-wp-apos.test --type=wp --title="BH's Site"'

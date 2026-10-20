@@ -20,10 +20,7 @@ Feature: WordPress multisite (--mu=subdir|subdom)
       define( 'COOKIE_DOMAIN', false );
       """
     When I run WP-CLI 'config get MULTISITE' on site 'bh-site-type-wp-subdir.test'
-    Then STDOUT should contain:
-      """
-      1
-      """
+    Then STDOUT should match '/^1$/m'
     When I create subsite 'bhsub1' in 'bh-site-type-wp-subdir.test'
     Then a GET request to 'http://bh-site-type-wp-subdir.test/' should return 200
     And a GET request to 'http://bh-site-type-wp-subdir.test/bhsub1/' should return 200
@@ -92,14 +89,15 @@ Feature: WordPress multisite (--mu=subdir|subdom)
     And the site 'bh-site-type-wp-muinh.test' should not exist
     And the directory '{SITES_DIR}/bh-site-type-wp-muinh.test' should not exist
 
-  # Suspected bug (new): the inherit/wildcard check runs after create_user_in_db() and exits via EE::error() without cleanup, so the global DB and user leak.
+  # WPT-8: the inherit/wildcard check runs after create_user_in_db() and exits via EE::error() without cleanup, so the global DB and user leak.
   @known-bug
   Scenario: A rejected inherit + subdom create leaves nothing in the global database
     When I run 'bin/ee site create bh-site-type-wp-muinh2.test --type=wp --mu=subdom --ssl=inherit'
     Then the command should fail
     And the global database should not have a database named 'bh_site_type_wp_muinh2_test'
+    And the global database should not have users starting with 'bh-site-type-wp-muinh2.test-'
 
-  # Suspected bug (new): `--mu` without a value only warns "--mu parameter needs a value" and silently creates a single site.
+  # WPT-6: `--mu` without a value only warns "--mu parameter needs a value" and creates a single site.
   @known-bug
   Scenario: --mu without a value is rejected
     When I run 'bin/ee site create bh-site-type-wp-muempty.test --type=wp --mu --skip-install'

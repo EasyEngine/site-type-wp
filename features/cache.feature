@@ -140,7 +140,7 @@ Feature: WordPress redis cache (--cache, --with-local-redis)
     Given a WordPress site 'bh-site-type-wp-mig16.test' exists created with '--cache --with-local-redis --skip-install'
     Then the 'redis' container of site 'bh-site-type-wp-mig16.test' should have restart policy 'always'
 
-  # Suspected bug (new): --with-local-redis alone is silently ignored (no redis container, no cache) although the help says "Enable cache with local redis container".
+  # WPT-6: --with-local-redis alone is silently ignored (no redis container, no cache) although the help says "Enable cache with local redis container".
   @known-bug
   Scenario: --with-local-redis without --cache enables the local redis cache
     When I run 'bin/ee site create bh-site-type-wp-lredisonly.test --type=wp --with-local-redis --skip-install'

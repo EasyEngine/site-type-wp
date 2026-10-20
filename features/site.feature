@@ -473,14 +473,15 @@ Feature: WordPress site lifecycle (create, info, list, enable/disable, restart/r
     And the site 'bh-site-type-wp-basic.test' should have 0 docker volumes
     And the docker network 'bh-site-type-wp-basic.test' should not exist
     And the global database should not have a database named 'bh_site_type_wp_basic_test'
+    And the global database should not have users starting with 'bh-site-type-wp-basic.test-'
     And the hosts file should not contain 'bh-site-type-wp-basic.test'
     And the EE database table 'cron' should have 0 rows where 'site_url' is 'bh-site-type-wp-basic.test'
     And a GET request to 'http://bh-site-type-wp-basic.test/' should return 503
 
   Scenario: Deleting a missing site fails
-    When I run 'bin/ee site delete bh-site-type-wp-basic.test --yes'
+    When I run 'bin/ee site delete bh-site-type-wp-missing.test --yes'
     Then the command should fail
     And STDERR should contain:
       """
-      Site bh-site-type-wp-basic.test does not exist.
+      Site bh-site-type-wp-missing.test does not exist.
       """
