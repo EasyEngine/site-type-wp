@@ -17,7 +17,7 @@ Legend: file names are under `features/`; "KB" = `@known-bug` scenario that docu
 | `--cache` | cache: Create a site with page and object cache…, The page cache is served from redis; subdom + cache: cache: Subdomain multisite with cache…; EE3 `--wpredis`: install-options |
 | `--vip`, `--vip=<repo>` | vip: Create a VIP site from the default skeleton with cache; inaccessible repo: vip: An inaccessible VIP repository is rejected… |
 | `--mu=subdir` / `--mu=subdom` | multisite: Create a subdirectory multisite / Create a subdomain multisite; invalid value: Unknown multisite type…; no value: multisite KB; subdom + inherit: Subdomain multisite cannot inherit SSL (+ KB for the DB leak); AUTH-5: multisite KB |
-| `--alias-domains` | alias-domains: Create a site with alias domains (incl. spaces), conflicts on create, subdom + wildcard alias; AUTH-1 and blank alias: alias-domains KB |
+| `--alias-domains` | alias-domains: Create a site with alias domains (incl. spaces), conflicts on create, subdom + wildcard alias; AUTH-1, PHPT-7 and blank alias: alias-domains KB |
 | `--title` | install-options: Custom title…; apostrophe: install-options KB; default (= site name): site: Create a default WordPress site |
 | `--admin-user`, `--admin-email`, `--admin-pass` | install-options: Custom title…; defaults (random `wp-user-*`, 18-char password, `admin@<site>`): site: Create a default WordPress site |
 | password policy / `--allow-insecure-pass` | install-options: Weak administrator password… (3 rules); Insecure password allowed… |
@@ -99,6 +99,7 @@ Estimated coverage: 61 of 67 inventory rows above are covered (about 90%; `--wil
 | install-options: Shell metacharacters in the site name are rejected | SEC-1 |
 | multisite: Subdomain multisite whose wildcard is already an alias… | AUTH-5 |
 | alias-domains: Reserved alias names are rejected on create | AUTH-1 |
+| alias-domains: An existing site cannot be reused as an alias on create | PHPT-7 |
 | alias-domains: Blank alias domains are dropped on create | fixed in site-type-wp #239 (not on develop) |
 | install-options: The latest WordPress download passes its checksums | WP-1 |
 | cache: The local redis container restarts with the site | MIG-16 |
@@ -125,8 +126,8 @@ Estimated coverage: 61 of 67 inventory rows above are covered (about 90%; `--wil
 
 | Tag | Scenarios | Meaning |
 |---|---|---|
-| (all) | 126 | including outline examples |
-| `@known-bug` | 27 | expected to fail until the bug is fixed; exclude with `--tags='~@known-bug'` |
+| (all) | 127 | including outline examples |
+| `@known-bug` | 28 | expected to fail until the bug is fixed; exclude with `--tags='~@known-bug'` |
 | `@destructive` | 6 | proxy-cache enable/disable restarts the global nginx-proxy (all sites blip) |
 | `@le` | 2 | one real Let's Encrypt issuance (`bh-site-type-wp-le1.ee4-test.rt.gw`); the second scenario only inspects its leftovers and refuses to run without the first. On CI both run against Pebble (`behat/ci/pebble-setup.sh`); the create passes, the leftovers one is `@known-bug` (SSL-5/SSL-9) |
 | `@le-real` | 0 | needs the public LE service itself; none, both `@le` scenarios work on Pebble |
