@@ -104,8 +104,7 @@ Feature: WordPress multisite (--mu=subdir|subdom)
     Then the command should fail
     And the site 'bh-site-type-wp-muempty.test' should not exist
 
-  # AUTH-5: subdom create doesn't check its implicit *.site against existing aliases (fixed in site-type-wp #239, not on develop).
-  @known-bug
+  # AUTH-5 regression: subdom create didn't check its implicit *.site against existing aliases (fixed by site-type-wp #239).
   Scenario: Subdomain multisite whose wildcard is already an alias of another site is rejected
     Given a WordPress site 'bh-site-type-wp-auth5owner.test' exists created with "--skip-install --alias-domains='*.bh-site-type-wp-auth5.test'"
     When I run 'bin/ee site create bh-site-type-wp-auth5.test --type=wp --mu=subdom --skip-install'

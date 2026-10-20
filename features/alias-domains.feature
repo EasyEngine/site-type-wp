@@ -132,15 +132,13 @@ Feature: Alias domains of WordPress sites (--alias-domains, --add/--delete-alias
       """
     And a GET request to 'http://foo.bh-site-type-wp-aliasmu-x.test/' should not return 503
 
-  # AUTH-1: an alias like `_wildcard.<site>` passes validation and can clobber the site's `_wildcard` proxy files (fixed in site-command #502 / site-type-wp #239, not on develop).
-  @known-bug
+  # AUTH-1 regression: an alias like `_wildcard.<site>` could clobber the site's `_wildcard` proxy files (fixed by site-command #502 / site-type-wp #239).
   Scenario: Reserved alias names are rejected on create
     When I run "bin/ee site create bh-site-type-wp-auth1.test --type=wp --skip-install --alias-domains='_wildcard.bh-site-type-wp-auth1.test'"
     Then the command should fail
     And the site 'bh-site-type-wp-auth1.test' should not exist
 
-  # Fixed in site-type-wp #239 (not on develop): a trailing comma stores an empty alias and a dangling `,` in VIRTUAL_HOST.
-  @known-bug
+  # Regression (fixed by site-type-wp #239): a trailing comma stored an empty alias and a dangling `,` in VIRTUAL_HOST.
   Scenario: Blank alias domains are dropped on create
     When I run "bin/ee site create bh-site-type-wp-blank.test --type=wp --skip-install --alias-domains='bh-site-type-wp-blank-a.test,'"
     Then the command should succeed
@@ -176,4 +174,6 @@ Feature: Alias domains of WordPress sites (--alias-domains, --add/--delete-alias
     And a GET request to 'http://bh-site-type-wp-aliasoff.test/' should return 200 within 30 seconds
     When I run 'bin/ee site update bh-site-type-wp-aliasoff.test --add-alias-domains=bh-site-type-wp-aliasoff-a.test'
     Then the command should succeed
-    And a GET request to 'http://bh-site-type-wp-aliasoff.test/' should return 200 within 30 seconds
+    # The update returns before docker-gen has the recreated container, so the old (HTTP) config could still answer: wait until the new alias is served.
+    When I wait until "curl -s -o /dev/null -D - --resolve bh-site-type-wp-aliasoff-a.test:80:127.0.0.1 http://bh-site-type-wp-aliasoff-a.test/ | head -n 1 | grep -qv ' 503'" succeeds within 60 seconds
+    Then a GET request to 'http://bh-site-type-wp-aliasoff.test/' should return 200
