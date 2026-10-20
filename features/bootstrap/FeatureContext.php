@@ -406,6 +406,44 @@ class FeatureContext implements Context
 	}
 
 	/**
+	 * On CI, EE's hardcoded Let's Encrypt host must point at Pebble or a blackhole (.github/behat/pebble-setup.sh), never the real service.
+	 *
+	 * @BeforeSuite
+	 */
+	public static function refuseRealAcmeOnCi()
+	{
+		if ( getenv( 'CI' ) && ! self::acme_host_is_local() ) {
+			throw new Exception( 'acme-v02.api.letsencrypt.org resolves to ' . gethostbyname( 'acme-v02.api.letsencrypt.org' ) . ' on CI; run `.github/behat/pebble-setup.sh setup` (le lanes) or `block` (every other lane) first.' );
+		}
+	}
+
+	/**
+	 * @le issues certificates: only against Pebble, or on a real test host with EE_BEHAT_LE_REAL=1 (ignored on CI).
+	 *
+	 * @BeforeScenario @le
+	 */
+	public function requireTestAcme()
+	{
+		if ( getenv( 'EE_BEHAT_LE_ISSUER' ) && self::acme_host_is_local() ) {
+			return;
+		}
+		if ( '1' === getenv( 'EE_BEHAT_LE_REAL' ) && ! getenv( 'CI' ) ) {
+			return;
+		}
+		throw new Exception( '@le needs Pebble (.github/behat/pebble-setup.sh setup), or EE_BEHAT_LE_REAL=1 on a host with real DNS for *.ee4-test.rt.gw.' );
+	}
+
+	/**
+	 * True when the LE host resolves to a private, loopback or TEST-NET address (Pebble's front proxy or the blackhole).
+	 */
+	private static function acme_host_is_local()
+	{
+		$ip = gethostbyname( 'acme-v02.api.letsencrypt.org' );
+
+		return (bool) preg_match( '/^(10\.|127\.|192\.168\.|192\.0\.2\.|172\.(1[6-9]|2\d|3[01])\.)/', $ip );
+	}
+
+	/**
 	 * Deletes only this suite's sites (upstream deleted a fixed list of generic names) and restores shared state.
 	 *
 	 * @AfterFeature
