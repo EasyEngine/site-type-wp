@@ -22,7 +22,9 @@ env:
   RCLONE_RELEASE: v1.75.1
   # No public DNS (Let's Encrypt) or real backup storage on hosted runners.
   EXCLUDE_TAGS: '~@le&&~@remote-real'
-  # Local rclone alias written to EE's rclone-path; empty = no rclone.
+  # le* lanes run @le against a local Pebble instead (.github/behat/pebble-setup.sh); @le-real needs the real service.
+  LE_TAGS: '@le&&~@le-real&&~@remote-real'
+  # Local rclone alias written to EE's rclone-path, for suites with @remote scenarios ('eetest:ee-backups'); empty = no rclone.
   EE_RCLONE_PATH: ''
   COMPOSE_INTERACTIVE_NO_CLI: 1
   RCLONE_CONFIG: /etc/rclone/rclone.conf
@@ -34,12 +36,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 150
     # Known bugs are expected to fail; they're reported, not gating.
-    continue-on-error: ${{ matrix.lane == 'known-bug' }}
+    continue-on-error: ${{ endsWith(matrix.lane, 'known-bug') }}
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.4']
-        lane: [main, slow, known-bug]
+        php: ['7.4', '8.5']
+        lane: [main, slow, known-bug, le, le-known-bug]
         include:
           - lane: main
             tags: '~@known-bug&&~@slow'
@@ -47,6 +49,12 @@ jobs:
             tags: '@slow&&~@known-bug'
           - lane: known-bug
             tags: '@known-bug'
+          # @le against Pebble (.github/behat/pebble-setup.sh).
+          - lane: le
+            tags: '~@known-bug'
+          # The whole @le feature: some known-bug scenarios check what an earlier one left behind.
+          - lane: le-known-bug
+            tags: '@le'
     steps:
       - name: Check out the package
         uses: actions/checkout@v7
@@ -83,6 +91,9 @@ jobs:
           docker-compose version
           openssl version
           echo "umask $(umask), under sudo $(sudo sh -c umask)"
+          # Suites that request the host's public IP use the first of these; EE picks a frontend subnet outside eth0's.
+          echo "hostname -I: $(hostname -I)"
+          ip -4 route
           if [ -n "$EE_RCLONE_PATH" ]; then
             curl -fsSL "https://github.com/rclone/rclone/releases/download/${RCLONE_RELEASE}/rclone-${RCLONE_RELEASE}-linux-amd64.zip" -o "$RUNNER_TEMP/rclone.zip"
             unzip -q -j -o "$RUNNER_TEMP/rclone.zip" '*/rclone' -d "$RUNNER_TEMP"
@@ -120,24 +131,38 @@ jobs:
           # The first non-cli command runs the initial setup (DB, config, image pulls).
           sudo -E bin/ee site list || true
           # Non-LE commands such as ssl-renew still prompt for le-mail when it's missing.
-          sudo -E bin/ee config set le-mail behat@example.com
+          sudo -E bin/ee config set le-mail behat-ci@example.org
           if [ -n "$EE_RCLONE_PATH" ]; then
             sudo -E bin/ee config set rclone-path "$EE_RCLONE_PATH"
             sudo -E bin/ee config set no-of-backups 3
           fi
+          # The first run swaps the installed compose for 2.27.0 (MIG-20), so that's what the suite runs on, as on a fresh install.
+          docker-compose version
+
+
+      - name: Start Pebble and redirect Let's Encrypt to it
+        if: startsWith(matrix.lane, 'le')
+        run: |
+          sudo -E pkg/.github/behat/pebble-setup.sh setup
+          # Diagnostic only: nginx-proxy may not be up before the first site exists.
+          sudo docker ps --format '{{.Names}} {{.Ports}}'
+          sudo pkg/.github/behat/pebble-setup.sh reach || true
 
       - name: Run Behat
         working-directory: easyengine
+        shell: 'script -q -e -c "bash {0}"'
         # A hung step (e.g. a command stopped on the TTY) should still leave logs.
         timeout-minutes: 75
-        shell: 'script -q -e -c "bash {0}"'
         run: |
           set -e
           mkdir -p "$RUNNER_TEMP/behat/junit"
-          sudo -E vendor/bin/behat --strict --tags="${EXCLUDE_TAGS}&&${{ matrix.tags }}" \
-            --format=progress --out=std \
-            --format=junit --out="$RUNNER_TEMP/behat/junit" \
-            --format=pretty --out="$RUNNER_TEMP/behat/pretty.log"
+          base="$EXCLUDE_TAGS"
+          case "${{ matrix.lane }}" in le*) base="$LE_TAGS" ;; esac
+          behat=(sudo -E vendor/bin/behat --strict --tags="${base}&&${{ matrix.tags }}"
+            --format=progress --out=std
+            --format=junit --out="$RUNNER_TEMP/behat/junit"
+            --format=pretty --out="$RUNNER_TEMP/behat/pretty.log")
+          "${behat[@]}"
 
       - name: Collect logs
         if: always()
@@ -147,20 +172,30 @@ jobs:
           sudo cp /opt/easyengine/logs/ee.log "$out/" 2>/dev/null || echo 'No ee.log.'
           sudo stat -c '%a %U:%G %n' /opt/easyengine /opt/easyengine/logs > "$out/dirs.txt" 2>/dev/null || true
           sudo docker ps -a --format '{{.Names}}\t{{.Image}}\t{{.Status}}' > "$out/containers.txt" || true
+          if [[ "${{ matrix.lane }}" == le* ]]; then
+            sudo pkg/.github/behat/pebble-setup.sh logs > "$out/pebble.log" 2>&1 || true
+            tail -n 60 "$out/pebble.log" || true
+          fi
           sudo chown -R "$USER" "$out"
           # One block per failed scenario, from the junit files.
           python3 - "$out" <<'PY'
-          import glob, sys, xml.etree.ElementTree as ET
+          import glob, re, sys, xml.etree.ElementTree as ET
           out = sys.argv[1]
           lines = []
           for f in sorted(glob.glob(out + '/junit/*.xml')):
-              for case in ET.parse(f).getroot().iter('testcase'):
+              # Behat copies raw output (docker logs with ANSI escapes) into the junit file; XML 1.0 forbids those bytes.
+              data = re.sub(rb'[\x00-\x08\x0b\x0c\x0e-\x1f]', b'', open(f, 'rb').read())
+              for case in ET.fromstring(data).iter('testcase'):
                   for bad in list(case.findall('failure')) + list(case.findall('error')):
                       lines.append('### %s :: %s\n%s\n%s\n' % (case.get('classname'), case.get('name'), bad.get('message') or '', bad.text or ''))
           open(out + '/failures.txt', 'w').write('\n'.join(lines) or 'No failures.\n')
           print('%d failed scenarios' % len(lines))
           PY
           head -c 20000 "$out/failures.txt"
+
+      - name: Tear down Pebble
+        if: always() && startsWith(matrix.lane, 'le')
+        run: sudo pkg/.github/behat/pebble-setup.sh teardown
 
       - name: Upload results
         if: always()
