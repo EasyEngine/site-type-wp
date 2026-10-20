@@ -137,7 +137,12 @@ jobs:
             sudo -E bin/ee config set no-of-backups 3
           fi
           # The first run swaps the installed compose for 2.27.0 (MIG-20), so that's what the suite runs on, as on a fresh install.
-          docker-compose version
+          # Its download has no --fail (MIG-10): a GitHub error page can replace the binary, so fetch 2.27.0 again then.
+          if ! docker-compose version; then
+            sudo curl -fsSL --retry 5 "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose version
+          fi
 
 
       - name: Start Pebble and redirect Let's Encrypt to it
