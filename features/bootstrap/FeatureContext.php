@@ -1526,7 +1526,8 @@ class FeatureContext implements Context
 		$sites = $pdo->query( 'SELECT site_url FROM sites' )->fetchAll( PDO::FETCH_COLUMN );
 		foreach ( $sites as $site ) {
 			if ( false !== strpos( $site, self::TEST_PREFIX ) ) {
-				EE::launch( "timeout 600 $ee site delete " . escapeshellarg( $site ) . ' --yes', false, true );
+				// --foreground: in a background process group the `docker exec -it` of a cache purge stops on SIGTTOU (with timeout itself) and hangs forever.
+				EE::launch( "timeout --foreground -k 30 600 $ee site delete " . escapeshellarg( $site ) . ' --yes', false, true );
 			}
 		}
 
