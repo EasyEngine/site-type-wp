@@ -89,8 +89,7 @@ Feature: WordPress multisite (--mu=subdir|subdom)
     And the site 'bh-site-type-wp-muinh.test' should not exist
     And the directory '{SITES_DIR}/bh-site-type-wp-muinh.test' should not exist
 
-  # WPT-8: the inherit/wildcard check runs after create_user_in_db() and exits via EE::error() without cleanup, so the global DB and user leak.
-  @known-bug
+  # WPT-8: the inherit/wildcard check runs before the database step, so nothing is created.
   Scenario: A rejected inherit + subdom create leaves nothing in the global database
     When I run 'bin/ee site create bh-site-type-wp-muinh2.test --type=wp --mu=subdom --ssl=inherit'
     Then the command should fail

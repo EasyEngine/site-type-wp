@@ -25,7 +25,7 @@ Legend: file names are under `features/`; "KB" = `@known-bug` scenario that docu
 | `--with-local-redis` | cache: Create a site with cache on a local redis container; alone: cache KB; restart policy: cache KB (MIG-16) |
 | `--public-dir` | install-options: Serve WordPress from a public directory…; without value: install-options KB |
 | `--php` (all 12 options) | 8.4 default and update to 8.2: php-version: Default PHP version and update…; 8.3, 8.5, latest: Create a site on PHP <php>; 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1: `@slow` outlines; invalid (7.1, 9.9, foo): Unsupported PHP version…; loose matches (8, 8.10): php-version KB |
-| `--dbname`, `--dbuser`, `--dbpass` | database: Custom database name…, Deleting the site drops its custom database and user; remote: external-db; collisions: database KB ×3 (WPT-1) |
+| `--dbname`, `--dbuser`, `--dbpass` | database: Custom database name…, Deleting the site drops its custom database and user; remote: external-db; collisions: database ×3 (WPT-1) |
 | `--dbhost` (+ `:port`) | database: Remote database host requires credentials, Unreachable remote database rolls the site back; external-db: all scenarios |
 | `--dbprefix`, `--dbcharset`, `--dbcollate`, `--skip-check` | database: Custom database name, user, password, prefix, charset and collation… |
 | `--version` | install-options: Install a specific WordPress version; php-version legacy outlines (6.2.6, 6.8.3) |
@@ -33,7 +33,7 @@ Legend: file names are under `features/`; "KB" = `@known-bug` scenario that docu
 | `--skip-install` | install-options: Skip the WordPress install; used as a fast fixture in many scenarios |
 | `--skip-status-check` | install-options: Insecure password allowed, status check skipped… |
 | `--ssl=self` | ssl: Create a site with a self-signed certificate; turning it off again: ssl KB (PHPT-10) |
-| `--ssl=custom`, `--ssl-key`, `--ssl-crt` | ssl: Create a site with a custom certificate; missing flags; missing files; rollback dropping another site's DB: database KB (WPT-1) |
+| `--ssl=custom`, `--ssl-key`, `--ssl-crt` | ssl: Create a site with a custom certificate; missing flags; missing files; rollback dropping another site's DB: database (WPT-1) |
 | `--ssl=inherit` | ssl: A subdomain site inherits…, Inherit without a parent site rolls back, parent without SSL (KB), with `--wildcard` |
 | `--ssl=le` | ssl: Create a WordPress site with a Let's Encrypt certificate (`@le`); leftovers after delete: ssl KB (SSL-5/SSL-9) |
 | unknown `--ssl` value | ssl: An unknown --ssl value rolls the whole create back (late rejection, WPT-13) |
@@ -94,7 +94,7 @@ Estimated coverage: 61 of 67 inventory rows above are covered (about 90%; `--wil
 
 ## Known bugs exposed (`@known-bug`)
 
-AUTH-1, AUTH-5 and the blank-alias scenario passed on develop after the 2026-09-25 merges of site-command #502 and site-type-wp #239 (https://github.com/mrrobot47/site-type-wp/actions/runs/36099148649) and are regular regression scenarios since. The WPT-2 + WPT-12 alias-change scenario passed there too, but only because the alias update now returns before docker-gen has the recreated container; it now waits for the new alias to be served before checking.
+AUTH-1, AUTH-5 and the blank-alias scenario passed on develop after the 2026-09-25 merges of site-command #502 and site-type-wp #239 (https://github.com/mrrobot47/site-type-wp/actions/runs/36099148649) and are regular regression scenarios since. The WPT-1 and WPT-8 scenarios (database: name collision, user collision, failed custom-SSL create, existing webroot; multisite: rejected inherit + subdom) are regular since the fixes on the `fix/site-name-collisions` branches of site-command, site-type-wp and site-type-php (2026-09-26, local): they fail on develop until those are merged. The WPT-2 + WPT-12 alias-change scenario passed there too, but only because the alias update now returns before docker-gen has the recreated container; it now waits for the new alias to be served before checking.
 
 | Scenario | Bug |
 |---|---|
@@ -105,11 +105,6 @@ AUTH-1, AUTH-5 and the blank-alias scenario passed on develop after the 2026-09-
 | cache: The local redis container restarts with the site | MIG-16 |
 | cache: ee site clean purges…; proxy-cache: ee site clean --proxy empties… | CACHE-1 |
 | ssl: Deleting a Let's Encrypt site leaves no ACME leftovers | SSL-5, SSL-9 |
-| database: A database name collision does not drop the other site's database | WPT-1: rollback DROPs another site's DB |
-| database: A database user collision does not drop the other site's user | WPT-1: rollback DROPs another site's DB user |
-| database: A failed custom-SSL create does not drop another site's database | WPT-1: level-0 rollback DROPs the colliding default DB name |
-| database: An existing webroot aborts the create without leaking database objects | WPT-8: DB/user leak |
-| multisite: A rejected inherit + subdom create leaves nothing in the global database | WPT-8: DB/user leak |
 | multisite: --mu without a value is rejected | WPT-6 |
 | cache: --with-local-redis without --cache enables the local redis cache | WPT-6 |
 | proxy-cache: Invalid proxy-cache value on update / on create is rejected | WPT-3: YAML `on`/`off` parsed as booleans |
@@ -127,7 +122,7 @@ AUTH-1, AUTH-5 and the blank-alias scenario passed on develop after the 2026-09-
 | Tag | Scenarios | Meaning |
 |---|---|---|
 | (all) | 128 | including outline examples |
-| `@known-bug` | 29 | expected to fail until the bug is fixed; exclude with `--tags='~@known-bug'` |
+| `@known-bug` | 24 | expected to fail until the bug is fixed; exclude with `--tags='~@known-bug'` |
 | `@destructive` | 6 | proxy-cache enable/disable restarts the global nginx-proxy (all sites blip) |
 | `@le` | 2 | one real Let's Encrypt issuance (`bh-site-type-wp-le1.ee4-test.rt.gw`); the second scenario only inspects its leftovers and refuses to run without the first. On CI both run against Pebble (`behat/ci/pebble-setup.sh`); the create passes, the leftovers one is `@known-bug` (SSL-5/SSL-9) |
 | `@le-real` | 0 | needs the public LE service itself; none, both `@le` scenarios work on Pebble |

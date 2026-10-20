@@ -129,29 +129,34 @@ Feature: Database options of WordPress sites (global DB flags, --local-db)
     And the site 'bh-site-type-wp-remote.test' should not exist
     And the directory '{SITES_DIR}/bh-site-type-wp-remote.test' should not exist
 
-  # WPT-1 (data loss): when CREATE DATABASE fails because the name is taken, catch_clean() runs cleanup_db() and DROPs the other site's database.
-  # `a-b.test` and `a.b.test` both map to the default name `a_b_test`, so no flag is needed to hit it.
-  @known-bug
+  # WPT-1: `a-b.test` and `a.b.test` both map to the default name `a_b_test` (and to the same volumes, PHPT-4). The create is
+  # refused before the database step, and a failed create only drops the database and user it created itself.
   Scenario: A database name collision does not drop the other site's database
     Given a WordPress site 'bh-site-type-wp-db-c.test' exists created with '--skip-install'
     And the global database should have a database named 'bh_site_type_wp_db_c_test'
     When I run 'bin/ee site create bh-site-type-wp-db.c.test --type=wp --skip-install'
     Then the command should fail
+    And STDERR should contain:
+      """
+      Site bh-site-type-wp-db.c.test would share docker volumes (bhsitetypewpdbctest_*) with the existing site bh-site-type-wp-db-c.test.
+      """
     And the site 'bh-site-type-wp-db.c.test' should not exist
     And the global database should have a database named 'bh_site_type_wp_db_c_test'
 
-  # WPT-1 (data loss): same rollback with --dbuser of another site DROPs that site's DB user.
-  @known-bug
+  # WPT-1: --dbuser of another site is refused up front instead of being dropped by the rollback.
   Scenario: A database user collision does not drop the other site's user
     Given a WordPress site 'bh-site-type-wp-dbuser.test' exists created with '--dbuser=bh_site_type_wp_shareduser --dbpass=BhDbPass123 --skip-install'
     When I run 'bin/ee site create bh-site-type-wp-dbuser2.test --type=wp --dbuser=bh_site_type_wp_shareduser --dbpass=BhDbPass123 --skip-install'
     Then the command should fail
+    And STDERR should contain:
+      """
+      Database user `bh_site_type_wp_shareduser` is already used by site bh-site-type-wp-dbuser.test on the global database.
+      """
     And the site 'bh-site-type-wp-dbuser2.test' should not exist
     And the global database should have a user named 'bh_site_type_wp_shareduser'
     And the global database should have a database named 'bh_site_type_wp_dbuser_test'
 
-  # WPT-8: create_site_root() exits via EE::error() after create_user_in_db() already ran, so the global DB and user leak.
-  @known-bug
+  # WPT-8: the webroot check runs before the database step, so nothing is created.
   Scenario: An existing webroot aborts the create without leaking database objects
     Given I run 'mkdir -p {SITES_DIR}/bh-site-type-wp-stale.test'
     And I run 'touch {SITES_DIR}/bh-site-type-wp-stale.test/keep-me'
@@ -166,8 +171,7 @@ Feature: Database options of WordPress sites (global DB flags, --local-db)
     And the global database should not have a database named 'bh_site_type_wp_stale_test'
     And the global database should not have users starting with 'bh-site-type-wp-stale.test-'
 
-  # WPT-1 (data loss): a failed --ssl=custom validation rolls back before any DB work, yet catch_clean() still DROPs the default-named database of the colliding site.
-  @known-bug
+  # WPT-1: a failed --ssl=custom validation rolls back before any DB work and must not drop the colliding site's default-named database.
   Scenario: A failed custom-SSL create does not drop another site's database
     Given a WordPress site 'bh-site-type-wp-db-s.test' exists created with '--skip-install'
     And the global database should have a database named 'bh_site_type_wp_db_s_test'
