@@ -103,7 +103,8 @@ Feature: WordPress install options (title/admin flags, locale, version, skip-con
       $wp_local_package = 'de_DE';
       """
     And a GET request to 'http://bh-site-type-wp-locale.test/' should return 200
-    And the response body should contain 'lang="de-DE"'
+    # The translation's html_lang_attribute decides between de and de-DE.
+    And the response body should contain 'lang="de'
     And the 'mailhog' container of site 'bh-site-type-wp-locale.test' should be running
     And the site 'bh-site-type-wp-locale.test' info should contain:
       | field           | value |
@@ -224,4 +225,4 @@ Feature: WordPress install options (title/admin flags, locale, version, skip-con
   Scenario: Shell metacharacters in the site name are rejected
     When I run "bin/ee site create 'bh-site-type-wp-sec1$(cd;>bhsitetypewpsec1pwned).test' --type=wp --skip-install"
     Then the command should fail
-    And the file '/root/bhsitetypewpsec1pwned' should not exist
+    And the file '{HOME}/bhsitetypewpsec1pwned' should not exist

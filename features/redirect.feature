@@ -1,9 +1,10 @@
 Feature: www / non-www redirection of WordPress sites
 
   # The www check curls the other host name from the host, so it needs a hosts entry before the site is created.
+  # Full installs: with --skip-install nothing waits for the proxy to load the vhost before the www check (WPT-17).
   Scenario: no_www-no_ssl redirection works properly
     Given I add a hosts entry for 'www.bh-site-type-wp-redir.test'
-    When I run 'bin/ee site create bh-site-type-wp-redir.test --type=wp --skip-install'
+    When I run 'bin/ee site create bh-site-type-wp-redir.test --type=wp'
     Then the command should succeed
     And the file '{EE_ROOT_DIR}/services/nginx-proxy/conf.d/bh-site-type-wp-redir.test-redirect.conf' should exist
     And a GET request to 'http://www.bh-site-type-wp-redir.test/' should return 301 within 30 seconds
@@ -15,7 +16,7 @@ Feature: www / non-www redirection of WordPress sites
 
   Scenario: www-no_ssl redirection works properly
     Given I add a hosts entry for 'bh-site-type-wp-redir2.test'
-    When I run 'bin/ee site create www.bh-site-type-wp-redir2.test --type=wp --skip-install'
+    When I run 'bin/ee site create www.bh-site-type-wp-redir2.test --type=wp'
     Then the command should succeed
     And the file '{EE_ROOT_DIR}/services/nginx-proxy/conf.d/www.bh-site-type-wp-redir2.test-redirect.conf' should exist
     And a GET request to 'http://bh-site-type-wp-redir2.test/' should return 301 within 30 seconds

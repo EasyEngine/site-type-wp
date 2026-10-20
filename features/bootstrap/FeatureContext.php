@@ -1227,12 +1227,22 @@ class FeatureContext implements Context
 			'{EE_ROOT_DIR}' => EE_ROOT_DIR,
 			'{SITES_DIR}'   => EE_SITE_ROOT,
 			'{TMP_DIR}'     => self::TEST_TMP_DIR,
+			'{HOME}'        => self::home_dir(),
 		];
 		if ( false !== strpos( $text, '{DOCKER_BRIDGE_IP}' ) ) {
 			$map['{DOCKER_BRIDGE_IP}'] = self::docker_bridge_ip();
 		}
 
 		return strtr( $text, $map );
+	}
+
+	/**
+	 * HOME as ee's shells see it (sudo -E keeps the caller's, e.g. /home/runner on CI).
+	 */
+	private static function home_dir() {
+		$home = getenv( 'HOME' );
+
+		return $home ? rtrim( $home, '/' ) : '/root';
 	}
 
 	private static function docker_bridge_ip() {
@@ -1596,6 +1606,6 @@ class FeatureContext implements Context
 		foreach ( glob( EE_ROOT_DIR . '/.backup/*' . self::TEST_PREFIX . '*', GLOB_NOSORT ) ?: [] as $dir ) {
 			EE::launch( 'rm -rf ' . escapeshellarg( $dir ), false, true );
 		}
-		EE::launch( 'rm -rf ' . escapeshellarg( self::TEST_TMP_DIR ) . ' /root/bhsitetypewpsec1pwned', false, true );
+		EE::launch( 'rm -rf ' . escapeshellarg( self::TEST_TMP_DIR ) . ' ' . escapeshellarg( self::home_dir() . '/bhsitetypewpsec1pwned' ) . ' /root/bhsitetypewpsec1pwned', false, true );
 	}
 }

@@ -319,10 +319,8 @@ Feature: WordPress site lifecycle (create, info, list, enable/disable, restart/r
       """
     When I run 'bin/ee site list --format=json'
     Then STDOUT should be valid json
-    And STDOUT should contain:
-      """
-      {"site":"bh-site-type-wp-basic.test","status":"enabled"}
-      """
+    # Pretty-printed or compact depending on the terminal.
+    And STDOUT should match '/\{\s*"site":\s*"bh-site-type-wp-basic\.test",\s*"status":\s*"enabled"\s*\}/'
     When I run 'bin/ee site list --enabled --format=text'
     Then STDOUT should contain:
       """
