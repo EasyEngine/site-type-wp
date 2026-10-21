@@ -3,5 +3,8 @@
 upload_max_filesize = 100M
 post_max_size = 100M
 
+; Session upload progress is off for security; set it to On only if your app needs it.
+session.upload_progress.enabled = Off
+
 [mail function]
 sendmail_path = /usr/bin/msmtp -t
