@@ -8,7 +8,7 @@ use EE\Model\Site;
 /**
  * Turns off session.upload_progress in the custom.ini of every WordPress site, as hardening against php2shell (CVE-2026-109618, CVE-2026-109619).
  *
- * A custom.ini that already sets it is left alone. Disabled sites pick it up on their next start.
+ * A custom.ini that already sets it outside [PATH=]/[HOST=] sections is left alone. Disabled sites pick it up on their next start.
  */
 class DisableWpSessionUploadProgress extends Base {
 
@@ -108,7 +108,7 @@ class DisableWpSessionUploadProgress extends Base {
 		foreach ( $sites as $site ) {
 			if ( $site->site_enabled ) {
 				$id = $this->get_php_container( $site );
-				if ( '' !== $id ) {
+				if ( null !== $id && '' !== $id ) {
 					$this->reload_php( $site->site_url, $id );
 				}
 			}
@@ -124,8 +124,11 @@ class DisableWpSessionUploadProgress extends Base {
 			if ( ! isset( $this->changed[ $site_url ] ) ) {
 				continue;
 			}
-			if ( $this->get_php_container( $this->changed[ $site_url ]['site'] ) !== $id ) {
-				EE::debug( "$site_url: php container was recreated or stopped, no reload needed." );
+			$now = $this->get_php_container( $this->changed[ $site_url ]['site'] );
+			if ( $now !== $id ) {
+				if ( null !== $now ) {
+					EE::debug( "$site_url: php container was recreated or stopped, no reload needed." );
+				}
 				continue;
 			}
 			$this->reload_php( $site_url, $id );
@@ -134,7 +137,7 @@ class DisableWpSessionUploadProgress extends Base {
 	}
 
 	/**
-	 * Return custom.ini content with the setting added, or null when it already sets it.
+	 * Return custom.ini content with the setting added, or null when it already sets it globally.
 	 *
 	 * @param string $content Current content.
 	 *
@@ -148,8 +151,7 @@ class DisableWpSessionUploadProgress extends Base {
 			$content = substr( $content, 3 );
 		}
 
-		// Directive names are case-sensitive, so only this spelling takes effect.
-		if ( preg_match( '/^[ \t]*session\.upload_progress\.enabled[ \t]*=/m', $content ) ) {
+		if ( self::sets_globally( $content ) ) {
 			return null;
 		}
 
@@ -160,18 +162,38 @@ class DisableWpSessionUploadProgress extends Base {
 			return $bom . $lines;
 		}
 
-		// Directives after a [PATH=] or [HOST=] section apply only there, so it goes before the first section.
-		if ( preg_match( '/^[ \t]*\[/m', $content, $matches, PREG_OFFSET_CAPTURE ) ) {
-			$pos = $matches[0][1];
+		// At the very top, so neither a [PATH=]/[HOST=] section nor a multi-line quoted value can capture it.
+		return $bom . $lines . $eol . $content;
+	}
 
-			return $bom . substr( $content, 0, $pos ) . $lines . $eol . substr( $content, $pos );
+	/**
+	 * Whether the content sets the directive outside [PATH=] and [HOST=] sections, read in the same mode as php.ini.
+	 *
+	 * @param string $content ini content without BOM.
+	 *
+	 * @return bool
+	 */
+	public static function sets_globally( string $content ) {
+
+		$ini = @parse_ini_string( $content, true, INI_SCANNER_NORMAL );
+		// PHP applies the lines above a syntax error, so only that part counts.
+		for ( $lines = preg_split( '/(?<=\n)/', $content ), $n = count( $lines ) - 1; false === $ini && $n > 0; $n-- ) {
+			$ini = @parse_ini_string( implode( '', array_slice( $lines, 0, $n ) ), true, INI_SCANNER_NORMAL );
+		}
+		if ( false === $ini ) {
+			return false;
 		}
 
-		if ( "\n" !== substr( $content, -1 ) ) {
-			$content .= $eol;
+		foreach ( $ini as $key => $value ) {
+			if ( 'session.upload_progress.enabled' === $key && ! is_array( $value ) ) {
+				return true;
+			}
+			if ( is_array( $value ) && array_key_exists( 'session.upload_progress.enabled', $value ) && ! preg_match( '/^(PATH|HOST)=/i', (string) $key ) ) {
+				return true;
+			}
 		}
 
-		return $bom . $content . $eol . $lines;
+		return false;
 	}
 
 	/**
@@ -212,6 +234,12 @@ class DisableWpSessionUploadProgress extends Base {
 			return;
 		}
 
+		if ( ! self::sets_globally( preg_replace( '/^\xEF\xBB\xBF/', '', $new_content ) ) ) {
+			EE::warning( "Skipped disabling session.upload_progress for $site->site_url: could not add it to custom.ini safely. $manual" );
+
+			return;
+		}
+
 		$backup = null;
 		if ( ! $created ) {
 			$backup = $this->backup_root . '/' . $site->site_url . '/custom.ini';
@@ -246,7 +274,7 @@ class DisableWpSessionUploadProgress extends Base {
 		}
 
 		$id = $site->site_enabled ? $this->get_php_container( $site ) : '';
-		if ( '' !== $id ) {
+		if ( null !== $id && '' !== $id ) {
 			$this->containers[ $site->site_url ] = $id;
 		}
 		EE::debug( "$site->site_url: disabled session.upload_progress in custom.ini." );
@@ -326,20 +354,23 @@ class DisableWpSessionUploadProgress extends Base {
 	/**
 	 * @param Site $site Site.
 	 *
-	 * @return string ID of the site's running php container, or '' when there is none.
+	 * @return string|null ID of the site's running php container, '' when none runs, null when the lookup failed (already warned).
 	 */
 	private function get_php_container( $site ) {
 
-		$cwd = getcwd();
-		if ( ! @chdir( $site->site_fs_path ) ) {
-			return '';
-		}
-		$result = EE::launch( \EE_DOCKER::docker_compose_with_custom() . ' ps -q php' );
+		$cwd    = getcwd();
+		$result = @chdir( $site->site_fs_path ) ? EE::launch( \EE_DOCKER::docker_compose_with_custom() . ' ps -q php' ) : null;
 		if ( false !== $cwd ) {
 			chdir( $cwd );
 		}
 
-		return 0 === $result->return_code ? trim( $result->stdout ) : '';
+		if ( null === $result || 0 !== $result->return_code ) {
+			EE::warning( "Could not check the php container of $site->site_url, so php-fpm may still run with the old session.upload_progress setting. Fix the error, then run: ee site reload $site->site_url" );
+
+			return null;
+		}
+
+		return trim( $result->stdout );
 	}
 
 	/**
