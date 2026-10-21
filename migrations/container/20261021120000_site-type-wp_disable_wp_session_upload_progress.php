@@ -8,7 +8,7 @@ use EE\Model\Site;
 /**
  * Turns off session.upload_progress in the custom.ini of every WordPress site, as hardening against php2shell (CVE-2026-109618, CVE-2026-109619).
  *
- * A custom.ini that already sets it outside [PATH=]/[HOST=] sections is left alone. Disabled sites pick it up on their next start.
+ * A custom.ini that already sets it globally (before any [PATH]/[HOST] section) is left alone. Disabled sites pick it up on their next start.
  */
 class DisableWpSessionUploadProgress extends Base {
 
@@ -167,7 +167,7 @@ class DisableWpSessionUploadProgress extends Base {
 	}
 
 	/**
-	 * Whether the content sets the directive outside [PATH=] and [HOST=] sections, read in the same mode as php.ini.
+	 * Whether the content sets the directive globally, read in the same mode as php.ini.
 	 *
 	 * @param string $content ini content without BOM.
 	 *
@@ -175,9 +175,10 @@ class DisableWpSessionUploadProgress extends Base {
 	 */
 	public static function sets_globally( string $content ) {
 
-		$ini = @parse_ini_string( $content, true, INI_SCANNER_NORMAL );
+		$global = self::global_part( $content );
+		$ini    = @parse_ini_string( $global, true, INI_SCANNER_NORMAL );
 		// PHP applies the lines above a syntax error, so only that part counts.
-		for ( $lines = preg_split( '/(?<=\n)/', $content ), $n = count( $lines ) - 1; false === $ini && $n > 0; $n-- ) {
+		for ( $lines = preg_split( '/(?<=\n)/', $global ), $n = count( $lines ) - 1; false === $ini && $n > 0; $n-- ) {
 			$ini = @parse_ini_string( implode( '', array_slice( $lines, 0, $n ) ), true, INI_SCANNER_NORMAL );
 		}
 		if ( false === $ini ) {
@@ -185,15 +186,36 @@ class DisableWpSessionUploadProgress extends Base {
 		}
 
 		foreach ( $ini as $key => $value ) {
-			if ( 'session.upload_progress.enabled' === $key && ! is_array( $value ) ) {
-				return true;
-			}
-			if ( is_array( $value ) && array_key_exists( 'session.upload_progress.enabled', $value ) && ! preg_match( '/^(PATH|HOST)=/i', (string) $key ) ) {
+			if ( is_array( $value ) ? array_key_exists( 'session.upload_progress.enabled', $value ) : 'session.upload_progress.enabled' === $key ) {
 				return true;
 			}
 		}
 
 		return false;
+	}
+
+	/**
+	 * The part of the content before the first section whose name starts with PATH or HOST.
+	 *
+	 * PHP scopes every entry after such a header to it, even under later ordinary headers.
+	 *
+	 * @param string $content ini content without BOM.
+	 *
+	 * @return string
+	 */
+	private static function global_part( string $content ) {
+
+		if ( preg_match_all( '/^[ \t]*\[(?:PATH|HOST)[^\r\n]*$/mi', $content, $matches, PREG_OFFSET_CAPTURE ) ) {
+			foreach ( $matches[0] as $match ) {
+				// Text inside a multi-line quoted value doesn't parse as the last section.
+				$ini = @parse_ini_string( substr( $content, 0, $match[1] + strlen( $match[0] ) ), true, INI_SCANNER_NORMAL );
+				if ( false !== $ini && is_array( end( $ini ) ) && preg_match( '/^(PATH|HOST)/i', (string) key( $ini ) ) ) {
+					return substr( $content, 0, $match[1] );
+				}
+			}
+		}
+
+		return $content;
 	}
 
 	/**
