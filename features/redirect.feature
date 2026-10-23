@@ -1,19 +1,46 @@
-Feature: Site Redirection
+Feature: www / non-www redirection of WordPress sites
 
+  # The www check curls the other host name from the host, so it needs a hosts entry before the site is created.
+  # Full installs: with --skip-install nothing waits for the proxy to load the vhost before the www check.
   Scenario: no_www-no_ssl redirection works properly
-    When I run '/bin/bash -c 'echo "127.0.0.1 www.example.test" >> /etc/hosts''
-    And I run 'bin/ee site create example.test --type=wp'
-    Then After delay of 5 seconds
-    And Request on 'localhost' with header 'Host: www.example.test' should contain following headers:
-    | header                         |
-    | HTTP/1.1 301 Moved Permanently |
-    | Location: http://example.test/ |
+    Given I add a hosts entry for 'www.bh-site-type-wp-redir.test'
+    When I run 'bin/ee site create bh-site-type-wp-redir.test --type=wp'
+    Then the command should succeed
+    And the file '{EE_ROOT_DIR}/services/nginx-proxy/conf.d/bh-site-type-wp-redir.test-redirect.conf' should exist
+    And a GET request to 'http://www.bh-site-type-wp-redir.test/' should return 301 within 30 seconds
+    And the response should redirect to 'http://bh-site-type-wp-redir.test/'
+    And Request on 'localhost' with header 'Host: www.bh-site-type-wp-redir.test' should contain following headers:
+      | header                                     |
+      | HTTP/1.1 301 Moved Permanently             |
+      | Location: http://bh-site-type-wp-redir.test/ |
 
   Scenario: www-no_ssl redirection works properly
-    When I run '/bin/bash -c 'echo "127.0.0.1 example1.test" >> /etc/hosts''
-    And I run 'bin/ee site create www.example1.test --type=wp'
-    Then After delay of 5 seconds
-    And Request on 'localhost' with header 'Host: example1.test' should contain following headers:
-    | header                              |
-    | HTTP/1.1 301 Moved Permanently      |
-    | Location: http://www.example1.test/ |
+    Given I add a hosts entry for 'bh-site-type-wp-redir2.test'
+    When I run 'bin/ee site create www.bh-site-type-wp-redir2.test --type=wp'
+    Then the command should succeed
+    And the file '{EE_ROOT_DIR}/services/nginx-proxy/conf.d/www.bh-site-type-wp-redir2.test-redirect.conf' should exist
+    And a GET request to 'http://bh-site-type-wp-redir2.test/' should return 301 within 30 seconds
+    And the response should redirect to 'http://www.bh-site-type-wp-redir2.test/'
+
+  Scenario: No redirect config when the www host does not resolve
+    When I run 'bin/ee site create bh-site-type-wp-redir3.test --type=wp --skip-install'
+    Then the command should succeed
+    And the file '{EE_ROOT_DIR}/services/nginx-proxy/conf.d/bh-site-type-wp-redir3.test-redirect.conf' should not exist
+    And a GET request to 'http://www.bh-site-type-wp-redir3.test/' should return 503
+
+  Scenario: Deleting the site removes its redirect config
+    Given I add a hosts entry for 'www.bh-site-type-wp-redir.test'
+    And a WordPress site 'bh-site-type-wp-redir.test' exists
+    And the file '{EE_ROOT_DIR}/services/nginx-proxy/conf.d/bh-site-type-wp-redir.test-redirect.conf' should exist
+    When I run 'bin/ee site delete bh-site-type-wp-redir.test --yes'
+    Then the command should succeed
+    And the file '{EE_ROOT_DIR}/services/nginx-proxy/conf.d/bh-site-type-wp-redir.test-redirect.conf' should not exist
+
+  # Regression check (fixed by EasyEngine/site-command#505): delete removed the redirect file without reloading nginx-proxy, so www kept redirecting to the deleted site.
+  Scenario: Deleting the site stops the www redirect
+    Given I add a hosts entry for 'www.bh-site-type-wp-redir4.test'
+    And a WordPress site 'bh-site-type-wp-redir4.test' exists
+    And a GET request to 'http://www.bh-site-type-wp-redir4.test/' should return 301 within 30 seconds
+    When I run 'bin/ee site delete bh-site-type-wp-redir4.test --yes'
+    Then the command should succeed
+    And a GET request to 'http://www.bh-site-type-wp-redir4.test/' should return 503 within 30 seconds
