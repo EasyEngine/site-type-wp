@@ -1224,6 +1224,10 @@ class FeatureContext implements Context
 	public function theResponseShouldNotHaveHeader( $name )
 	{
 		$response = $this->last_response();
+		// Code 0 is a transport error (no HTTP response), never a pass.
+		if ( 0 === $response['code'] ) {
+			throw new Exception( "No HTTP response to check:\n" . $response['headers'] );
+		}
 		if ( preg_match( '/^' . preg_quote( $name, '/' ) . '\s*:/mi', $response['headers'] ) ) {
 			throw new Exception( "Header `$name` found in:\n" . $response['headers'] );
 		}
