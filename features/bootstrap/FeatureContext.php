@@ -848,6 +848,9 @@ class FeatureContext implements Context
 	public function theSiteShouldHaveRunningContainers( $site, $count )
 	{
 		$result = EE::launch( 'docker ps --format "{{.Names}}" --filter ' . escapeshellarg( "label=io.easyengine.site=$site" ), false, true );
+		if ( 0 !== $result->return_code ) {
+			throw new Exception( "Could not list site containers:\n" . $this->describe_command( $result ) );
+		}
 		$names  = array_filter( explode( "\n", trim( $result->stdout ) ) );
 		if ( (int) $count !== count( $names ) ) {
 			throw new Exception( "Expected $count running containers for $site, found " . count( $names ) . ': ' . implode( ', ', $names ) );
@@ -935,7 +938,12 @@ class FeatureContext implements Context
 	 */
 	public function theDockerNetworkShouldNotExist( $network )
 	{
-		if ( 0 === EE::launch( 'docker network inspect ' . escapeshellarg( $network ), false, true )->return_code ) {
+		$result = EE::launch( 'docker network ls --format "{{.Name}}"', false, true );
+		if ( 0 !== $result->return_code ) {
+			throw new Exception( "Could not list Docker networks:\n" . $this->describe_command( $result ) );
+		}
+		$networks = array_filter( explode( "\n", trim( $result->stdout ) ) );
+		if ( in_array( $network, $networks, true ) ) {
 			throw new Exception( "Docker network $network exists." );
 		}
 	}
@@ -1445,7 +1453,11 @@ class FeatureContext implements Context
 			escapeshellarg( "label=io.easyengine.site=$site" ),
 			escapeshellarg( "label=com.docker.compose.service=$service" )
 		);
-		$ids = array_filter( explode( "\n", trim( EE::launch( $command, false, true )->stdout ) ) );
+		$result = EE::launch( $command, false, true );
+		if ( 0 !== $result->return_code ) {
+			throw new Exception( "Could not list site containers:\n" . $this->describe_command( $result ) );
+		}
+		$ids = array_filter( explode( "\n", trim( $result->stdout ) ) );
 
 		return $ids ? reset( $ids ) : '';
 	}
@@ -1456,7 +1468,12 @@ class FeatureContext implements Context
 			throw new Exception( "No $service container exists for $site." );
 		}
 
-		return trim( EE::launch( 'docker inspect -f ' . escapeshellarg( $format ) . " $id", false, true )->stdout );
+		$result = EE::launch( 'docker inspect -f ' . escapeshellarg( $format ) . " $id", false, true );
+		if ( 0 !== $result->return_code ) {
+			throw new Exception( "Could not inspect the $service container of $site:\n" . $this->describe_command( $result ) );
+		}
+
+		return trim( $result->stdout );
 	}
 
 	private function container_networks( $site, $service ) {
@@ -1467,6 +1484,9 @@ class FeatureContext implements Context
 
 	private static function site_volumes( $site ) {
 		$result = EE::launch( 'docker volume ls -q --filter ' . escapeshellarg( "label=io.easyengine.site=$site" ), false, true );
+		if ( 0 !== $result->return_code ) {
+			throw new Exception( "Could not list site volumes:\n" . $result->stdout . $result->stderr );
+		}
 
 		return array_values( array_filter( explode( "\n", trim( $result->stdout ) ) ) );
 	}
