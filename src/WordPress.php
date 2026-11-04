@@ -1004,7 +1004,7 @@ class WordPress extends EE_Site_Command {
 			if ( 'custom' === $this->site_data['site_ssl'] ) {
 				$this->custom_site_ssl();
 			}
-			$this->www_ssl_wrapper( [ 'nginx' ] );
+			$this->run_ssl_step();
 		} catch ( \Exception $e ) {
 			$this->catch_clean( $e );
 		}
@@ -1049,6 +1049,21 @@ class WordPress extends EE_Site_Command {
 		}
 
 		$this->info( [ $this->site_data['site_url'] ], [] );
+	}
+
+	/**
+	 * Runs the certificate step and switches the URLs back to http when the site isn't served over HTTPS afterwards.
+	 */
+	private function run_ssl_step() {
+
+		// install_wp() used https:// URLs for any SSL type.
+		$installed_with_https = ! $this->skip_install && ! empty( $this->site_data['site_ssl'] );
+
+		$this->www_ssl_wrapper( [ 'nginx' ] );
+
+		if ( $installed_with_https && ! $this->serves_https() ) {
+			$this->replace_url_scheme( 'https', 'http', false );
+		}
 	}
 
 	/**
@@ -1462,32 +1477,85 @@ class WordPress extends EE_Site_Command {
 	protected function update_ssl( $assoc_args ) {
 
 		parent::update_ssl( $assoc_args );
+
+		$ssl = get_flag_value( $assoc_args, 'ssl' );
+		// A manual DNS-01 challenge keeps the site on HTTP; site_scheme_changed() switches the URLs once ssl-verify succeeds.
+		if ( 'off' !== $ssl && ! $this->serves_https() ) {
+			return;
+		}
+
+		$this->replace_url_scheme( 'off' === $ssl ? 'https' : 'http', 'off' === $ssl ? 'http' : 'https' );
+	}
+
+	/**
+	 * Switches the WordPress URLs when site-command changes the site's scheme outside `ee site update --ssl`.
+	 *
+	 * @param string $scheme The scheme the site is served over now: http or https.
+	 */
+	protected function site_scheme_changed( $scheme ) {
+
+		chdir( $this->site_data['site_fs_path'] );
+		// A site created with --skip-install has no URLs to switch yet.
+		if ( ! EE::exec( \EE_DOCKER::docker_compose_with_custom() . ' exec php wp core is-installed' ) ) {
+			return;
+		}
+
+		$this->replace_url_scheme( 'https' === $scheme ? 'http' : 'https', $scheme );
+	}
+
+	/**
+	 * Whether the site is served over HTTPS. site-command keeps it on HTTP when its certificate could not be issued (it
+	 * clears site_ssl) and while a manual DNS-01 challenge waits for `ee site ssl-verify`.
+	 *
+	 * @return bool
+	 */
+	private function serves_https() {
+
+		if ( empty( $this->site_data['site_ssl'] ) ) {
+			return false;
+		}
+
+		// Older site-command versions have no pending state.
+		return ! function_exists( '\EE\Site\Utils\is_le_ssl_pending' ) || ! \EE\Site\Utils\is_le_ssl_pending( $this->site_data['site_url'], $this->site_data['site_ssl'] );
+	}
+
+	/**
+	 * Rewrites the site's URLs in its database from one scheme to the other.
+	 *
+	 * @param string $from   Scheme of the URLs now.
+	 * @param string $to     Scheme to switch them to.
+	 * @param bool   $backup Whether to export the database first.
+	 */
+	private function replace_url_scheme( $from, $to, $backup = true ) {
+
 		chdir( $this->site_data['site_fs_path'] );
 
 		EE::log( 'Running search-replace.' );
-		EE::log( 'Taking database backup before search-replace.' );
-		EE::exec( sprintf( \EE_DOCKER::docker_compose_with_custom() . ' exec php wp db export --skip-ssl %s.db', $this->site_data['site_url'] ) );
-
-		$db_file         = $this->site_data['site_fs_path'] . '/app/htdocs/' . $this->site_data['site_url'] . '.db';
+		$backup_success  = false;
 		$backup_location = EE_BACKUP_DIR . '/' . $this->site_data['site_url'] . '/' . $this->site_data['site_url'] . '.db';
-		$this->fs->mkdir( dirname( $backup_location ) );
+		if ( $backup ) {
+			EE::log( 'Taking database backup before search-replace.' );
+			EE::exec( sprintf( \EE_DOCKER::docker_compose_with_custom() . ' exec php wp db export --skip-ssl %s.db', $this->site_data['site_url'] ) );
 
-		$backup_success = false;
-		if ( $this->fs->exists( $db_file ) ) {
-			$this->fs->remove( $backup_location );
-			$this->fs->rename( $db_file, $backup_location );
-			$backup_success = true;
+			$db_file = $this->site_data['site_fs_path'] . '/app/htdocs/' . $this->site_data['site_url'] . '.db';
+			$this->fs->mkdir( dirname( $backup_location ) );
+
+			if ( $this->fs->exists( $db_file ) ) {
+				$this->fs->remove( $backup_location );
+				$this->fs->rename( $db_file, $backup_location );
+				$backup_success = true;
+			}
 		}
 
 		$extra_flags = '--precise';
 		$extra_flags .= ( 'wp' === $this->site_data['app_sub_type'] ) ? '' : ' --network';
 
-		$ssl  = get_flag_value( $assoc_args, 'ssl' );
-		$from = $ssl === 'off' ? 'https' : 'http';
-		$to   = $ssl === 'off' ? 'http' : 'https';
-
-		EE::exec( sprintf( \EE_DOCKER::docker_compose_with_custom() . ' exec php wp search-replace %2$s://%1$s %3$s://%1$s %4$s', $this->site_data['site_url'], $from, $to, $extra_flags ), true, true );
-		EE::success( 'Successfully completed search-replace.' );
+		$search_replace = sprintf( 'wp search-replace %2$s://%1$s %3$s://%1$s %4$s', $this->site_data['site_url'], $from, $to, $extra_flags );
+		if ( EE::exec( \EE_DOCKER::docker_compose_with_custom() . ' exec php ' . $search_replace, true, true ) ) {
+			EE::success( 'Successfully completed search-replace.' );
+		} else {
+			EE::warning( sprintf( 'The site URLs could not be switched to %1$s. Run `ee shell %2$s --command=\'%3$s\'` to switch them.', $to, $this->site_data['site_url'], $search_replace ) );
+		}
 
 		if ( $backup_success ) {
 			EE::log( "In case something is not working as intended, you can restore your DB from backup file generated before search-replace located at:\n `$backup_location`\nand proceed with search-replace according to your needs." );
