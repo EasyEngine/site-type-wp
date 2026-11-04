@@ -14,6 +14,9 @@ class DisableWpSessionUploadProgress extends Base {
 
 	const SITE_TYPE = 'wp';
 
+	/** Largest custom.ini read. */
+	const MAX_SIZE = 1048576;
+
 	const SETTING_LINES = [
 		'; Session upload progress is off for security; set it to On only if your app needs it.',
 		'session.upload_progress.enabled = Off',
@@ -22,7 +25,7 @@ class DisableWpSessionUploadProgress extends Base {
 	/** @var Site[] */
 	private $sites = [];
 
-	/** @var array site_url => [ 'site' => Site, 'file' => string, 'backup' => string|null ] for every custom.ini changed by up(). */
+	/** @var array site_url => [ 'site' => Site, 'file' => string, 'dir' => string, 'backup' => string ] for every custom.ini changed by up(). */
 	private $changed = [];
 
 	/** @var array site_url => php container ID seen by up(), for running sites. */
@@ -225,26 +228,25 @@ class DisableWpSessionUploadProgress extends Base {
 	 */
 	private function update_site( $site ) {
 
-		$conf_dir = $site->site_fs_path . '/config/php/php/conf.d';
-		$file     = $conf_dir . '/custom.ini';
-		$manual   = "Add 'session.upload_progress.enabled = Off' to $file and run: ee site reload $site->site_url";
+		$file   = $site->site_fs_path . '/config/php/php/conf.d/custom.ini';
+		$manual = "Add 'session.upload_progress.enabled = Off' to $file and run: ee site reload $site->site_url";
 
-		if ( is_link( $file ) || ( file_exists( $file ) && ! is_file( $file ) ) ) {
-			EE::warning( "Skipped disabling session.upload_progress for $site->site_url: custom.ini is not a regular file. $manual" );
-
-			return;
-		}
-
-		$created = ! file_exists( $file );
-		if ( $created && ! is_dir( $conf_dir ) ) {
-			EE::warning( "Skipped disabling session.upload_progress for $site->site_url: $conf_dir is missing. $manual" );
+		// Not created when missing: PHP can't create a file safely in a directory the site's php container can swap.
+		if ( ! file_exists( $file ) && ! is_link( $file ) ) {
+			EE::warning( "Skipped disabling session.upload_progress for $site->site_url: custom.ini is missing. $manual" );
 
 			return;
 		}
 
-		$content = $created ? '' : @file_get_contents( $file );
-		if ( false === $content ) {
-			EE::warning( "Skipped disabling session.upload_progress for $site->site_url: could not read custom.ini. $manual" );
+		try {
+			$base = realpath( $site->site_fs_path . '/config/php' );
+			if ( false === $base ) {
+				throw new \Exception( 'could not resolve config/php' );
+			}
+			$conf_dir = $base . '/php/conf.d';
+			$content  = self::read_custom_ini( $file, $conf_dir );
+		} catch ( \Exception $e ) {
+			EE::warning( "Skipped disabling session.upload_progress for $site->site_url: {$e->getMessage()}. $manual" );
 
 			return;
 		}
@@ -262,38 +264,44 @@ class DisableWpSessionUploadProgress extends Base {
 			return;
 		}
 
-		$backup = null;
-		if ( ! $created ) {
-			$backup = $this->backup_root . '/' . $site->site_url . '/custom.ini';
-			try {
-				$this->fs->mkdir( dirname( $backup ), 0700 );
-				$this->fs->copy( $file, $backup, true );
-				$this->fs->chmod( $backup, fileperms( $file ) & 0777 );
-				$this->fs->touch( $backup, filemtime( $file ) );
-			} catch ( \Throwable $e ) {
-				EE::warning( "Skipped disabling session.upload_progress for $site->site_url: could not back up custom.ini ({$e->getMessage()}). $manual" );
+		// Rollback reads the file back with the same limit.
+		if ( strlen( $new_content ) > self::MAX_SIZE ) {
+			EE::warning( "Skipped disabling session.upload_progress for $site->site_url: custom.ini would be larger than " . self::MAX_SIZE . " bytes. $manual" );
 
-				return;
+			return;
+		}
+
+		$backup = $this->backup_root . '/' . $site->site_url . '/custom.ini';
+		try {
+			$stat = @lstat( $file );
+			$this->fs->mkdir( dirname( $backup ), 0700 );
+			$this->fs->dumpFile( $backup, $content );
+			if ( $stat ) {
+				$this->fs->chmod( $backup, $stat['mode'] & 0777 );
+				$this->fs->touch( $backup, $stat['mtime'] );
 			}
+		} catch ( \Throwable $e ) {
+			EE::warning( "Skipped disabling session.upload_progress for $site->site_url: could not back up custom.ini ({$e->getMessage()}). $manual" );
+
+			return;
+		}
+
+		// In place, so owner, mode and inode stay (macOS bind-mounts this single file); a failed write puts the old content back itself.
+		try {
+			self::write_custom_ini( $file, $conf_dir, $new_content, $content );
+		} catch ( \Exception $e ) {
+			// Kept: if putting the old content back failed too, it is the only copy.
+			EE::warning( "Could not disable session.upload_progress for $site->site_url: {$e->getMessage()}. The original custom.ini is $backup. $manual" );
+
+			return;
 		}
 
 		$this->changed[ $site->site_url ] = [
 			'site'   => $site,
 			'file'   => $file,
+			'dir'    => $conf_dir,
 			'backup' => $backup,
 		];
-
-		// Written in place: keeps owner, mode and inode (macOS bind-mounts this single file).
-		if ( ! $this->write_in_place( $file, $new_content ) ) {
-			$this->restore_file( $site->site_url );
-			EE::warning( "Could not disable session.upload_progress for $site->site_url: could not write custom.ini. $manual" );
-
-			return;
-		}
-
-		if ( $created ) {
-			$this->match_owner( $file, $conf_dir );
-		}
 
 		$id = $site->site_enabled ? $this->get_php_container( $site ) : '';
 		if ( null !== $id && '' !== $id ) {
@@ -327,18 +335,14 @@ class DisableWpSessionUploadProgress extends Base {
 		$entry = $this->changed[ $site_url ];
 		unset( $this->changed[ $site_url ] );
 
-		if ( null === $entry['backup'] ) {
-			if ( ! @unlink( $entry['file'] ) && file_exists( $entry['file'] ) ) {
-				EE::warning( "Could not remove {$entry['file']} added by the session.upload_progress migration." );
+		try {
+			$content = @file_get_contents( $entry['backup'] );
+			if ( false === $content ) {
+				throw new \Exception( 'could not read the backup' );
 			}
-
-			return;
-		}
-
-		$content = @file_get_contents( $entry['backup'] );
-		// Skip the write when it never happened, e.g. on an immutable file.
-		if ( false === $content || ( @file_get_contents( $entry['file'] ) !== $content && ! $this->write_in_place( $entry['file'], $content ) ) ) {
-			EE::warning( "Could not restore {$entry['file']}; its original is {$entry['backup']}" );
+			self::write_custom_ini( $entry['file'], $entry['dir'], $content );
+		} catch ( \Exception $e ) {
+			EE::warning( "Could not restore {$entry['file']} ({$e->getMessage()}); its original is {$entry['backup']}" );
 
 			return;
 		}
@@ -347,30 +351,88 @@ class DisableWpSessionUploadProgress extends Base {
 	}
 
 	/**
-	 * @param string $file    File to overwrite without replacing it.
-	 * @param string $content New content.
+	 * Read custom.ini, which the site's php container can swap for a symlink, as can every directory above it in its config volume.
 	 *
-	 * @return bool Whether the file now holds exactly $content.
+	 * site-command's checked handle refuses anything but the regular file in $dir; an older site-command lacks it, so only the path is checked then.
+	 *
+	 * @param string $file custom.ini.
+	 * @param string $dir  Real path of its directory.
+	 *
+	 * @return string
+	 * @throws \Exception
 	 */
-	private function write_in_place( string $file, string $content ) {
+	private static function read_custom_ini( string $file, string $dir ) {
 
-		$written = @file_put_contents( $file, $content );
-		clearstatcache( true, $file );
+		if ( function_exists( '\EE\Site\Utils\get_container_file_contents' ) ) {
+			return \EE\Site\Utils\get_container_file_contents( $file, $dir, self::MAX_SIZE );
+		}
 
-		return strlen( $content ) === $written && @file_get_contents( $file ) === $content;
+		self::check_custom_ini_path( $file, $dir );
+		$content = @file_get_contents( $file, false, null, 0, self::MAX_SIZE + 1 );
+		if ( false === $content || strlen( $content ) > self::MAX_SIZE ) {
+			throw new \Exception( 'could not read custom.ini' );
+		}
+
+		return $content;
 	}
 
 	/**
-	 * Give a new file the owner and group of its directory.
+	 * Overwrite custom.ini in place, checked like read_custom_ini().
 	 *
-	 * @param string $file File.
-	 * @param string $dir  Directory.
+	 * @param string      $file     custom.ini.
+	 * @param string      $dir      Real path of its directory.
+	 * @param string      $content  New content.
+	 * @param string|null $expected Content it must still hold; null for any.
+	 *
+	 * @throws \Exception When it isn't written; the old content is put back after a partial write.
 	 */
-	private function match_owner( string $file, string $dir ) {
+	private static function write_custom_ini( string $file, string $dir, string $content, ?string $expected = null ) {
 
-		@chmod( $file, 0644 );
-		@chown( $file, fileowner( $dir ) );
-		@chgrp( $file, filegroup( $dir ) );
+		if ( function_exists( '\EE\Site\Utils\put_container_file_contents' ) ) {
+			\EE\Site\Utils\put_container_file_contents( $file, $dir, $content, $expected, self::MAX_SIZE );
+
+			return;
+		}
+
+		$current = self::read_custom_ini( $file, $dir );
+		if ( null !== $expected && $current !== $expected ) {
+			throw new \Exception( 'custom.ini changed while it was checked' );
+		}
+		// Skip a write that isn't needed, e.g. on an immutable file.
+		if ( $current === $content ) {
+			return;
+		}
+		self::check_custom_ini_path( $file, $dir );
+		$written = @file_put_contents( $file, $content );
+		clearstatcache( true, $file );
+		if ( strlen( $content ) !== $written || @file_get_contents( $file ) !== $content ) {
+			// Checked again: the path may have been swapped since the write.
+			try {
+				self::check_custom_ini_path( $file, $dir );
+				$restored = strlen( $current ) === @file_put_contents( $file, $current );
+			} catch ( \Exception $e ) {
+				$restored = false;
+			}
+			throw new \Exception( 'could not write custom.ini' . ( $restored ? '' : ', nor put the old content back' ) );
+		}
+	}
+
+	/**
+	 * @param string $file custom.ini.
+	 * @param string $dir  Real path of its directory.
+	 *
+	 * @throws \Exception When it isn't a regular file or a directory above it is a symlink.
+	 */
+	private static function check_custom_ini_path( string $file, string $dir ) {
+
+		clearstatcache( true );
+		$stat = @lstat( $file );
+		if ( realpath( dirname( $file ) ) !== $dir ) {
+			throw new \Exception( 'a directory above custom.ini is a symlink' );
+		}
+		if ( ! $stat || 0100000 !== ( $stat['mode'] & 0170000 ) ) {
+			throw new \Exception( 'custom.ini is not a regular file' );
+		}
 	}
 
 	/**
