@@ -1557,8 +1557,44 @@ class WordPress extends EE_Site_Command {
 			EE::warning( sprintf( 'The site URLs could not be switched to %1$s. Run `ee shell %2$s --command=\'%3$s\'` to switch them.', $to, $this->site_data['site_url'], $search_replace ) );
 		}
 
+		if ( 'subdom' === $this->site_data['app_sub_type'] ) {
+			$this->replace_subsite_url_scheme( $from, $to );
+		}
+
 		if ( $backup_success ) {
 			EE::log( "In case something is not working as intended, you can restore your DB from backup file generated before search-replace located at:\n `$backup_location`\nand proceed with search-replace according to your needs." );
+		}
+	}
+
+	/**
+	 * Switches the scheme of the subdomain subsites, whose origins the network-wide search for the site's own origin doesn't match.
+	 *
+	 * @param string $from Scheme of the URLs now.
+	 * @param string $to   Scheme to switch them to.
+	 */
+	private function replace_subsite_url_scheme( $from, $to ) {
+
+		$compose = \EE_DOCKER::docker_compose_with_custom();
+		$sites   = EE::launch( $compose . ' exec -T php wp site list --field=url' );
+		if ( $sites->return_code ) {
+			EE::warning( 'Could not list the subsites, so their URLs were not switched to ' . $to . '.' );
+
+			return;
+		}
+
+		$suffix = '.' . $this->site_data['site_url'];
+		foreach ( preg_split( '/\R/', trim( $sites->stdout ) ) as $url ) {
+			$host = (string) parse_url( trim( $url ), PHP_URL_HOST );
+			// Only subdomains of the site are covered by its certificate; mapped domains keep their scheme.
+			// The host goes into a shell command unquoted, so accept plain hostnames only.
+			if ( parse_url( trim( $url ), PHP_URL_SCHEME ) !== $from || substr( $host, -strlen( $suffix ) ) !== $suffix || ! preg_match( '/^[a-z0-9.-]+$/i', $host ) ) {
+				continue;
+			}
+
+			$search_replace = sprintf( 'wp search-replace %2$s://%1$s %3$s://%1$s --precise --url=%1$s', $host, $from, $to );
+			if ( ! EE::exec( $compose . ' exec php ' . $search_replace, true, true ) ) {
+				EE::warning( sprintf( 'The URLs of %1$s could not be switched to %2$s. Run `ee shell %3$s --command=\'%4$s\'` to switch them.', $host, $to, $this->site_data['site_url'], $search_replace ) );
+			}
 		}
 	}
 
