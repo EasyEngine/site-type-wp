@@ -353,7 +353,7 @@ class DisableWpSessionUploadProgress extends Base {
 	/**
 	 * Read custom.ini, which the site's php container can swap for a symlink, as can every directory above it in its config volume.
 	 *
-	 * site-command's checked handle refuses anything but the regular file in $dir; an older site-command lacks it, so only the path is checked then.
+	 * Only through site-command's checked handle: PHP can't open a path without following a symlink, so a path check alone leaves a race.
 	 *
 	 * @param string $file custom.ini.
 	 * @param string $dir  Real path of its directory.
@@ -363,17 +363,11 @@ class DisableWpSessionUploadProgress extends Base {
 	 */
 	private static function read_custom_ini( string $file, string $dir ) {
 
-		if ( function_exists( '\EE\Site\Utils\get_container_file_contents' ) ) {
-			return \EE\Site\Utils\get_container_file_contents( $file, $dir, self::MAX_SIZE );
+		if ( ! function_exists( '\EE\Site\Utils\get_container_file_contents' ) ) {
+			throw new \Exception( 'this site-command version cannot read custom.ini safely' );
 		}
 
-		self::check_custom_ini_path( $file, $dir );
-		$content = @file_get_contents( $file, false, null, 0, self::MAX_SIZE + 1 );
-		if ( false === $content || strlen( $content ) > self::MAX_SIZE ) {
-			throw new \Exception( 'could not read custom.ini' );
-		}
-
-		return $content;
+		return \EE\Site\Utils\get_container_file_contents( $file, $dir, self::MAX_SIZE );
 	}
 
 	/**
@@ -388,51 +382,11 @@ class DisableWpSessionUploadProgress extends Base {
 	 */
 	private static function write_custom_ini( string $file, string $dir, string $content, ?string $expected = null ) {
 
-		if ( function_exists( '\EE\Site\Utils\put_container_file_contents' ) ) {
-			\EE\Site\Utils\put_container_file_contents( $file, $dir, $content, $expected, self::MAX_SIZE );
-
-			return;
+		if ( ! function_exists( '\EE\Site\Utils\put_container_file_contents' ) ) {
+			throw new \Exception( 'this site-command version cannot write custom.ini safely' );
 		}
 
-		$current = self::read_custom_ini( $file, $dir );
-		if ( null !== $expected && $current !== $expected ) {
-			throw new \Exception( 'custom.ini changed while it was checked' );
-		}
-		// Skip a write that isn't needed, e.g. on an immutable file.
-		if ( $current === $content ) {
-			return;
-		}
-		self::check_custom_ini_path( $file, $dir );
-		$written = @file_put_contents( $file, $content );
-		clearstatcache( true, $file );
-		if ( strlen( $content ) !== $written || @file_get_contents( $file ) !== $content ) {
-			// Checked again: the path may have been swapped since the write.
-			try {
-				self::check_custom_ini_path( $file, $dir );
-				$restored = strlen( $current ) === @file_put_contents( $file, $current );
-			} catch ( \Exception $e ) {
-				$restored = false;
-			}
-			throw new \Exception( 'could not write custom.ini' . ( $restored ? '' : ', nor put the old content back' ) );
-		}
-	}
-
-	/**
-	 * @param string $file custom.ini.
-	 * @param string $dir  Real path of its directory.
-	 *
-	 * @throws \Exception When it isn't a regular file or a directory above it is a symlink.
-	 */
-	private static function check_custom_ini_path( string $file, string $dir ) {
-
-		clearstatcache( true );
-		$stat = @lstat( $file );
-		if ( realpath( dirname( $file ) ) !== $dir ) {
-			throw new \Exception( 'a directory above custom.ini is a symlink' );
-		}
-		if ( ! $stat || 0100000 !== ( $stat['mode'] & 0170000 ) ) {
-			throw new \Exception( 'custom.ini is not a regular file' );
-		}
+		\EE\Site\Utils\put_container_file_contents( $file, $dir, $content, $expected, self::MAX_SIZE );
 	}
 
 	/**
