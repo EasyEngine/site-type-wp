@@ -1591,7 +1591,7 @@ class WordPress extends EE_Site_Command {
 				continue;
 			}
 
-			$search_replace = sprintf( 'wp search-replace %2$s://%1$s %3$s://%1$s --precise --url=%1$s', $host, $from, $to );
+			$search_replace = sprintf( 'wp search-replace %2$s://%1$s %3$s://%1$s --precise --network', $host, $from, $to );
 			if ( ! EE::exec( $compose . ' exec php ' . $search_replace, true, true ) ) {
 				EE::warning( sprintf( 'The URLs of %1$s could not be switched to %2$s. Run `ee shell %3$s --command=\'%4$s\'` to switch them.', $host, $to, $this->site_data['site_url'], $search_replace ) );
 			}
