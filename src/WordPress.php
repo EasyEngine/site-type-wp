@@ -1543,7 +1543,18 @@ class WordPress extends EE_Site_Command {
 			if ( $this->fs->exists( $db_file ) ) {
 				$this->fs->remove( $backup_location );
 				$this->fs->rename( $db_file, $backup_location );
-				$backup_success = true;
+				// The site could have put a symlink there; chmod() and chown() would follow it.
+				if ( is_link( $backup_location ) || ! is_file( $backup_location ) ) {
+					$this->fs->remove( $backup_location );
+					EE::warning( 'The database export was not a regular file (e.g. a symlink), so no database backup was kept before the search-replace.' );
+				} else {
+					// A full DB dump: readable only by EE's user, not 0644 as www-data exported it.
+					chmod( $backup_location, 0600 );
+					if ( function_exists( 'posix_getuid' ) ) {
+						chown( $backup_location, posix_getuid() );
+					}
+					$backup_success = true;
+				}
 			}
 		}
 
