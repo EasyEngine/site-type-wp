@@ -24,6 +24,9 @@ class SkipSetCookieResponsesInWpPageCache extends Base {
 	/** Same as in templates/config/nginx/main.conf.mustache, so a migrated file matches a newly generated one. */
 	const COMMENT = '# Evaluated after the response headers: a response that sets a cookie (e.g. a new session) is never stored.';
 
+	/** Prefix of the site's page-cache keys in Redis, as `set $key` in main.conf.mustache builds them. */
+	const CACHE_KEY = '%s_page:http';
+
 	/** @var Site[] */
 	private $sites = [];
 
@@ -32,6 +35,9 @@ class SkipSetCookieResponsesInWpPageCache extends Base {
 
 	/** @var string|null Where up() saves the previous main.conf of each site it changes. */
 	private $backup_root;
+
+	/** @var int Changed sites whose running nginx may still use the previous main.conf (not found or not reloaded). */
+	private $pending = 0;
 
 	public function __construct() {
 
@@ -80,7 +86,8 @@ class SkipSetCookieResponsesInWpPageCache extends Base {
 		}
 
 		if ( ! empty( $this->changed ) ) {
-			EE::log( 'Responses that set a cookie are no longer stored in the page cache of ' . count( $this->changed ) . ' ' . self::SITE_TYPE . ' site(s). The previous main.conf files are in ' . $this->backup_root );
+			$pending = $this->pending ? "; {$this->pending} more once their nginx is reloaded" : '';
+			EE::log( 'Responses that set a cookie are no longer stored in the page cache of ' . ( count( $this->changed ) - $this->pending ) . ' ' . self::SITE_TYPE . " site(s)$pending. The previous main.conf files are in " . $this->backup_root );
 		}
 	}
 
@@ -104,6 +111,7 @@ class SkipSetCookieResponsesInWpPageCache extends Base {
 			}
 		}
 		$this->changed = [];
+		$this->pending = 0;
 	}
 
 	/**
@@ -155,7 +163,7 @@ class SkipSetCookieResponsesInWpPageCache extends Base {
 		} catch ( \Exception $e ) {
 			// A failed write may have left main.conf partly written; any other failure left it as it was.
 			if ( 0 === strpos( $e->getMessage(), 'could not write' ) ) {
-				throw new \Exception( $e->getMessage() . "; the previous file is $backup" );
+				throw new \Exception( $e->getMessage() . ", so it may be partly written: first copy back the previous file $backup" );
 			}
 			$this->remove_backup( $backup );
 			throw $e;
@@ -184,7 +192,13 @@ class SkipSetCookieResponsesInWpPageCache extends Base {
 
 		$this->changed[] = $change;
 		EE::debug( "$site->site_url: main.conf no longer stores responses that set a cookie; the previous file is $backup." );
-		self::reload_nginx( $site, $id );
+		// Until its nginx loads the change it can store such responses again, so clearing the cache would not last.
+		if ( null === $id || ! self::reload_nginx( $site, $id ) ) {
+			$this->pending++;
+
+			return;
+		}
+		self::clear_page_cache( $site );
 	}
 
 	/**
@@ -197,7 +211,8 @@ class SkipSetCookieResponsesInWpPageCache extends Base {
 	public static function replace_line( string $content ) {
 
 		$pattern = '/^([ \t]*)' . preg_quote( self::OLD_LINE, '/' ) . '([ \t]*)(\r?)$/m';
-		if ( 1 !== substr_count( $content, 'srcache_store_skip' ) || 1 !== preg_match( $pattern, $content, $matches ) ) {
+		// Comment lines don't count; any other mention, even after a directive on the same line, does.
+		if ( 1 !== preg_match_all( '/^(?![ \t]*#)[^\r\n]*srcache_store_skip/m', $content ) || 1 !== preg_match( $pattern, $content, $matches ) ) {
 			return null;
 		}
 
@@ -225,7 +240,8 @@ class SkipSetCookieResponsesInWpPageCache extends Base {
 		if ( false === $old ) {
 			throw new \Exception( 'could not read the backup' );
 		}
-		\EE\Site\Utils\put_container_file_contents( $change['file'], $change['dir'], $old, $change['content'], self::MAX_SIZE );
+		// The file holds the change, which can be larger than MAX_SIZE.
+		\EE\Site\Utils\put_container_file_contents( $change['file'], $change['dir'], $old, $change['content'], strlen( $change['content'] ) );
 		$this->remove_backup( $change['backup'] );
 	}
 
@@ -252,7 +268,35 @@ class SkipSetCookieResponsesInWpPageCache extends Base {
 	 */
 	private static function manual_fix( $site ) {
 
-		return "To stop the page cache from storing responses that set a cookie, change the srcache_store_skip line in $site->site_fs_path/config/nginx/conf.d/main.conf to '" . self::NEW_LINE . "' and run: ee site reload $site->site_url --nginx";
+		return "To stop the page cache from storing responses that set a cookie, add \$upstream_http_set_cookie to the end of the srcache_store_skip value in $site->site_fs_path/config/nginx/conf.d/main.conf, keeping what is there (EasyEngine's line becomes '" . self::NEW_LINE . "'), and run: ee site reload $site->site_url --nginx";
+	}
+
+	/**
+	 * Delete the site's page-cache entries: those stored before the change may hold a response that set a cookie, e.g. another visitor's session id.
+	 *
+	 * @param Site $site Site.
+	 */
+	private static function clear_page_cache( $site ) {
+
+		$prefix = sprintf( self::CACHE_KEY, $site->site_url );
+		if ( 'redis' !== $site->cache_host ) {
+			$cleared = \EE\Site\Utils\clean_site_cache( $prefix );
+		} else {
+			// A local redis goes with the site's containers, so a disabled site starts with an empty one.
+			$id = self::get_container( $site, 'redis' );
+			if ( '' === $id ) {
+				EE::debug( "$site->site_url: its redis isn't running, so there is no page cache to clear." );
+
+				return;
+			}
+			$cleared = null !== $id && 0 === EE::launch( 'docker exec ' . escapeshellarg( $id ) . ' redis-cli --eval purge_all_cache.lua 0 , ' . escapeshellarg( $prefix . '*' ) )->return_code;
+		}
+
+		if ( $cleared ) {
+			EE::debug( "$site->site_url: cleared its page cache." );
+		} else {
+			EE::warning( "Could not clear the page cache of $site->site_url. The pages it stored before this upgrade expire within 4 hours." );
+		}
 	}
 
 	/**
@@ -262,23 +306,33 @@ class SkipSetCookieResponsesInWpPageCache extends Base {
 	 */
 	private static function get_nginx_container( $site ) {
 
+		$id = self::get_container( $site, 'nginx' );
+		if ( null === $id ) {
+			EE::warning( "Could not check the nginx container of $site->site_url, so it may still use its previous main.conf. Run: ee site reload $site->site_url --nginx" );
+		}
+
+		return $id;
+	}
+
+	/**
+	 * @param Site   $site    Site.
+	 * @param string $service Compose service.
+	 *
+	 * @return string|null ID of its running container, '' when none runs (or the site is disabled), null when the lookup failed.
+	 */
+	private static function get_container( $site, string $service ) {
+
 		if ( ! $site->site_enabled ) {
 			return '';
 		}
 
 		$cwd    = getcwd();
-		$result = @chdir( $site->site_fs_path ) ? EE::launch( \EE_DOCKER::docker_compose_with_custom() . ' ps -q nginx' ) : null;
+		$result = @chdir( $site->site_fs_path ) ? EE::launch( \EE_DOCKER::docker_compose_with_custom() . " ps -q $service" ) : null;
 		if ( false !== $cwd ) {
 			chdir( $cwd );
 		}
 
-		if ( null === $result || 0 !== $result->return_code ) {
-			EE::warning( "Could not check the nginx container of $site->site_url, so it may still use its previous main.conf. Run: ee site reload $site->site_url --nginx" );
-
-			return null;
-		}
-
-		return trim( $result->stdout );
+		return null === $result || 0 !== $result->return_code ? null : trim( $result->stdout );
 	}
 
 	/**
@@ -308,18 +362,26 @@ class SkipSetCookieResponsesInWpPageCache extends Base {
 	 *
 	 * @param Site        $site Site.
 	 * @param string|null $id   From get_nginx_container().
+	 *
+	 * @return bool Whether nginx uses the file now: reloaded, or not running.
 	 */
 	private static function reload_nginx( $site, $id ) {
 
-		if ( null === $id || '' === $id ) {
-			return;
+		if ( null === $id ) {
+			return false;
+		}
+		if ( '' === $id ) {
+			return true;
 		}
 
 		$result = EE::launch( 'docker exec ' . escapeshellarg( $id ) . ' nginx -s reload' );
 		if ( 0 === $result->return_code ) {
 			EE::debug( "$site->site_url: reloaded nginx." );
-		} else {
-			EE::warning( "Could not reload nginx of $site->site_url. Run: ee site reload $site->site_url --nginx" );
+
+			return true;
 		}
+		EE::warning( "Could not reload nginx of $site->site_url. Run: ee site reload $site->site_url --nginx" );
+
+		return false;
 	}
 }

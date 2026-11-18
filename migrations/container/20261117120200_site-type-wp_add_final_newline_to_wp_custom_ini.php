@@ -71,7 +71,8 @@ class AddFinalNewlineToWpCustomIni extends Base {
 
 		foreach ( array_reverse( $this->changed ) as $change ) {
 			try {
-				\EE\Site\Utils\put_container_file_contents( $change['file'], $change['dir'], $change['old'], $change['new'], self::MAX_SIZE );
+				// The file holds the change, which can be a byte larger than MAX_SIZE.
+				\EE\Site\Utils\put_container_file_contents( $change['file'], $change['dir'], $change['old'], $change['new'], strlen( $change['new'] ) );
 			} catch ( \Throwable $e ) {
 				EE::warning( sprintf( 'Could not remove the final newline added to the custom.ini of %s: %s.', $change['site']->site_url, rtrim( $e->getMessage(), '.' ) ) );
 			}
