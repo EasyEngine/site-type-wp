@@ -67,7 +67,8 @@ server {
 		try_files $uri =404;
 
 		srcache_fetch_skip $skip;
-		srcache_store_skip $skip;
+		# Evaluated after the response headers: a response that sets a cookie (e.g. a new session) is never stored.
+		srcache_store_skip $skip$upstream_http_set_cookie;
 
 		srcache_response_cache_control off;
 
