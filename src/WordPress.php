@@ -141,7 +141,7 @@ class WordPress extends EE_Site_Command {
 	 * [--php=<php-version>]
 	 * : PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6 and latest.
 	 * ---
-	 * default: 8.4
+	 * default: 8.5
 	 * options:
 	 *	- 5.6
 	 *	- 7.0
@@ -396,7 +396,7 @@ class WordPress extends EE_Site_Command {
 				$this->site_data['php_version'] = 7.4;
 				$old_version                    .= ' yet';
 			} elseif ( 8 === $floor ) {
-			$this->site_data['php_version'] = 8.4;
+			$this->site_data['php_version'] = 8.5;
 			$old_version .= ' yet';
 		} else {
 				EE::error( 'Unsupported PHP version: ' . $this->site_data['php_version'] );
