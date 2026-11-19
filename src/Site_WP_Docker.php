@@ -67,7 +67,7 @@ class Site_WP_Docker {
 		}
 
 		// PHP configuration.
-		$php_image_key = ( 'latest' === $filters['php_version'] ? 'easyengine/php8.4' : 'easyengine/php' . $filters['php_version'] );
+		$php_image_key = ( 'latest' === $filters['php_version'] ? 'easyengine/php' . WordPress::DEFAULT_PHP_VERSION : 'easyengine/php' . $filters['php_version'] );
 
 		$php['service_name'] = [ 'name' => 'php' ];
 		$php['image']        = [ 'name' => $php_image_key . ':' . $img_versions[ $php_image_key ] ];

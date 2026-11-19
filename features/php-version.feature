@@ -4,8 +4,8 @@ Feature: PHP versions of WordPress sites (--php on create and update)
     Given a WordPress site 'bh-site-type-wp-php.test' exists
     Then the site 'bh-site-type-wp-php.test' info should contain:
       | field       | value |
-      | php_version | 8.4   |
-    And the 'php' container of site 'bh-site-type-wp-php.test' should use image 'easyengine/php8.4:'
+      | php_version | 8.5   |
+    And the 'php' container of site 'bh-site-type-wp-php.test' should use image 'easyengine/php8.5:'
     When I run 'bin/ee site update bh-site-type-wp-php.test --php=8.2'
     Then the command should succeed
     And STDOUT should contain:
@@ -19,7 +19,7 @@ Feature: PHP versions of WordPress sites (--php on create and update)
       | field       | value |
       | php_version | 8.2   |
     And the 'php' container of site 'bh-site-type-wp-php.test' should use image 'easyengine/php8.2:'
-    And the directory '{SITES_DIR}/bh-site-type-wp-php.test/.backup/config/php-8.4' should exist
+    And the directory '{SITES_DIR}/bh-site-type-wp-php.test/.backup/config/php-8.5' should exist
     And the file '{SITES_DIR}/bh-site-type-wp-php.test/config/php/php/conf.d/custom.ini' should contain:
       """
       sendmail_path = /usr/bin/msmtp -t
@@ -69,7 +69,7 @@ Feature: PHP versions of WordPress sites (--php on create and update)
       | php    | name   | image   | runtime |
       | 8.3    | 83     | php8.3  | 8.3.    |
       | 8.5    | 85     | php8.5  | 8.5.    |
-      | latest | latest | php8.4  | 8.4.    |
+      | latest | latest | php8.5  | 8.5.    |
 
   # These pull the older php images (not present on a fresh host) and need an older WordPress for PHP < 7.4.
   @slow
