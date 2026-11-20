@@ -413,6 +413,10 @@ class WordPress extends EE_Site_Command {
 			}
 			\EE::confirm( sprintf( 'EEv4 does not support PHP %s. Continue with PHP %s?', $old_version, $this->site_data['php_version'] ), $assoc_args );
 		}
+		// Stored as the concrete version: a stored `latest` would move to a newer image on a later default bump and keep the old PHP config.
+		if ( 'latest' === $this->site_data['php_version'] ) {
+			$this->site_data['php_version'] = self::DEFAULT_PHP_VERSION;
+		}
 
 		if ( \EE\Utils\get_flag_value( $assoc_args, 'local-db' ) ) {
 			$this->site_data['db_host'] = 'db';

@@ -53,8 +53,8 @@ Feature: PHP versions of WordPress sites (--php on create and update)
     When I run 'bin/ee site create bh-site-type-wp-php<name>.test --type=wp --php=<php>'
     Then the command should succeed
     And the site 'bh-site-type-wp-php<name>.test' info should contain:
-      | field       | value |
-      | php_version | <php> |
+      | field       | value    |
+      | php_version | <stored> |
     And the 'php' container of site 'bh-site-type-wp-php<name>.test' should use image 'easyengine/<image>:'
     When In the 'php' container of site 'bh-site-type-wp-php<name>.test' I run 'php -v'
     Then STDOUT should contain:
@@ -65,11 +65,12 @@ Feature: PHP versions of WordPress sites (--php on create and update)
     When I run 'bin/ee site delete bh-site-type-wp-php<name>.test --yes'
     Then the command should succeed
 
+    # `latest` is stored as the default version (8.5), so a later default bump doesn't move the site.
     Examples:
-      | php    | name   | image   | runtime |
-      | 8.3    | 83     | php8.3  | 8.3.    |
-      | 8.5    | 85     | php8.5  | 8.5.    |
-      | latest | latest | php8.5  | 8.5.    |
+      | php    | name   | stored | image   | runtime |
+      | 8.3    | 83     | 8.3    | php8.3  | 8.3.    |
+      | 8.5    | 85     | 8.5    | php8.5  | 8.5.    |
+      | latest | latest | 8.5    | php8.5  | 8.5.    |
 
   # These pull the older php images (not present on a fresh host) and need an older WordPress for PHP < 7.4.
   @slow
