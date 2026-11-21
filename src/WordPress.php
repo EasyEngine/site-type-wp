@@ -1550,15 +1550,35 @@ class WordPress extends EE_Site_Command {
 		$backup_location = EE_BACKUP_DIR . '/' . $this->site_data['site_url'] . '/' . $this->site_data['site_url'] . '.db';
 		if ( $backup ) {
 			EE::log( 'Taking database backup before search-replace.' );
-			EE::exec( sprintf( \EE_DOCKER::docker_compose_with_custom() . ' exec php wp db export --skip-ssl %s.db', $this->site_data['site_url'] ) );
+			// Into /var/www (the site's app/), not the web root under it: nginx would serve the .db file while it's written.
+			$exported = EE::exec( sprintf( \EE_DOCKER::docker_compose_with_custom() . ' exec php wp db export --skip-ssl /var/www/%s.db', $this->site_data['site_url'] ) );
 
-			$db_file = $this->site_data['site_fs_path'] . '/app/htdocs/' . $this->site_data['site_url'] . '.db';
+			$db_file = $this->site_data['site_fs_path'] . '/app/' . $this->site_data['site_url'] . '.db';
 			$this->fs->mkdir( dirname( $backup_location ) );
 
-			if ( $this->fs->exists( $db_file ) ) {
+			if ( ! $exported || ! $this->fs->exists( $db_file ) ) {
+				// A failed export can leave a partial dump.
+				$this->fs->remove( $db_file );
+				EE::warning( 'The database could not be exported, so no database backup was kept before the search-replace.' );
+			} else {
 				$this->fs->remove( $backup_location );
 				$this->fs->rename( $db_file, $backup_location );
-				$backup_success = true;
+				// The site could have put a symlink there; chmod() and chown() would follow it.
+				if ( is_link( $backup_location ) || ! is_file( $backup_location ) ) {
+					$this->fs->remove( $backup_location );
+					EE::warning( 'The database export was not a regular file (e.g. a symlink), so no database backup was kept before the search-replace.' );
+				} else {
+					// A full DB dump: readable only by EE's user, not 0644 as www-data exported it.
+					$private = chmod( $backup_location, 0600 );
+					if ( function_exists( 'posix_getuid' ) ) {
+						$private = chown( $backup_location, posix_getuid() ) && $private;
+					}
+					// Still the only copy taken before the search-replace, so keep it either way.
+					if ( ! $private ) {
+						EE::warning( sprintf( 'Could not make %s readable only by its owner. Restrict its permissions by hand.', $backup_location ) );
+					}
+					$backup_success = true;
+				}
 			}
 		}
 
