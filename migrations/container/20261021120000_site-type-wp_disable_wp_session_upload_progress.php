@@ -281,6 +281,7 @@ class DisableWpSessionUploadProgress extends Base {
 				$this->fs->touch( $backup, $stat['mtime'] );
 			}
 		} catch ( \Throwable $e ) {
+			$this->remove_backup( $backup );
 			EE::warning( "Skipped disabling session.upload_progress for $site->site_url: could not back up custom.ini ({$e->getMessage()}). $manual" );
 
 			return;
@@ -290,6 +291,13 @@ class DisableWpSessionUploadProgress extends Base {
 		try {
 			self::write_custom_ini( $file, $conf_dir, $new_content, $content );
 		} catch ( \Exception $e ) {
+			// Only a failed write can leave it changed; any other refusal comes before writing.
+			if ( 0 !== strpos( $e->getMessage(), 'could not write' ) ) {
+				$this->remove_backup( $backup );
+				EE::warning( "Skipped disabling session.upload_progress for $site->site_url: {$e->getMessage()}. $manual" );
+
+				return;
+			}
 			// Kept: if putting the old content back failed too, it is the only copy.
 			EE::warning( "Could not disable session.upload_progress for $site->site_url: {$e->getMessage()}. The original custom.ini is $backup. $manual" );
 
@@ -308,6 +316,24 @@ class DisableWpSessionUploadProgress extends Base {
 			$this->containers[ $site->site_url ] = $id;
 		}
 		EE::debug( "$site->site_url: disabled session.upload_progress in custom.ini." );
+	}
+
+	/**
+	 * Remove a backup that up() didn't need, and the backup dir once it is empty.
+	 *
+	 * @param string $backup Saved custom.ini.
+	 */
+	private function remove_backup( string $backup ) {
+
+		try {
+			$this->fs->remove( dirname( $backup ) );
+		} catch ( \Throwable $e ) {
+			EE::debug( "Could not remove $backup: {$e->getMessage()}" );
+
+			return;
+		}
+		// rmdir() refuses it while it holds other sites' backups.
+		@rmdir( $this->backup_root );
 	}
 
 	/**
