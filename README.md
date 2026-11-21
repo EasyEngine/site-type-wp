@@ -58,9 +58,9 @@ ee site create --type=wp <site-name> [--cache] [--vip] [--mu=<subdir>] [--mu=<su
 		Enable cache with local redis container.
 
 	[--php=<php-version>]
-		PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5 and latest.
+		PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6 and latest.
 		---
-		default: 8.4
+		default: 8.5
 		options:
 			- 5.6
 			- 7.0
@@ -73,6 +73,7 @@ ee site create --type=wp <site-name> [--cache] [--vip] [--mu=<subdir>] [--mu=<su
 			- 8.3
 			- 8.4
 			- 8.5
+			- 8.6
 			- latest
 		---
 
@@ -255,9 +256,9 @@ ee site info --type=wp <site-name> [--cache] [--vip] [--mu=<subdir>] [--mu=<subd
 		Enable cache with local redis container.
 
 	[--php=<php-version>]
-		PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5 and latest.
+		PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6 and latest.
 		---
-		default: 8.4
+		default: 8.5
 		options:
 			- 5.6
 			- 7.0
@@ -270,6 +271,7 @@ ee site info --type=wp <site-name> [--cache] [--vip] [--mu=<subdir>] [--mu=<subd
 			- 8.3
 			- 8.4
 			- 8.5
+			- 8.6
 			- latest
 		---
 
@@ -536,9 +538,9 @@ ee site reload --type=wp <site-name> [--cache] [--vip] [--mu=<subdir>] [--mu=<su
 		Enable cache with local redis container.
 
 	[--php=<php-version>]
-		PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5 and latest.
+		PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6 and latest.
 		---
-		default: 8.4
+		default: 8.5
 		options:
 			- 5.6
 			- 7.0
@@ -551,6 +553,7 @@ ee site reload --type=wp <site-name> [--cache] [--vip] [--mu=<subdir>] [--mu=<su
 			- 8.3
 			- 8.4
 			- 8.5
+			- 8.6
 			- latest
 		---
 
@@ -680,9 +683,9 @@ ee site restart --type=wp <site-name> [--cache] [--vip] [--mu=<subdir>] [--mu=<s
 		Enable cache with local redis container.
 
 	[--php=<php-version>]
-		PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5 and latest.
+		PHP version for site. Currently only supports PHP 5.6, 7.0, 7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6 and latest.
 		---
-		default: 8.4
+		default: 8.5
 		options:
 			- 5.6
 			- 7.0
@@ -695,6 +698,7 @@ ee site restart --type=wp <site-name> [--cache] [--vip] [--mu=<subdir>] [--mu=<s
 			- 8.3
 			- 8.4
 			- 8.5
+			- 8.6
 			- latest
 		---
 

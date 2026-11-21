@@ -89,7 +89,7 @@ Feature: WordPress site lifecycle (create, info, list, enable/disable, restart/r
       | cache_mysql_query      | 0                                   |
       | cache_app_object       | 0                                   |
       | cache_host             | <empty>                             |
-      | php_version            | 8.4                                 |
+      | php_version            | 8.5                                 |
       | db_host                | global-db                           |
       | db_port                | 3306                                |
       | db_name                | bh_site_type_wp_basic_test          |
@@ -141,7 +141,7 @@ Feature: WordPress site lifecycle (create, info, list, enable/disable, restart/r
       """
     And the file '{SITES_DIR}/bh-site-type-wp-basic.test/docker-compose.yml' should contain:
       """
-      image: easyengine/php8.4:
+      image: easyengine/php8.5:
       - VIRTUAL_HOST
       - VIRTUAL_PATH=/
       - HSTS=off
@@ -161,7 +161,7 @@ Feature: WordPress site lifecycle (create, info, list, enable/disable, restart/r
     And the 'mailhog' container of site 'bh-site-type-wp-basic.test' should not exist
     And the 'db' container of site 'bh-site-type-wp-basic.test' should not exist
     And the 'redis' container of site 'bh-site-type-wp-basic.test' should not exist
-    And the 'php' container of site 'bh-site-type-wp-basic.test' should use image 'easyengine/php8.4:'
+    And the 'php' container of site 'bh-site-type-wp-basic.test' should use image 'easyengine/php8.5:'
     And the 'php' container of site 'bh-site-type-wp-basic.test' should have restart policy 'always'
     And the 'php' container of site 'bh-site-type-wp-basic.test' should be connected to network 'ee-global-backend-network'
     And the 'nginx' container of site 'bh-site-type-wp-basic.test' should be connected to network 'ee-global-frontend-network'
